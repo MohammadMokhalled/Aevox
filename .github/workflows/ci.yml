@@ -203,10 +203,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Clang 18 and clang-tidy 18
+      - name: Install Clang 18, clang-tidy 18, CMake, and Ninja
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang-18 clang++-18 clang-tidy-18 ninja-build
+          sudo apt-get install -y clang-18 clang++-18 clang-tidy-18 cmake ninja-build
 
       - name: Symlink clang-tidy-18 as clang-tidy
         run: sudo ln -sf /usr/bin/clang-tidy-18 /usr/local/bin/clang-tidy
