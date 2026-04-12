@@ -15,7 +15,7 @@
 find_package(asio CONFIG REQUIRED)
 
 add_library(aevox_core STATIC
-    aevox_placeholder.cpp   # Removed by AEV-001 when src/net/asio_executor.cpp lands
+    net/asio_executor.cpp   # AEV-001: Asio-backed executor + accept loop
 )
 
 target_include_directories(aevox_core

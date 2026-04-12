@@ -13,10 +13,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   mode dependency management, and ASan/UBSan/Clang-Tidy configurations (AEV-002)
 
 ### Added
-- `aevox::Executor` abstract interface — async I/O execution layer (AEV-001)
-- `aevox::Task<T>` coroutine return type — public async primitive (AEV-001)
-- `aevox::make_executor()` factory — creates Asio-backed executor (AEV-001)
+- `aevox::Executor` abstract interface — async I/O execution layer with TCP acceptor loop,
+  thread pool management, and graceful drain on shutdown (AEV-001)
+- `aevox::Task<T>` coroutine return type — lazy, move-only, symmetric-transfer task with
+  full `promise_type` defined in the public header using only std types (AEV-001)
+- `aevox::ExecutorConfig` — thread count and drain timeout configuration for `make_executor()` (AEV-001)
+- `aevox::make_executor()` factory — creates Asio-backed executor; Asio types confined to `src/net/` (AEV-001)
 - `aevox::ExecutorError` error enum with `to_string()` (AEV-001)
+- `aevox::ConnectionHandler` concept — constrains TCP connection handler callables (AEV-001)
 
 ---
 
