@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Infrastructure
+- CMake 3.27+ build system with C++23 baseline, Ninja and MSVC presets, vcpkg manifest
+  mode dependency management, and ASan/UBSan/Clang-Tidy configurations (AEV-002)
+
 ### Added
 - `aevox::Executor` abstract interface — async I/O execution layer (AEV-001)
 - `aevox::Task<T>` coroutine return type — public async primitive (AEV-001)

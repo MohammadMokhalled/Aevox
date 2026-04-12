@@ -100,6 +100,38 @@ Any deviation from the ADD must be recorded here with a justification. If the de
 
 ---
 
+## Git Workflow — Feature Branches
+
+Before starting implementation, ensure you are on a dedicated feature branch.
+
+**Branch naming convention:**
+```
+feature/<feature-name-in-kebab-case>
+```
+
+**Examples:**
+- `feature/asio-async-io-core` (for AEV-001)
+- `feature/cmake-vcpkg-build-system` (for AEV-006)
+- `feature/router-path-parameters` (for AEV-003)
+
+**Workflow:**
+
+1. Check the current branch:
+   ```bash
+   git branch --show-current
+   ```
+
+2. If you are NOT already on a feature branch (i.e., you are on `main` or another branch), create and check out a new feature branch derived from the task name:
+   ```bash
+   git checkout -b feature/<feature-name-in-kebab-case>
+   ```
+
+3. If you are already on a dedicated feature branch for this task, proceed normally.
+
+Do not implement on `main` or other shared branches. Each task gets its own feature branch.
+
+---
+
 ## Phase 1 — Planning
 
 Before touching any file:

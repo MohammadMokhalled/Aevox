@@ -1,0 +1,78 @@
+---
+Language:        Cpp
+BasedOnStyle:    LLVM
+Standard:        c++23
+
+# Indentation
+IndentWidth:               4
+ContinuationIndentWidth:   4
+AccessModifierOffset:      -4
+IndentCaseLabels:          true
+IndentPPDirectives:        BeforeHash
+NamespaceIndentation:      None
+
+# Line length
+ColumnLimit:     100
+
+# Braces
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass:            true
+  AfterControlStatement: MultiLine
+  AfterEnum:             true
+  AfterFunction:         true
+  AfterNamespace:        false
+  AfterStruct:           true
+  AfterUnion:            true
+  BeforeCatch:           true
+  BeforeElse:            true
+  IndentBraces:          false
+  SplitEmptyFunction:    false
+  SplitEmptyRecord:      false
+  SplitEmptyNamespace:   false
+
+# Alignment
+AlignConsecutiveAssignments:
+  Enabled:          true
+  AcrossEmptyLines: false
+  AcrossComments:   false
+AlignConsecutiveDeclarations:
+  Enabled:          true
+  AcrossEmptyLines: false
+  AcrossComments:   false
+AlignTrailingComments:
+  Kind:           Always
+  OverEmptyLines: 0
+
+# Include sorting
+IncludeBlocks:   Regroup
+SortIncludes:    CaseInsensitive
+IncludeCategories:
+  - Regex:           '^<aevox/'
+    Priority:        1
+  - Regex:           '^<(asio|llhttp|glaze|spdlog)'
+    Priority:        2
+  - Regex:           '^<(catch2|nanobench)'
+    Priority:        3
+  - Regex:           '^<'
+    Priority:        4
+  - Regex:           '.*'
+    Priority:        5
+
+# Spacing
+SpaceBeforeParens:             ControlStatements
+SpaceAfterTemplateKeyword:     true
+SpacesInAngles:                Never
+SpaceInEmptyBlock:             false
+
+# Penalties (prefer breaking after return type for long signatures)
+PenaltyBreakBeforeFirstCallParameter: 100
+PenaltyReturnTypeOnItsOwnLine:        200
+
+# Misc
+PointerAlignment:         Left
+ReferenceAlignment:       Left
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+ReflowComments:           true

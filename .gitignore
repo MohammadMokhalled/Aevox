@@ -23,6 +23,7 @@ _install/
 # -----------------------------------------------------------------------------
 # CMake generated files
 # -----------------------------------------------------------------------------
+CMakeUserPresets.json
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake

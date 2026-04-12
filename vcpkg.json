@@ -1,0 +1,33 @@
+{
+  "name": "aevox",
+  "version": "0.1.0",
+  "description": "A modern C++23 high-performance web framework",
+  "builtin-baseline": "VCPKG_BASELINE_TODO",
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "dependencies": [
+    {
+      "name": "asio",
+      "version>=": "1.30.2"
+    },
+    {
+      "name": "llhttp",
+      "version>=": "9.2.1"
+    },
+    {
+      "name": "glaze",
+      "version>=": "3.6.0"
+    },
+    {
+      "name": "spdlog",
+      "version>=": "1.14.1"
+    },
+    {
+      "name": "catch2",
+      "version>=": "3.7.0"
+    },
+    {
+      "name": "nanobench",
+      "version>=": "4.3.11"
+    }
+  ]
+}
