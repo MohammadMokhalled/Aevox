@@ -1,0 +1,181 @@
+# =============================================================================
+# Aevox — C++23 Web Framework
+# .gitignore
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Internal project artifacts (not for public repo)
+# -----------------------------------------------------------------------------
+Tasks/
+ProductRequirement/
+
+# -----------------------------------------------------------------------------
+# Build output directories
+# -----------------------------------------------------------------------------
+build/
+build-*/
+cmake-build-*/
+out/
+dist/
+install/
+_install/
+
+# -----------------------------------------------------------------------------
+# CMake generated files
+# -----------------------------------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# -----------------------------------------------------------------------------
+# Compiled object files and libraries
+# -----------------------------------------------------------------------------
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.pdb
+*.ilk
+*.exp
+
+# -----------------------------------------------------------------------------
+# Executables
+# -----------------------------------------------------------------------------
+*.exe
+*.out
+*.app
+*.bin
+
+# -----------------------------------------------------------------------------
+# vcpkg
+# -----------------------------------------------------------------------------
+vcpkg_installed/
+vcpkg/buildtrees/
+vcpkg/downloads/
+vcpkg/packages/
+vcpkg/ports/
+
+# -----------------------------------------------------------------------------
+# Compiler/sanitizer/profiler output
+# -----------------------------------------------------------------------------
+# AddressSanitizer / UBSan
+*.asan
+*.ubsan
+# Coverage
+*.gcda
+*.gcno
+*.gcov
+coverage/
+lcov.info
+# Profiling (perf, gprof, valgrind)
+*.perf
+gmon.out
+callgrind.out.*
+massif.out.*
+cachegrind.out.*
+
+# -----------------------------------------------------------------------------
+# MkDocs generated site
+# -----------------------------------------------------------------------------
+site/
+
+# -----------------------------------------------------------------------------
+# IDE and editor files
+# -----------------------------------------------------------------------------
+# VS Code
+.vscode/
+!.vscode/extensions.json
+
+# CLion / JetBrains
+.idea/
+cmake-build-debug/
+cmake-build-release/
+cmake-build-relwithdebinfo/
+cmake-build-minsizerel/
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Vim / Neovim
+*.swp
+*.swo
+*~
+.netrwhist
+tags
+
+# Emacs
+*#
+.\#*
+*.elc
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+
+# -----------------------------------------------------------------------------
+# Clang tools
+# -----------------------------------------------------------------------------
+.clang-tidy-cache/
+clangd/
+compile_commands.json
+.cache/
+
+# -----------------------------------------------------------------------------
+# OS generated files
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# -----------------------------------------------------------------------------
+# Logs and temporary files
+# -----------------------------------------------------------------------------
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+
+# -----------------------------------------------------------------------------
+# Test artifacts
+# -----------------------------------------------------------------------------
+Testing/
+CTestCostData.txt
+LastTest.log
+LastTestsFailed.log
+test_results/
+*.xml
