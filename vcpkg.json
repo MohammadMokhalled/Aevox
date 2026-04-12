@@ -2,7 +2,7 @@
   "name": "aevox",
   "version": "0.1.0",
   "description": "A modern C++23 high-performance web framework",
-  "builtin-baseline": "VCPKG_BASELINE_TODO",
+  "builtin-baseline": "0b88aacde46a853151730fbe7d0b7ee45f4b6864",
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "dependencies": [
     {
