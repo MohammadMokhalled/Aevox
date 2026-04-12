@@ -15,7 +15,8 @@
       "Bash(g++ -std=c++23 -Wall -Wextra -Wpedantic -Werror -I/mnt/c/projects/aevox/include -fsyntax-only /tmp/aevox_header_check.cpp)",
       "Bash(git merge --no-ff feature/asio-async-io-core -m ':*)",
       "Bash(git stash:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
