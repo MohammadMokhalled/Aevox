@@ -9,12 +9,12 @@
 // immediately). Not a full round-trip — HTTP parsing is AEV-003.
 
 #define ANKERL_NANOBENCH_IMPLEMENT
-#include <nanobench.h>
-
 #include <aevox/executor.hpp>
 #include <aevox/task.hpp>
 
 #include <asio.hpp>
+
+#include <nanobench.h>
 
 #include <atomic>
 #include <chrono>
@@ -23,16 +23,18 @@
 
 using namespace std::chrono_literals;
 
-static std::uint16_t find_free_port() {
-    asio::io_context ioc;
+static std::uint16_t find_free_port()
+{
+    asio::io_context        ioc;
     asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
-int main() {
+int main()
+{
     constexpr int CONNECTIONS_PER_EPOCH = 500;
 
-    auto port = find_free_port();
+    auto             port = find_free_port();
     std::atomic<int> handled{0};
 
     auto ex = aevox::make_executor({.thread_count = 2, .drain_timeout = 5s});
@@ -54,7 +56,7 @@ int main() {
         asio::io_context ioc;
         for (int i = 0; i < 10; ++i) {
             asio::ip::tcp::socket s{ioc};
-            asio::error_code ec;
+            asio::error_code      ec;
             s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
         }
         std::this_thread::sleep_for(10ms);
@@ -63,14 +65,14 @@ int main() {
 
     ankerl::nanobench::Bench bench;
     bench.title("AEV-001: accept_loop loopback throughput")
-         .unit("connection")
-         .minEpochIterations(CONNECTIONS_PER_EPOCH)
-         .warmup(3);
+        .unit("connection")
+        .minEpochIterations(CONNECTIONS_PER_EPOCH)
+        .warmup(3);
 
     bench.run("AEV-001: accept_loop loopback throughput", [&] {
-        asio::io_context ioc;
+        asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
-        asio::error_code ec;
+        asio::error_code      ec;
         s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
         s.close(ec);
         ankerl::nanobench::doNotOptimizeAway(handled.load());

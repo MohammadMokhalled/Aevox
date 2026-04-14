@@ -11,7 +11,7 @@
 //
 // Design: ADD §3, §4 (AEV-001-arch.md Rev.2)
 
-#include <aevox/executor.hpp>   // public interface we implement
+#include <aevox/executor.hpp> // public interface we implement
 
 // Standalone Asio — ASIO_STANDALONE and ASIO_NO_DEPRECATED defined via CMake.
 // These macros are set PRIVATELY on aevox_core, so they never reach consumers.
@@ -36,7 +36,8 @@ namespace aevox::net {
  *   - stop() is the only method safe to call from another thread while run()
  *     is executing.
  */
-class AsioExecutor final : public aevox::Executor {
+class AsioExecutor final : public aevox::Executor
+{
 public:
     /**
      * Constructs the executor with a fully-resolved config.
@@ -47,9 +48,9 @@ public:
     explicit AsioExecutor(aevox::ExecutorConfig config);
     ~AsioExecutor() override;
 
-    [[nodiscard]] std::expected<void, aevox::ExecutorError>
-    listen(std::uint16_t port,
-           std::move_only_function<aevox::Task<void>(std::uint64_t)> handler) override;
+    [[nodiscard]] std::expected<void, aevox::ExecutorError> listen(
+        std::uint16_t                                             port,
+        std::move_only_function<aevox::Task<void>(std::uint64_t)> handler) override;
 
     [[nodiscard]] std::expected<void, aevox::ExecutorError> run() override;
 
@@ -62,21 +63,26 @@ private:
     // AcceptLoop — one per listen() call.
     // Owns the acceptor and handler for a single port.
     // -------------------------------------------------------------------------
-    struct AcceptLoop {
-        asio::ip::tcp::acceptor                              acceptor;
+    struct AcceptLoop
+    {
+        asio::ip::tcp::acceptor                                   acceptor;
         std::move_only_function<aevox::Task<void>(std::uint64_t)> handler;
 
-        // Non-copyable, movable (acceptor is move-only).
-        AcceptLoop(const AcceptLoop&)            = delete;
-        AcceptLoop& operator=(const AcceptLoop&) = delete;
-        AcceptLoop(AcceptLoop&&)                 = default;
-        AcceptLoop& operator=(AcceptLoop&&)      = default;
+        // Non-copyable (implicitly, due to move_only_function).
+        // Movable by default. No explicit member declarations to keep this an aggregate.
     };
 
     // -------------------------------------------------------------------------
     // Internal state machine
     // -------------------------------------------------------------------------
-    enum class State : int { idle, configured, running, draining, stopped };
+    enum class State : int
+    {
+        idle,
+        configured,
+        running,
+        draining,
+        stopped
+    };
 
     // -------------------------------------------------------------------------
     // Internal coroutine — runs as asio::awaitable<void> on the thread pool.
@@ -87,16 +93,16 @@ private:
     // -------------------------------------------------------------------------
     // Data members
     // -------------------------------------------------------------------------
-    aevox::ExecutorConfig         config_;
-    asio::thread_pool             pool_;           // owns N worker threads
-    std::vector<AcceptLoop>       accept_loops_;   // one per listen() call
-    std::atomic<State>            state_{State::idle};
-    std::atomic<std::uint64_t>    next_conn_id_{0};
+    aevox::ExecutorConfig      config_;
+    asio::thread_pool          pool_;         // owns N worker threads
+    std::vector<AcceptLoop>    accept_loops_; // one per listen() call
+    std::atomic<State>         state_{State::idle};
+    std::atomic<std::uint64_t> next_conn_id_{0};
 
     // Drain timer: promise/future pair used to signal the timer thread.
     // Timer thread calls pool_.stop() after drain_timeout if not cancelled.
-    std::promise<void>  drain_signal_;
-    std::thread         drain_thread_;
+    std::promise<void> drain_signal_;
+    std::thread        drain_thread_;
 };
 
 } // namespace aevox::net
