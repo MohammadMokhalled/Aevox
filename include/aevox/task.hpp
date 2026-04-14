@@ -17,8 +17,7 @@
 namespace aevox {
 
 // Forward declaration — required by FinalAwaitable template.
-template<typename T = void>
-class Task;
+template <typename T = void> class Task;
 
 namespace detail {
 
@@ -31,11 +30,15 @@ namespace detail {
  *
  * @note Not part of the public Aevox API. Used internally by Task<T>.
  */
-struct FinalAwaitable {
+struct FinalAwaitable
+{
     /**
      * @brief Never immediately ready — always suspends to run the continuation.
      */
-    [[nodiscard]] bool await_ready() const noexcept { return false; }
+    [[nodiscard]] bool await_ready() const noexcept
+    {
+        return false;
+    }
 
     /**
      * @brief Symmetrically transfers control to the waiting coroutine.
@@ -45,9 +48,9 @@ struct FinalAwaitable {
      * @return    The continuation handle if one is registered, otherwise
      *            `std::noop_coroutine()` (Task was detached or at root).
      */
-    template<typename P>
-    [[nodiscard]] std::coroutine_handle<>
-    await_suspend(std::coroutine_handle<P> h) noexcept {
+    template <typename P>
+    [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<P> h) noexcept
+    {
         auto cont = h.promise().continuation_;
         return cont ? cont : std::noop_coroutine();
     }
@@ -92,8 +95,8 @@ struct FinalAwaitable {
  *       Task is co_await-ed. Destroying a Task before awaiting it destroys the
  *       coroutine frame without executing the body.
  */
-template<typename T>
-class Task {
+template <typename T> class Task
+{
 public:
     // =========================================================================
     // promise_type
@@ -108,14 +111,16 @@ public:
      * Manages the coroutine's result, exception, and continuation chain.
      * Not intended for direct use — the compiler generates the call sites.
      */
-    class promise_type {
+    class promise_type
+    {
     public:
         /**
          * @brief Creates the Task object from the promise.
          *
          * Called by the compiler at coroutine entry before the body runs.
          */
-        [[nodiscard]] Task get_return_object() noexcept {
+        [[nodiscard]] Task get_return_object() noexcept
+        {
             return Task{std::coroutine_handle<promise_type>::from_promise(*this)};
         }
 
@@ -125,7 +130,10 @@ public:
          * Suspending at the start ensures the continuation is registered
          * before the body executes, preventing any ordering races.
          */
-        [[nodiscard]] std::suspend_always initial_suspend() noexcept { return {}; }
+        [[nodiscard]] std::suspend_always initial_suspend() noexcept
+        {
+            return {};
+        }
 
         /**
          * @brief Symmetric transfer to the waiting coroutine on completion.
@@ -133,7 +141,10 @@ public:
          * FinalAwaitable::await_suspend tail-calls the continuation handle,
          * keeping the stack depth bounded.
          */
-        [[nodiscard]] detail::FinalAwaitable final_suspend() noexcept { return {}; }
+        [[nodiscard]] detail::FinalAwaitable final_suspend() noexcept
+        {
+            return {};
+        }
 
         /**
          * @brief Stores the return value produced by `co_return expr;`.
@@ -143,7 +154,7 @@ public:
          * @param value  The value to store for retrieval by await_resume().
          */
         void return_value(T value) noexcept
-            requires (!std::is_void_v<T>)
+            requires(!std::is_void_v<T>)
         {
             result_.emplace(std::move(value));
         }
@@ -154,7 +165,8 @@ public:
          * Called by the compiler if an exception propagates out of the
          * coroutine body. The exception is re-thrown by await_resume().
          */
-        void unhandled_exception() noexcept {
+        void unhandled_exception() noexcept
+        {
             exception_ = std::current_exception();
         }
 
@@ -173,12 +185,13 @@ public:
 
     explicit Task(std::coroutine_handle<promise_type> h) noexcept : handle_{h} {}
 
-    Task(Task&& other) noexcept
-        : handle_{std::exchange(other.handle_, {})} {}
+    Task(Task&& other) noexcept : handle_{std::exchange(other.handle_, {})} {}
 
-    Task& operator=(Task&& other) noexcept {
+    Task& operator=(Task&& other) noexcept
+    {
         if (this != &other) {
-            if (handle_) handle_.destroy();
+            if (handle_)
+                handle_.destroy();
             handle_ = std::exchange(other.handle_, {});
         }
         return *this;
@@ -187,8 +200,10 @@ public:
     Task(const Task&)            = delete;
     Task& operator=(const Task&) = delete;
 
-    ~Task() {
-        if (handle_) handle_.destroy();
+    ~Task()
+    {
+        if (handle_)
+            handle_.destroy();
     }
 
     /**
@@ -197,7 +212,8 @@ public:
      * Returns false after the Task has been moved from or after the coroutine
      * has completed and the handle has been destroyed.
      */
-    [[nodiscard]] bool valid() const noexcept {
+    [[nodiscard]] bool valid() const noexcept
+    {
         return static_cast<bool>(handle_);
     }
 
@@ -211,7 +227,10 @@ public:
      * The coroutine body starts (for the first time) only when await_suspend
      * is called. Subsequent awaits resume a suspended body.
      */
-    [[nodiscard]] bool await_ready() const noexcept { return false; }
+    [[nodiscard]] bool await_ready() const noexcept
+    {
+        return false;
+    }
 
     /**
      * @brief Registers the caller as the continuation and starts this Task.
@@ -222,8 +241,8 @@ public:
      * @param caller  The coroutine handle of the co_await-ing coroutine.
      * @return        This Task's coroutine handle (symmetric transfer).
      */
-    [[nodiscard]] std::coroutine_handle<>
-    await_suspend(std::coroutine_handle<> caller) noexcept {
+    [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
+    {
         handle_.promise().continuation_ = caller;
         return handle_; // symmetric transfer — compiler tail-calls this
     }
@@ -237,7 +256,8 @@ public:
      * @throws  Whatever exception was thrown inside the coroutine body and
      *          captured by unhandled_exception().
      */
-    T await_resume() {
+    T await_resume()
+    {
         if (handle_.promise().exception_) {
             std::rethrow_exception(handle_.promise().exception_);
         }
@@ -269,23 +289,32 @@ private:
  * @note Thread-safety: same as Task<T> — await on the same strand as creation.
  * @note Move semantics: moved-from Task<void> has valid() == false.
  */
-template<>
-class Task<void> {
+template <> class Task<void>
+{
 public:
     /** @brief Coroutine promise type for Task<void>. */
-    class promise_type {
+    class promise_type
+    {
     public:
-        [[nodiscard]] Task<void> get_return_object() noexcept {
+        [[nodiscard]] Task<void> get_return_object() noexcept
+        {
             return Task<void>{std::coroutine_handle<promise_type>::from_promise(*this)};
         }
-        [[nodiscard]] std::suspend_always initial_suspend() noexcept { return {}; }
-        [[nodiscard]] detail::FinalAwaitable final_suspend() noexcept { return {}; }
+        [[nodiscard]] std::suspend_always initial_suspend() noexcept
+        {
+            return {};
+        }
+        [[nodiscard]] detail::FinalAwaitable final_suspend() noexcept
+        {
+            return {};
+        }
 
         /** @brief Called when the coroutine reaches `co_return;`. */
         void return_void() noexcept {}
 
         /** @brief Captures exception for re-throw at co_await site. */
-        void unhandled_exception() noexcept {
+        void unhandled_exception() noexcept
+        {
             exception_ = std::current_exception();
         }
 
@@ -298,12 +327,13 @@ public:
 
     explicit Task(std::coroutine_handle<promise_type> h) noexcept : handle_{h} {}
 
-    Task(Task&& other) noexcept
-        : handle_{std::exchange(other.handle_, {})} {}
+    Task(Task&& other) noexcept : handle_{std::exchange(other.handle_, {})} {}
 
-    Task& operator=(Task&& other) noexcept {
+    Task& operator=(Task&& other) noexcept
+    {
         if (this != &other) {
-            if (handle_) handle_.destroy();
+            if (handle_)
+                handle_.destroy();
             handle_ = std::exchange(other.handle_, {});
         }
         return *this;
@@ -312,19 +342,25 @@ public:
     Task(const Task&)            = delete;
     Task& operator=(const Task&) = delete;
 
-    ~Task() {
-        if (handle_) handle_.destroy();
+    ~Task()
+    {
+        if (handle_)
+            handle_.destroy();
     }
 
     /** @brief Returns true if this Task holds a live coroutine handle. */
-    [[nodiscard]] bool valid() const noexcept {
+    [[nodiscard]] bool valid() const noexcept
+    {
         return static_cast<bool>(handle_);
     }
 
-    [[nodiscard]] bool await_ready() const noexcept { return false; }
+    [[nodiscard]] bool await_ready() const noexcept
+    {
+        return false;
+    }
 
-    [[nodiscard]] std::coroutine_handle<>
-    await_suspend(std::coroutine_handle<> caller) noexcept {
+    [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
+    {
         handle_.promise().continuation_ = caller;
         return handle_;
     }
@@ -334,7 +370,8 @@ public:
      *
      * @throws  Whatever exception was thrown inside the coroutine body.
      */
-    void await_resume() {
+    void await_resume()
+    {
         if (handle_.promise().exception_) {
             std::rethrow_exception(handle_.promise().exception_);
         }

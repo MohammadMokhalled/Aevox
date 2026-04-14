@@ -12,6 +12,7 @@
 // PRD §5.5, §5.6 — Executor abstraction, future-proof networking
 
 #include <aevox/task.hpp>
+
 #include <chrono>
 #include <cstdint>
 #include <expected>
@@ -41,7 +42,8 @@ namespace aevox {
  *                                  .drain_timeout = std::chrono::seconds{2}});
  * @endcode
  */
-struct ExecutorConfig {
+struct ExecutorConfig
+{
     /**
      * @brief Number of worker threads in the I/O thread pool.
      *
@@ -72,7 +74,8 @@ struct ExecutorConfig {
  *
  * Returned via `std::expected<void, ExecutorError>`. Never thrown.
  */
-enum class ExecutorError {
+enum class ExecutorError : std::uint8_t
+{
     bind_failed,     ///< OS refused to bind to the requested address/port.
     listen_failed,   ///< `listen()` syscall failed after successful bind.
     accept_failed,   ///< An individual `accept()` call failed (non-fatal, logged).
@@ -108,9 +111,11 @@ enum class ExecutorError {
  * static_assert(aevox::ConnectionHandler<decltype(handler)>);
  * @endcode
  */
-template<typename F>
+template <typename F>
 concept ConnectionHandler = requires(F f, std::uint64_t conn_id) {
-    { f(conn_id) } -> std::same_as<Task<void>>;
+    {
+        f(conn_id)
+    } -> std::same_as<Task<void>>;
 };
 
 // =============================================================================
@@ -142,7 +147,8 @@ concept ConnectionHandler = requires(F f, std::uint64_t conn_id) {
  * @note Ownership: not copyable or movable. Manage via `std::unique_ptr<Executor>`
  *       returned by `make_executor()`.
  */
-class Executor {
+class Executor
+{
 public:
     virtual ~Executor() = default;
 
@@ -169,9 +175,8 @@ public:
      *                 - `ExecutorError::listen_failed` on syscall failure.
      *                 - Empty (success) otherwise.
      */
-    [[nodiscard]] virtual std::expected<void, ExecutorError>
-    listen(std::uint16_t port,
-           std::move_only_function<Task<void>(std::uint64_t)> handler) = 0;
+    [[nodiscard]] virtual std::expected<void, ExecutorError> listen(
+        std::uint16_t port, std::move_only_function<Task<void>(std::uint64_t)> handler) = 0;
 
     /**
      * @brief Runs the event loop, blocking until `stop()` is called.
@@ -236,7 +241,6 @@ protected:
  * @note `noexcept` because `std::terminate` is the correct response to OS thread
  *       exhaustion at startup. Do not catch or handle thread creation failures.
  */
-[[nodiscard]] std::unique_ptr<Executor>
-make_executor(ExecutorConfig config = {}) noexcept;
+[[nodiscard]] std::unique_ptr<Executor> make_executor(ExecutorConfig config = {}) noexcept;
 
 } // namespace aevox

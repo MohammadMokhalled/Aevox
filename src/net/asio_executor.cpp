@@ -8,10 +8,50 @@
 
 #include "asio_executor.hpp"
 
-#include <algorithm>    // std::max
+#include <algorithm> // std::max
 #include <format>
 #include <stdexcept>
 #include <thread>
+
+namespace {
+
+// Fire-and-forget coroutine: starts immediately (suspend_never initial),
+// self-destructs on completion (suspend_never final).
+// Its promise defines no await_transform, so any awaitable — including
+// aevox::Task<void> — can be co_await-ed inside its body.
+struct FireAndForget
+{
+    struct promise_type
+    {
+        FireAndForget get_return_object() noexcept
+        {
+            return {};
+        }
+        std::suspend_never initial_suspend() noexcept
+        {
+            return {};
+        }
+        std::suspend_never final_suspend() noexcept
+        {
+            return {};
+        }
+        void return_void() noexcept {}
+        void unhandled_exception() noexcept
+        {
+            std::terminate();
+        }
+    };
+};
+
+// Drives a single handler invocation to completion via symmetric transfer.
+// Called on a thread-pool thread (posted via asio::post).
+FireAndForget dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>* handler,
+                               std::uint64_t                                              conn_id)
+{
+    co_await (*handler)(conn_id); // OK: plain coroutine, no await_transform
+}
+
+} // anonymous namespace
 
 namespace aevox::net {
 
@@ -20,15 +60,16 @@ namespace aevox::net {
 // =============================================================================
 
 AsioExecutor::AsioExecutor(aevox::ExecutorConfig config)
-    : config_{std::move(config)}
-    , pool_{config_.thread_count}   // thread_count already resolved by make_executor()
+    : config_{std::move(config)},
+      pool_{config_.thread_count} // thread_count already resolved by make_executor()
 {
     // Pre-allocate to avoid vector reallocation after run() co_spawns the loops.
     // 8 listen() calls is generous for typical usage.
     accept_loops_.reserve(8);
 }
 
-AsioExecutor::~AsioExecutor() {
+AsioExecutor::~AsioExecutor()
+{
     // Unconditionally stop — pool_.stop() is idempotent. Handles the case where
     // the user destroys the executor without completing the stop→run lifecycle.
     pool_.stop();
@@ -37,7 +78,11 @@ AsioExecutor::~AsioExecutor() {
     if (drain_thread_.joinable()) {
         // The promise may already be satisfied if run() completed normally.
         // Ignore the exception in that case.
-        try { drain_signal_.set_value(); } catch (const std::future_error&) {}
+        try {
+            drain_signal_.set_value();
+        }
+        catch (const std::future_error&) {
+        }
         drain_thread_.join();
     }
 
@@ -56,9 +101,9 @@ AsioExecutor::~AsioExecutor() {
 // listen() — bind to port and register a connection handler
 // =============================================================================
 
-std::expected<void, aevox::ExecutorError>
-AsioExecutor::listen(std::uint16_t port,
-                     std::move_only_function<aevox::Task<void>(std::uint64_t)> handler) {
+std::expected<void, aevox::ExecutorError> AsioExecutor::listen(
+    std::uint16_t port, std::move_only_function<aevox::Task<void>(std::uint64_t)> handler)
+{
     // Guard (M-1): listen() is only valid before run() starts. Calling it after run()
     // would (a) potentially invalidate existing AcceptLoop* pointers held by pool threads
     // via vector reallocation, and (b) never co_spawn the new loop (run() only iterates
@@ -87,11 +132,11 @@ AsioExecutor::listen(std::uint16_t port,
         state_.compare_exchange_strong(expected, State::configured);
 
         return {};
-    } catch (const asio::system_error& e) {
+    }
+    catch (const asio::system_error& e) {
         // Distinguish bind vs. listen failures by checking the error code.
         // asio::error::address_in_use is the canonical bind failure.
-        if (e.code() == asio::error::address_in_use ||
-            e.code() == asio::error::access_denied) {
+        if (e.code() == asio::error::address_in_use || e.code() == asio::error::access_denied) {
             return std::unexpected{aevox::ExecutorError::bind_failed};
         }
         return std::unexpected{aevox::ExecutorError::listen_failed};
@@ -102,11 +147,12 @@ AsioExecutor::listen(std::uint16_t port,
 // run_accept_loop() — internal coroutine running on the thread pool
 // =============================================================================
 
-asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop) {
+asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
+{
     for (;;) {
         // async_accept with as_tuple gives [error_code, socket] without throwing.
-        auto [ec, socket] = co_await loop.acceptor.async_accept(
-            asio::as_tuple(asio::use_awaitable));
+        auto [ec, socket] =
+            co_await loop.acceptor.async_accept(asio::as_tuple(asio::use_awaitable));
 
         if (ec) {
             // operation_aborted = acceptor was closed by stop() — clean exit.
@@ -128,16 +174,14 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop) {
         // we only need uniqueness, not any happens-before guarantee.
         auto conn_id = next_conn_id_.fetch_add(1, std::memory_order_relaxed);
 
-        // Bridge Task<void> into Asio's coroutine machinery via a wrapper lambda.
-        // Task<void> satisfies C++20's awaitable concept (await_ready/suspend/resume),
-        // so it can be co_await-ed inside an asio::awaitable<void>. This is the only
-        // place in the codebase where Asio and Task<void> are glued together.
-        asio::co_spawn(
-            pool_.get_executor(),
-            [handler = &loop.handler, conn_id]() -> asio::awaitable<void> {
-                co_await (*handler)(conn_id);
-            },
-            asio::detached);
+        // Dispatch the handler to run on the thread pool.
+        // We use FireAndForget (defined at file scope) as the dispatch vehicle instead of
+        // asio::awaitable<void>, because Asio's awaitable promise restricts co_await to
+        // asio::awaitable<T> and async operations. Task<void> is a standard C++20 awaitable
+        // but does NOT satisfy Asio's constraints. By using a plain coroutine (FireAndForget)
+        // whose promise does NOT define await_transform, we can co_await Task<void> directly.
+        asio::post(pool_.get_executor(),
+                   [handler = &loop.handler, conn_id] { dispatch_handler(handler, conn_id); });
     }
 }
 
@@ -145,7 +189,8 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop) {
 // run() — start the event loop; blocks until stop() + drain complete
 // =============================================================================
 
-std::expected<void, aevox::ExecutorError> AsioExecutor::run() {
+std::expected<void, aevox::ExecutorError> AsioExecutor::run()
+{
     // Guard against double-run.
     State expected = State::configured;
     if (!state_.compare_exchange_strong(expected, State::running)) {
@@ -159,9 +204,7 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run() {
     // Co_spawn an accept loop coroutine for each registered port.
     // The loops run until their acceptors are closed by stop().
     for (auto& loop : accept_loops_) {
-        asio::co_spawn(pool_.get_executor(),
-                       run_accept_loop(loop),
-                       asio::detached);
+        asio::co_spawn(pool_.get_executor(), run_accept_loop(loop), asio::detached);
     }
 
     // Block until the pool drains naturally or stop() force-cancels it.
@@ -176,7 +219,11 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run() {
         // Either way: signal the timer to stop waiting and join it.
         // The promise may already be satisfied if the drain timer fired pool_.stop()
         // before pool_.join() returned. That's fine — ignore the exception.
-        try { drain_signal_.set_value(); } catch (const std::future_error&) {}
+        try {
+            drain_signal_.set_value();
+        }
+        catch (const std::future_error&) {
+        }
         drain_thread_.join();
     }
 
@@ -188,7 +235,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run() {
 // stop() — signal shutdown; called from any thread
 // =============================================================================
 
-void AsioExecutor::stop() noexcept {
+void AsioExecutor::stop() noexcept
+{
     State expected = State::running;
     if (!state_.compare_exchange_strong(expected, State::draining)) {
         // Not running: either idle, configured, already draining, or stopped.
@@ -207,8 +255,8 @@ void AsioExecutor::stop() noexcept {
     // 2. Start the drain timer thread.
     //    Creates a new promise each time stop() is called.
     drain_signal_ = std::promise<void>{};
-    auto future  = drain_signal_.get_future();
-    auto timeout = config_.drain_timeout;
+    auto future   = drain_signal_.get_future();
+    auto timeout  = config_.drain_timeout;
 
     drain_thread_ = std::thread([p = std::move(future), timeout, this]() mutable {
         // Wait for run() to signal (natural drain) or for the timeout to expire.
@@ -226,7 +274,8 @@ void AsioExecutor::stop() noexcept {
 // thread_count()
 // =============================================================================
 
-std::size_t AsioExecutor::thread_count() const noexcept {
+std::size_t AsioExecutor::thread_count() const noexcept
+{
     return config_.thread_count;
 }
 
@@ -238,29 +287,34 @@ std::size_t AsioExecutor::thread_count() const noexcept {
 
 namespace aevox {
 
-[[nodiscard]] std::unique_ptr<Executor>
-make_executor(ExecutorConfig config) noexcept {
+[[nodiscard]] std::unique_ptr<Executor> make_executor(ExecutorConfig config) noexcept
+{
     // Resolve thread_count: 0 means hardware_concurrency(), clamped to ≥ 1.
     if (config.thread_count == 0) {
-        config.thread_count =
-            std::max(1u, std::thread::hardware_concurrency());
+        config.thread_count = std::max(1u, std::thread::hardware_concurrency());
     }
     // noexcept contract: if thread creation fails, std::terminate is correct.
     // An executor that cannot create threads cannot serve requests.
-    return std::make_unique<net::AsioExecutor>(std::move(config));
+    return std::make_unique<net::AsioExecutor>(config);
 }
 
 // =============================================================================
 // to_string() for ExecutorError
 // =============================================================================
 
-[[nodiscard]] std::string_view to_string(ExecutorError e) noexcept {
+[[nodiscard]] std::string_view to_string(ExecutorError e) noexcept
+{
     switch (e) {
-        case ExecutorError::bind_failed:     return "bind_failed: OS refused to bind to the requested address/port";
-        case ExecutorError::listen_failed:   return "listen_failed: listen() syscall failed";
-        case ExecutorError::accept_failed:   return "accept_failed: accept() call failed";
-        case ExecutorError::already_running: return "already_running: run() called on an already-running executor";
-        case ExecutorError::not_running:     return "not_running: operation attempted on a stopped executor";
+        case ExecutorError::bind_failed:
+            return "bind_failed: OS refused to bind to the requested address/port";
+        case ExecutorError::listen_failed:
+            return "listen_failed: listen() syscall failed";
+        case ExecutorError::accept_failed:
+            return "accept_failed: accept() call failed";
+        case ExecutorError::already_running:
+            return "already_running: run() called on an already-running executor";
+        case ExecutorError::not_running:
+            return "not_running: operation attempted on a stopped executor";
     }
     return "unknown ExecutorError";
 }
