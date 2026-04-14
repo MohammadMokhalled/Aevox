@@ -2,11 +2,12 @@
 #
 # Aevox CI Pipeline
 #
-# Triggers: push (all branches), pull_request (targeting main)
+# Triggers: pull_request (targeting main)
 # Jobs:
 #   build-linux        — GCC 13, CMake default preset
+#   build-linux-clang  — Clang 18, CMake default preset
 #   build-linux-asan   — GCC 13, CMake asan preset (ASan + UBSan)
-#   build-macos        — Clang 16, CMake default preset
+#   build-macos        — Clang 18, CMake default preset
 #   build-windows      — MSVC 2022, CMake windows-msvc preset
 #   format-check       — clang-format diff (no build)
 #   tidy-check         — clang-tidy via lint preset (Clang 18)
@@ -16,8 +17,6 @@
 name: CI
 
 on:
-  push:
-    branches: ["**"]
   pull_request:
     branches: [main]
 
@@ -95,6 +94,42 @@ jobs:
 
       - name: Test (asan preset — ASan + UBSan)
         run: ctest --preset asan
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Linux — Clang 18, default preset
+  # Ensures code compiles and works on Clang (complementary to GCC 13).
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-linux-clang:
+    name: Build — Linux (Clang 18)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Clang 18, CMake, and Ninja
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang-18 clang++-18 cmake ninja-build
+
+      - name: Install vcpkg and restore binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Configure (default preset)
+        run: cmake --preset default
+        env:
+          CC: clang-18
+          CXX: clang++-18
+
+      - name: Build (default preset)
+        run: cmake --build --preset default
+
+      - name: Test (default preset)
+        run: ctest --preset default
 
   # ─────────────────────────────────────────────────────────────────────────────
   # macOS — Clang 18 (Homebrew llvm@18), default preset
