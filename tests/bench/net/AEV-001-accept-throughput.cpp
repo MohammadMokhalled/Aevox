@@ -18,6 +18,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <format>
+#include <iostream>
 #include <latch>
 #include <thread>
 
@@ -32,20 +34,22 @@ static std::uint16_t find_free_port()
 
 int main()
 {
-    constexpr int CONNECTIONS_PER_EPOCH = 500;
+    constexpr int connections_per_epoch = 500;
 
     auto             port = find_free_port();
     std::atomic<int> handled{0};
 
     auto ex = aevox::make_executor({.thread_count = 2, .drain_timeout = 5s});
-    auto lr = ex->listen(port, [&handled](std::uint64_t) -> aevox::Task<void> {
-        handled.fetch_add(1, std::memory_order_relaxed);
-        co_return;
-    });
+    auto lr = ex->listen(
+        port,
+        [&handled](std::uint64_t)
+            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+            handled.fetch_add(1, std::memory_order_relaxed);
+            co_return;
+        });
 
     if (!lr.has_value()) {
-        std::fprintf(stderr, "listen() failed: %s\n",
-                     std::string{aevox::to_string(lr.error())}.c_str());
+        std::cerr << std::format("listen() failed: {}\n", aevox::to_string(lr.error()));
         return 1;
     }
 
@@ -66,7 +70,7 @@ int main()
     ankerl::nanobench::Bench bench;
     bench.title("AEV-001: accept_loop loopback throughput")
         .unit("connection")
-        .minEpochIterations(CONNECTIONS_PER_EPOCH)
+        .minEpochIterations(connections_per_epoch)
         .warmup(3);
 
     bench.run("AEV-001: accept_loop loopback throughput", [&] {

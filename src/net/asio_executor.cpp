@@ -45,10 +45,10 @@ struct FireAndForget
 
 // Drives a single handler invocation to completion via symmetric transfer.
 // Called on a thread-pool thread (posted via asio::post).
-FireAndForget dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>& handler,
+FireAndForget dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>* handler,
                                std::uint64_t                                              conn_id)
 {
-    co_await handler(conn_id); // OK: plain coroutine, no await_transform
+    co_await (*handler)(conn_id); // OK: plain coroutine, no await_transform
 }
 
 } // anonymous namespace
@@ -181,7 +181,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
         // but does NOT satisfy Asio's constraints. By using a plain coroutine (FireAndForget)
         // whose promise does NOT define await_transform, we can co_await Task<void> directly.
         asio::post(pool_.get_executor(),
-                   [handler = &loop.handler, conn_id] { dispatch_handler(*handler, conn_id); });
+                   [handler = &loop.handler, conn_id] { dispatch_handler(handler, conn_id); });
     }
 }
 
@@ -295,7 +295,7 @@ namespace aevox {
     }
     // noexcept contract: if thread creation fails, std::terminate is correct.
     // An executor that cannot create threads cannot serve requests.
-    return std::make_unique<net::AsioExecutor>(std::move(config));
+    return std::make_unique<net::AsioExecutor>(config);
 }
 
 // =============================================================================

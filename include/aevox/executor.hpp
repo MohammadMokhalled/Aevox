@@ -74,7 +74,7 @@ struct ExecutorConfig
  *
  * Returned via `std::expected<void, ExecutorError>`. Never thrown.
  */
-enum class ExecutorError
+enum class ExecutorError : std::uint8_t
 {
     bind_failed,     ///< OS refused to bind to the requested address/port.
     listen_failed,   ///< `listen()` syscall failed after successful bind.

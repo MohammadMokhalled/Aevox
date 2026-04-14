@@ -55,6 +55,12 @@ CheckOptions:
     value: CamelCase
   - key:   readability-identifier-naming.ConceptCase
     value: CamelCase
+  - key:   readability-identifier-naming.PublicMemberCase
+    value: lower_case
+  - key:   readability-identifier-naming.PublicMemberSuffix
+    value: ""
+  - key:   readability-identifier-naming.StructIgnoredRegexp
+    value: "promise_type"
 
   # ── modernize options ────────────────────────────────────────────────────────
   - key:   modernize-use-default-member-init.UseAssignment

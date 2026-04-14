@@ -60,9 +60,9 @@ FireAndForget run_void_task(aevox::Task<void> t)
 }
 
 // Drives a Task<T> to completion and stores the result.
-template <typename T> FireAndForget run_typed_task(aevox::Task<T> t, T& out)
+template <typename T> FireAndForget run_typed_task(aevox::Task<T> t, T* out)
 {
-    out = co_await t;
+    *out = co_await t;
 }
 
 } // anonymous namespace
@@ -102,7 +102,7 @@ static void connect_and_close(std::uint16_t port)
 template <typename T> T run_task(aevox::Task<T> task)
 {
     T result{};
-    run_typed_task(std::move(task), result);
+    run_typed_task(std::move(task), &result);
     return result;
 }
 
@@ -122,7 +122,7 @@ TEST_CASE("AEV-001: make_executor() returns non-null with default config", "[net
     REQUIRE(ex != nullptr);
 }
 
-TEST_CASE("AEV-001: Executor — listen() on port 0 succeeds", "[net]")
+TEST_CASE("AEV-001: Executor - listen() on port 0 succeeds", "[net]")
 {
     auto ex = aevox::make_executor(test_config());
 
@@ -131,7 +131,7 @@ TEST_CASE("AEV-001: Executor — listen() on port 0 succeeds", "[net]")
     REQUIRE(result.has_value());
 }
 
-TEST_CASE("AEV-001: Executor — listen() twice on same port returns bind_failed", "[net]")
+TEST_CASE("AEV-001: Executor - listen() twice on same port returns bind_failed", "[net]")
 {
     // Use a fixed port for this test. If the port happens to be in use on the
     // test machine, the first listen() will also fail — both cases are acceptable.
@@ -164,7 +164,7 @@ TEST_CASE("AEV-001: Executor — listen() twice on same port returns bind_failed
     REQUIRE(r2.has_value());
 }
 
-TEST_CASE("AEV-001: Executor — run() + stop() from another thread terminates cleanly", "[net]")
+TEST_CASE("AEV-001: Executor - run() + stop() from another thread terminates cleanly", "[net]")
 {
     auto port          = find_free_port();
     auto ex            = aevox::make_executor(test_config());
@@ -184,7 +184,7 @@ TEST_CASE("AEV-001: Executor — run() + stop() from another thread terminates c
     stopper.join();
 }
 
-TEST_CASE("AEV-001: Executor — stop() before run() is a no-op, not a crash", "[net]")
+TEST_CASE("AEV-001: Executor - stop() before run() is a no-op, not a crash", "[net]")
 {
     auto ex = aevox::make_executor(test_config());
     // Calling stop() without ever calling run() must not crash or hang.
@@ -192,7 +192,7 @@ TEST_CASE("AEV-001: Executor — stop() before run() is a no-op, not a crash", "
     // No assertion needed — if we reach here, the test passes.
 }
 
-TEST_CASE("AEV-001: Executor — thread_count() matches construction argument", "[net]")
+TEST_CASE("AEV-001: Executor - thread_count() matches construction argument", "[net]")
 {
     aevox::ExecutorConfig cfg{.thread_count = 3, .drain_timeout = 1s};
     auto                  ex = aevox::make_executor(cfg);
@@ -204,7 +204,7 @@ TEST_CASE("AEV-001: Executor — thread_count() matches construction argument", 
 // (Use minimal asio::io_context driver — see file header for justification)
 // ==========================================================================
 
-TEST_CASE("AEV-001: Task<int> — co_return value is received by co_await caller", "[net]")
+TEST_CASE("AEV-001: Task<int> - co_return value is received by co_await caller", "[net]")
 {
     auto producer = []() -> aevox::Task<int> { co_return 42; };
 
@@ -212,10 +212,11 @@ TEST_CASE("AEV-001: Task<int> — co_return value is received by co_await caller
     REQUIRE(result == 42);
 }
 
-TEST_CASE("AEV-001: Task<void> — completes without value", "[net]")
+TEST_CASE("AEV-001: Task<void> - completes without value", "[net]")
 {
     bool ran      = false;
-    auto producer = [&ran]() -> aevox::Task<void> {
+    auto producer = [&ran]()
+        -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
         ran = true;
         co_return;
     };
@@ -224,7 +225,7 @@ TEST_CASE("AEV-001: Task<void> — completes without value", "[net]")
     REQUIRE(ran);
 }
 
-TEST_CASE("AEV-001: Task — moved-from Task::valid() returns false", "[net]")
+TEST_CASE("AEV-001: Task - moved-from Task::valid() returns false", "[net]")
 {
     auto t1 = []() -> aevox::Task<int> { co_return 0; }();
     REQUIRE(t1.valid());

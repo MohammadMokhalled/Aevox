@@ -97,11 +97,11 @@ jobs:
         run: ctest --preset asan
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # macOS — Clang 16 (Homebrew llvm@16), default preset
-  # Apple Clang is not used — Homebrew LLVM provides full C++23 support.
+  # macOS — Clang 18 (Homebrew llvm@18), default preset
+  # Apple Clang is not used — Homebrew LLVM 18 provides full C++23 support.
   # ─────────────────────────────────────────────────────────────────────────────
   build-macos:
-    name: Build — macOS (Clang 16)
+    name: Build — macOS (Clang 18)
     runs-on: macos-14
 
     steps:
@@ -110,12 +110,12 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Clang 16, CMake, and Ninja
-        run: brew install llvm@16 cmake ninja
+      - name: Install Clang 18, CMake, and Ninja
+        run: brew install llvm@18 cmake ninja
 
-      - name: Export Clang 16 compiler paths
+      - name: Export Clang 18 compiler paths
         run: |
-          LLVM_PREFIX=$(brew --prefix llvm@16)
+          LLVM_PREFIX=$(brew --prefix llvm@18)
           echo "CC=${LLVM_PREFIX}/bin/clang" >> $GITHUB_ENV
           echo "CXX=${LLVM_PREFIX}/bin/clang++" >> $GITHUB_ENV
 
@@ -203,10 +203,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Clang 18, clang-tidy 18, CMake, and Ninja
+      - name: Install Clang 18, clang-tidy 18, CMake, Ninja, and GCC 13 headers
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y clang-18 clang++-18 clang-tidy-18 cmake ninja-build
+          sudo apt-get install -y clang-18 clang++-18 clang-tidy-18 cmake ninja-build g++-13
 
       - name: Symlink clang-tidy-18 as clang-tidy
         run: sudo ln -sf /usr/bin/clang-tidy-18 /usr/local/bin/clang-tidy
