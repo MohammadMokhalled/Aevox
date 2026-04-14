@@ -53,12 +53,28 @@ struct ExecutorConfig
     std::size_t thread_count{0};
 
     /**
+     * @brief Number of threads in the dedicated CPU thread pool.
+     *
+     * The CPU pool is used exclusively by `aevox::pool(fn)`. I/O threads
+     * never run CPU-pool work, and CPU-pool threads never run I/O work.
+     *
+     * Set to 0 to disable the dedicated CPU pool. When disabled, `aevox::pool(fn)`
+     * posts work to the I/O thread pool instead — the callable still does not block
+     * the calling coroutine, but it occupies an I/O thread. Useful in tests to
+     * avoid spawning extra threads.
+     *
+     * Default (4) suits typical workloads such as image resizing, PDF generation,
+     * and large JSON serialisation.
+     */
+    std::size_t cpu_pool_threads{4};
+
+    /**
      * @brief Grace period given to in-flight coroutines after `stop()`.
      *
      * After `stop()` is called the executor stops accepting new connections.
      * In-flight connection coroutines are given this long to complete. If the
-     * timeout expires, `pool_.stop()` is called — remaining coroutines have
-     * their pending I/O cancelled and frames destroyed.
+     * timeout expires, the I/O context is force-stopped — remaining coroutines
+     * have their pending I/O cancelled and frames destroyed.
      *
      * Default (30 s) suits most HTTP keep-alive workloads. Lower for tests.
      */
