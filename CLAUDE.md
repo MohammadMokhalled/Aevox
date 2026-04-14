@@ -10,7 +10,7 @@ This file is loaded by Claude Code at the start of every session. It governs all
 
 **Source of truth:** `ProductRequirement/cpp_web_framework_prd.md` (v1.7). Read it before making any design or product decision. When in doubt, the PRD decides.
 
-**Active language standard:** C++23. Minimum compilers: GCC 13+, Clang 16+, MSVC 2022+.
+**Active language standard:** C++23. Supported compilers: GCC 13+ (Linux), MSVC 2022+ (Windows). macOS is not a supported platform.
 
 ---
 

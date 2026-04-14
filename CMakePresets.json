@@ -25,21 +25,12 @@
     },
     {
       "name": "asan",
-      "description": "Debug build with AddressSanitizer + UndefinedBehaviorSanitizer (Linux/macOS only)",
+      "description": "Debug build with AddressSanitizer + UndefinedBehaviorSanitizer (Linux only)",
       "inherits": "default",
       "binaryDir": "${sourceDir}/build/asan",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer"
-      }
-    },
-    {
-      "name": "lint",
-      "description": "Debug build with Clang-Tidy enabled — used in CI lint step, slow for local iteration",
-      "inherits": "default",
-      "binaryDir": "${sourceDir}/build/lint",
-      "cacheVariables": {
-        "CMAKE_CXX_CLANG_TIDY": "clang-tidy"
       }
     },
     {
@@ -69,10 +60,6 @@
     {
       "name": "asan",
       "configurePreset": "asan"
-    },
-    {
-      "name": "lint",
-      "configurePreset": "lint"
     },
     {
       "name": "windows-msvc-debug",

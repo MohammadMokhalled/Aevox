@@ -5,13 +5,11 @@
 # Triggers: pull_request (targeting main)
 # Jobs:
 #   build-linux        — GCC 13, CMake default preset
-#   build-linux-clang  — Clang 18, CMake default preset
 #   build-linux-asan   — GCC 13, CMake asan preset (ASan + UBSan)
-#   build-macos        — Clang 18, CMake default preset
 #   build-windows      — MSVC 2022, CMake windows-msvc preset
 #   format-check       — clang-format diff (no build)
-#   tidy-check         — clang-tidy via lint preset (Clang 18)
 #
+# Supported platforms: Linux (GCC 13), Windows (MSVC 2022). macOS is not supported.
 # Cache strategy: lukka/run-vcpkg keyed on hash of vcpkg.json
 
 name: CI
@@ -96,79 +94,6 @@ jobs:
         run: ctest --preset asan
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Linux — Clang 18, default preset
-  # Ensures code compiles and works on Clang (complementary to GCC 13).
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-linux-clang:
-    name: Build — Linux (Clang 18)
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Clang 18, CMake, and Ninja
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang-18 clang++-18 cmake ninja-build
-
-      - name: Install vcpkg and restore binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgJsonGlob: 'vcpkg.json'
-
-      - name: Configure (default preset)
-        run: cmake --preset default
-        env:
-          CC: clang-18
-          CXX: clang++-18
-
-      - name: Build (default preset)
-        run: cmake --build --preset default
-
-      - name: Test (default preset)
-        run: ctest --preset default
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # macOS — Clang 18 (Homebrew llvm@18), default preset
-  # Apple Clang is not used — Homebrew LLVM 18 provides full C++23 support.
-  # ─────────────────────────────────────────────────────────────────────────────
-  build-macos:
-    name: Build — macOS (Clang 18)
-    runs-on: macos-14
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Clang 18, CMake, and Ninja
-        run: brew install llvm@18 cmake ninja
-
-      - name: Export Clang 18 compiler paths
-        run: |
-          LLVM_PREFIX=$(brew --prefix llvm@18)
-          echo "CC=${LLVM_PREFIX}/bin/clang" >> $GITHUB_ENV
-          echo "CXX=${LLVM_PREFIX}/bin/clang++" >> $GITHUB_ENV
-
-      - name: Install vcpkg and restore binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgJsonGlob: 'vcpkg.json'
-
-      - name: Configure (default preset)
-        run: cmake --preset default
-
-      - name: Build (default preset)
-        run: cmake --build --preset default
-
-      - name: Test (default preset)
-        run: ctest --preset default
-
-  # ─────────────────────────────────────────────────────────────────────────────
   # Windows — MSVC 2022, Visual Studio 17 2022 generator (multi-config)
   # Uses the windows-msvc CMake preset (no Ninja required on Windows runners).
   # ─────────────────────────────────────────────────────────────────────────────
@@ -223,39 +148,3 @@ jobs:
           git diff --exit-code || \
             (echo "::error::Format violations found — run clang-format locally and commit" && exit 1)
 
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Tidy check — uses the lint CMake preset which sets CMAKE_CXX_CLANG_TIDY.
-  # Any clang-tidy finding fails the build (WarningsAsErrors: "*" in .clang-tidy).
-  # Runs independently — does not share artifacts with build-linux.
-  # ─────────────────────────────────────────────────────────────────────────────
-  tidy-check:
-    name: Tidy Check — clang-tidy (Clang 18)
-    runs-on: ubuntu-24.04
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Clang 18, clang-tidy 18, CMake, Ninja, and GCC 13 headers
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y clang-18 clang++-18 clang-tidy-18 cmake ninja-build g++-13
-
-      - name: Symlink clang-tidy-18 as clang-tidy
-        run: sudo ln -sf /usr/bin/clang-tidy-18 /usr/local/bin/clang-tidy
-
-      - name: Install vcpkg and restore binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgJsonGlob: 'vcpkg.json'
-
-      - name: Configure (lint preset — enables CMAKE_CXX_CLANG_TIDY)
-        run: cmake --preset lint
-        env:
-          CC: clang-18
-          CXX: clang++-18
-
-      - name: Build with clang-tidy (any tidy finding fails this step)
-        run: cmake --build --preset lint

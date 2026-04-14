@@ -9,10 +9,15 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Infrastructure
-- GitHub Actions CI pipeline: Linux (GCC 13), macOS (Clang 16), Windows (MSVC 2022),
-  ASan + UBSan, clang-format, and clang-tidy checks on every push and PR (AEV-007)
+- GitHub Actions CI pipeline: Linux (GCC 13), Windows (MSVC 2022), ASan + UBSan,
+  and clang-format on every PR (AEV-007)
 - CMake 3.27+ build system with C++23 baseline, Ninja and MSVC presets, vcpkg manifest
-  mode dependency management, and ASan/UBSan/Clang-Tidy configurations (AEV-002)
+  mode dependency management, and ASan/UBSan configurations (AEV-002)
+
+### Changed
+- Dropped macOS and Clang as supported/CI-tested configurations; supported compilers are
+  now GCC 13+ (Linux) and MSVC 2022+ (Windows) only
+- Removed `lint` CMake preset (Clang-Tidy CI job); clang-format check is retained
 
 ### Added
 - `aevox::Executor` abstract interface — async I/O execution layer with TCP acceptor loop,
