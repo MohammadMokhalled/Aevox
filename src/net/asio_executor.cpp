@@ -313,11 +313,19 @@ void AsioExecutor::stop() noexcept
     }
 
     // 1. Close all acceptors — terminates the accept loop coroutines.
-    for (auto& loop : accept_loops_) {
-        asio::error_code ec;
-        loop.acceptor.close(ec);
-        // Ignore ec — loop sees operation_aborted and exits cleanly.
-    }
+    //    Post the close to io_ctx_ so it runs serialized with async_accept
+    //    initiations on an I/O thread. Calling acceptor.close() from another
+    //    thread races with the accept loop's start_op path: Asio's
+    //    epoll_reactor::close frees the descriptor_state synchronously, and an
+    //    I/O thread locking descriptor_state->mutex_ in start_op would then
+    //    dereference a freed pointer (SEGV observed under ASan/UBSan).
+    asio::post(io_ctx_, [this] {
+        for (auto& loop : accept_loops_) {
+            asio::error_code ec;
+            loop.acceptor.close(ec);
+            // Ignore ec — loop sees operation_aborted and exits cleanly.
+        }
+    });
 
     // 2. Release the work guard — io_ctx_ can now drain naturally.
     //    In-flight coroutines continue to run; io_ctx_.run() returns
