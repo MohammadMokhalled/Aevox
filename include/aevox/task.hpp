@@ -94,8 +94,11 @@ struct FinalAwaitable
  * @note Lifetime: Task is lazy — the coroutine body does not start until the
  *       Task is co_await-ed. Destroying a Task before awaiting it destroys the
  *       coroutine frame without executing the body.
+ * @note `[[nodiscard]]`: the compiler will warn if a Task return value is
+ *       discarded without being `co_await`-ed. Always `co_await` or explicitly
+ *       detach via `aevox::detail::FireAndForget`.
  */
-template <typename T> class Task
+template <typename T> class [[nodiscard]] Task
 {
 public:
     // =========================================================================
@@ -288,8 +291,10 @@ private:
  *
  * @note Thread-safety: same as Task<T> — await on the same strand as creation.
  * @note Move semantics: moved-from Task<void> has valid() == false.
+ * @note `[[nodiscard]]`: discarding a Task<void> without co_await silently
+ *       drops the coroutine. The compiler will warn on such misuse.
  */
-template <> class Task<void>
+template <> class [[nodiscard]] Task<void>
 {
 public:
     /** @brief Coroutine promise type for Task<void>. */

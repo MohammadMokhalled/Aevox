@@ -19,6 +19,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   now GCC 13+ (Linux) and MSVC 2022+ (Windows) only
 - Removed `lint` CMake preset (Clang-Tidy CI job); clang-format check is retained
 
+### Changed
+- `aevox::Task<T>` and `aevox::Task<void>` are now `[[nodiscard]]` — the compiler will
+  warn when a coroutine return value is discarded without being `co_await`-ed (AEV-006)
+
 ### Added
 - `aevox::pool(fn)` — dispatches CPU-bound callable to dedicated CPU thread pool, returns
   `Task<R>`; suspends calling coroutine without blocking I/O thread (AEV-006)
