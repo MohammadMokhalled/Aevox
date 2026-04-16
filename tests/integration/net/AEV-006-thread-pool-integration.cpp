@@ -47,7 +47,7 @@ static void tcp_connect(std::uint16_t port)
 
 // ---------------------------------------------------------------------------
 
-TEST_CASE("AEV-006 integration: 1000 concurrent coroutines — all complete",
+TEST_CASE("AEV-006 integration: 1000 concurrent coroutines - all complete",
           "[integration][net][thread-safety]")
 {
     constexpr int N = 1000;
@@ -133,7 +133,7 @@ TEST_CASE("AEV-006 integration: pool() does not block I/O threads", "[integratio
     REQUIRE(h2_order.load() < h1_order.load());
 }
 
-TEST_CASE("AEV-006 integration: thread-safety — 100 concurrent pool() calls",
+TEST_CASE("AEV-006 integration: thread-safety - 100 concurrent pool() calls",
           "[integration][net][thread-safety]")
 {
     constexpr int N = 100;
@@ -172,7 +172,7 @@ TEST_CASE("AEV-006 integration: thread-safety — 100 concurrent pool() calls",
     REQUIRE(sum.load() == expected_sum);
 }
 
-TEST_CASE("AEV-006 integration: when_all — concurrent sleep-based tasks",
+TEST_CASE("AEV-006 integration: when_all - concurrent sleep-based tasks",
           "[integration][net][when_all]")
 {
     std::string result_a;

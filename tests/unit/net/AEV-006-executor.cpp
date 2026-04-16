@@ -72,7 +72,7 @@ template <typename HandlerFn> void run_single(HandlerFn&& handler_fn)
 // pool() tests
 // =============================================================================
 
-TEST_CASE("AEV-006: pool() — callable executes on CPU pool thread, not I/O thread",
+TEST_CASE("AEV-006: pool() - callable executes on CPU pool thread, not I/O thread",
           "[executor][pool]")
 {
     std::thread::id io_thread_id{};
@@ -94,7 +94,7 @@ TEST_CASE("AEV-006: pool() — callable executes on CPU pool thread, not I/O thr
     REQUIRE(io_thread_id != cpu_thread_id);
 }
 
-TEST_CASE("AEV-006: pool() — return value propagates correctly through Task", "[executor][pool]")
+TEST_CASE("AEV-006: pool() - return value propagates correctly through Task", "[executor][pool]")
 {
     int result = 0;
 
@@ -106,7 +106,7 @@ TEST_CASE("AEV-006: pool() — return value propagates correctly through Task", 
     REQUIRE(result == 42);
 }
 
-TEST_CASE("AEV-006: pool() — exception inside fn propagates to co_await site", "[executor][pool]")
+TEST_CASE("AEV-006: pool() - exception inside fn propagates to co_await site", "[executor][pool]")
 {
     bool exception_caught = false;
 
@@ -142,7 +142,7 @@ TEST_CASE("AEV-006: pool() — exception inside fn propagates to co_await site",
 // sleep() tests
 // =============================================================================
 
-TEST_CASE("AEV-006: sleep() — coroutine resumes after duration without blocking thread",
+TEST_CASE("AEV-006: sleep() - coroutine resumes after duration without blocking thread",
           "[executor][sleep]")
 {
     std::chrono::milliseconds elapsed{0};
@@ -158,7 +158,7 @@ TEST_CASE("AEV-006: sleep() — coroutine resumes after duration without blockin
     REQUIRE(elapsed.count() >= 45); // some tolerance for scheduler granularity
 }
 
-TEST_CASE("AEV-006: sleep() — other coroutines can run while sleeping", "[executor][sleep]")
+TEST_CASE("AEV-006: sleep() - other coroutines can run while sleeping", "[executor][sleep]")
 {
     std::atomic<int> counter{0};
 
@@ -197,7 +197,7 @@ TEST_CASE("AEV-006: sleep() — other coroutines can run while sleeping", "[exec
 // when_all() tests
 // =============================================================================
 
-TEST_CASE("AEV-006: when_all() — two tasks return correct results in declaration order",
+TEST_CASE("AEV-006: when_all() - two tasks return correct results in declaration order",
           "[executor][when_all]")
 {
     int    int_result    = 0;
@@ -217,7 +217,7 @@ TEST_CASE("AEV-006: when_all() — two tasks return correct results in declarati
     REQUIRE(double_result == 3.14); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
 }
 
-TEST_CASE("AEV-006: when_all() — tasks run concurrently, not sequentially", "[executor][when_all]")
+TEST_CASE("AEV-006: when_all() - tasks run concurrently, not sequentially", "[executor][when_all]")
 {
     // Two tasks each sleep 20ms. If they run sequentially the total is ≥ 40ms.
     // Concurrently the total should be ≤ 35ms (with scheduler slack).
@@ -244,7 +244,7 @@ TEST_CASE("AEV-006: when_all() — tasks run concurrently, not sequentially", "[
     REQUIRE(elapsed.count() < 35);
 }
 
-TEST_CASE("AEV-006: when_all() — first exception propagates, others complete",
+TEST_CASE("AEV-006: when_all() - first exception propagates, others complete",
           "[executor][when_all]")
 {
     bool exception_caught = false;
@@ -294,7 +294,7 @@ TEST_CASE("AEV-006: when_all() — first exception propagates, others complete",
 // ExecutorConfig — cpu_pool_threads
 // =============================================================================
 
-TEST_CASE("AEV-006: ExecutorConfig — cpu_pool_threads respected", "[executor][config]")
+TEST_CASE("AEV-006: ExecutorConfig - cpu_pool_threads respected", "[executor][config]")
 {
     // When cpu_pool_threads > 0, pool() callable runs on a DIFFERENT thread than I/O.
     // When cpu_pool_threads == 0, pool() posts to I/O pool — may be same or different thread.
