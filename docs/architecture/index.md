@@ -30,3 +30,4 @@ ADDs live in `Tasks/architecture/`. Each ADD covers one task's design in full de
 | ADD | Task | Status |
 |---|---|---|
 | [AEV-001-arch.md](../../Tasks/architecture/AEV-001-arch.md) | Asio-based async I/O core | Draft |
+| [AEV-006-arch.md](../../Tasks/architecture/AEV-006-arch.md) | Thread pool + coroutine async helpers (`pool`, `sleep`, `when_all`) | Draft |

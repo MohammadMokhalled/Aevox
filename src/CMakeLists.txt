@@ -15,7 +15,8 @@
 find_package(asio CONFIG REQUIRED)
 
 add_library(aevox_core STATIC
-    net/asio_executor.cpp   # AEV-001: Asio-backed executor + accept loop
+    net/asio_executor.cpp      # AEV-001: Asio-backed executor + accept loop
+    net/executor_context.cpp   # AEV-006: thread_local executor bridge definitions
 )
 
 target_include_directories(aevox_core

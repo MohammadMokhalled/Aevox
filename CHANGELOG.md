@@ -19,7 +19,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
   now GCC 13+ (Linux) and MSVC 2022+ (Windows) only
 - Removed `lint` CMake preset (Clang-Tidy CI job); clang-format check is retained
 
+### Changed
+- `aevox::Task<T>` and `aevox::Task<void>` are now `[[nodiscard]]` — the compiler will
+  warn when a coroutine return value is discarded without being `co_await`-ed (AEV-006)
+
 ### Added
+- `aevox::pool(fn)` — dispatches CPU-bound callable to dedicated CPU thread pool, returns
+  `Task<R>`; suspends calling coroutine without blocking I/O thread (AEV-006)
+- `aevox::sleep(duration)` — non-blocking coroutine timer; suspends for at least `duration`
+  without occupying an I/O thread (AEV-006)
+- `aevox::when_all(tasks...)` — concurrent fan-out over ≥ 2 non-void `Task<T>` values;
+  returns `Task<std::tuple<Ts...>>` when all tasks complete (AEV-006)
+- `aevox::ExecutorConfig::cpu_pool_threads` — configures the dedicated CPU thread pool size
+  (default 4; 0 disables dedicated pool) (AEV-006)
 - `aevox::Executor` abstract interface — async I/O execution layer with TCP acceptor loop,
   thread pool management, and graceful drain on shutdown (AEV-001)
 - `aevox::Task<T>` coroutine return type — lazy, move-only, symmetric-transfer task with

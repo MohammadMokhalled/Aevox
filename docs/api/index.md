@@ -6,8 +6,9 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers ar
 
 | Module | Header | Description |
 |---|---|---|
-| Executor | `<aevox/executor.hpp>` | Async I/O execution layer — thread pool, accept loop |
-| Task | `<aevox/task.hpp>` | Coroutine return type for all async operations |
+| [Executor](executor.md) | `<aevox/executor.hpp>` | Async I/O execution layer — thread pool, accept loops, graceful drain |
+| [Task](task.md) | `<aevox/task.hpp>` | Coroutine return type for all async operations |
+| [Async Helpers](async.md) | `<aevox/async.hpp>` | `pool()`, `sleep()`, `when_all()` — CPU offload, timers, concurrent fan-out |
 | App | `<aevox/app.hpp>` | Top-level application object _(coming in v0.1)_ |
 | Request | `<aevox/request.hpp>` | Incoming HTTP request _(coming in v0.1)_ |
 | Response | `<aevox/response.hpp>` | Outgoing HTTP response _(coming in v0.1)_ |
