@@ -33,19 +33,30 @@ struct FireAndForget
 {
     struct promise_type
     {
-        FireAndForget get_return_object() noexcept { return {}; }
-        std::suspend_never initial_suspend() noexcept { return {}; }
-        std::suspend_never final_suspend() noexcept { return {}; }
+        FireAndForget get_return_object() noexcept
+        {
+            return {};
+        }
+        std::suspend_never initial_suspend() noexcept
+        {
+            return {};
+        }
+        std::suspend_never final_suspend() noexcept
+        {
+            return {};
+        }
         void return_void() noexcept {}
-        void unhandled_exception() noexcept { std::terminate(); }
+        void unhandled_exception() noexcept
+        {
+            std::terminate();
+        }
     };
 };
 
 // Drives a single handler invocation to completion via symmetric transfer.
 // Called on a thread-pool thread (posted via tl_post_to_io / asio::post).
-FireAndForget dispatch_handler(
-    std::move_only_function<aevox::Task<void>(std::uint64_t)>* handler,
-    std::uint64_t                                              conn_id)
+FireAndForget dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>* handler,
+                               std::uint64_t                                              conn_id)
 {
     co_await (*handler)(conn_id);
 }
@@ -58,8 +69,7 @@ namespace aevox::net {
 // Construction / destruction
 // =============================================================================
 
-AsioExecutor::AsioExecutor(aevox::ExecutorConfig config)
-    : config_{std::move(config)}
+AsioExecutor::AsioExecutor(aevox::ExecutorConfig config) : config_{std::move(config)}
 {
     // Pre-allocate to avoid vector reallocation after run() co_spawns the loops.
     accept_loops_.reserve(8);
@@ -89,7 +99,11 @@ AsioExecutor::~AsioExecutor()
 
     // Cancel the drain timer thread if still running.
     if (drain_thread_.joinable()) {
-        try { drain_signal_.set_value(); } catch (const std::future_error&) {}
+        try {
+            drain_signal_.set_value();
+        }
+        catch (const std::future_error&) {
+        }
         drain_thread_.join();
     }
 
@@ -127,14 +141,12 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::listen(
 
         // Transition from idle → configured on first listen().
         State expected = State::idle;
-        state_.compare_exchange_strong(expected, State::configured,
-                                       std::memory_order_release,
+        state_.compare_exchange_strong(expected, State::configured, std::memory_order_release,
                                        std::memory_order_relaxed);
         return {};
     }
     catch (const asio::system_error& e) {
-        if (e.code() == asio::error::address_in_use ||
-            e.code() == asio::error::access_denied) {
+        if (e.code() == asio::error::address_in_use || e.code() == asio::error::access_denied) {
             return std::unexpected{aevox::ExecutorError::bind_failed};
         }
         return std::unexpected{aevox::ExecutorError::listen_failed};
@@ -170,9 +182,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
         // dispatch_handler uses FireAndForget (a plain coroutine without
         // await_transform) so it can co_await Task<void> directly.
         asio::post(io_ctx_,
-                   [handler = &loop.handler, conn_id] {
-                       dispatch_handler(handler, conn_id);
-                   });
+                   [handler = &loop.handler, conn_id] { dispatch_handler(handler, conn_id); });
     }
 }
 
@@ -184,13 +194,13 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 {
     // Guard against double-run.
     State expected = State::configured;
-    if (!state_.compare_exchange_strong(expected, State::running,
-                                        std::memory_order_acq_rel,
-                                        std::memory_order_relaxed)) {
+    if (!state_.compare_exchange_strong(expected, State::running, std::memory_order_acq_rel,
+                                        std::memory_order_relaxed))
+    {
         State idle = State::idle;
-        if (!state_.compare_exchange_strong(idle, State::running,
-                                            std::memory_order_acq_rel,
-                                            std::memory_order_relaxed)) {
+        if (!state_.compare_exchange_strong(idle, State::running, std::memory_order_acq_rel,
+                                            std::memory_order_relaxed))
+        {
             return std::unexpected{aevox::ExecutorError::already_running};
         }
     }
@@ -224,50 +234,42 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
     auto io_exec = io_ctx_.get_executor();
 
     for (std::size_t i = 0; i < config_.thread_count; ++i) {
-        io_threads_.emplace_back(
-            [this, io_exec,
-             cpu_pool_ptr = cpu_pool_ ? &*cpu_pool_ : nullptr]() {
+        io_threads_.emplace_back([this, io_exec,
+                                  cpu_pool_ptr = cpu_pool_ ? &*cpu_pool_ : nullptr]() {
+            // Bind tl_post_to_io — posts any callable to the I/O pool.
+            // Takes std::move_only_function<void()> so callers can pass
+            // move-only lambdas (e.g. those capturing aevox::Task<T>).
+            detail::tl_post_to_io = [io_exec](std::move_only_function<void()> fn) mutable {
+                asio::post(io_exec, std::move(fn));
+            };
 
-                // Bind tl_post_to_io — posts any callable to the I/O pool.
-                // Takes std::move_only_function<void()> so callers can pass
-                // move-only lambdas (e.g. those capturing aevox::Task<T>).
-                detail::tl_post_to_io =
-                    [io_exec](std::move_only_function<void()> fn) mutable {
-                        asio::post(io_exec, std::move(fn));
-                    };
+            // Bind tl_post_to_cpu — posts to CPU pool (or I/O pool if disabled).
+            if (cpu_pool_ptr != nullptr) {
+                auto cpu_exec          = cpu_pool_ptr->get_executor();
+                detail::tl_post_to_cpu = [cpu_exec](std::move_only_function<void()> fn) mutable {
+                    asio::post(cpu_exec, std::move(fn));
+                };
+            }
+            else {
+                // No dedicated CPU pool — reuse I/O pool binding.
+                detail::tl_post_to_cpu = [io_exec](std::move_only_function<void()> fn) mutable {
+                    asio::post(io_exec, std::move(fn));
+                };
+            }
 
-                // Bind tl_post_to_cpu — posts to CPU pool (or I/O pool if disabled).
-                if (cpu_pool_ptr != nullptr) {
-                    auto cpu_exec = cpu_pool_ptr->get_executor();
-                    detail::tl_post_to_cpu =
-                        [cpu_exec](std::move_only_function<void()> fn) mutable {
-                            asio::post(cpu_exec, std::move(fn));
-                        };
-                } else {
-                    // No dedicated CPU pool — reuse I/O pool binding.
-                    detail::tl_post_to_cpu =
-                        [io_exec](std::move_only_function<void()> fn) mutable {
-                            asio::post(io_exec, std::move(fn));
-                        };
-                }
+            // Bind tl_schedule_after — creates a steady_timer and posts
+            // the callable on expiry. The shared_ptr keeps the timer alive
+            // until it fires, even if the awaitable is destroyed.
+            detail::tl_schedule_after = [io_exec](std::chrono::steady_clock::duration dur,
+                                                  std::move_only_function<void()>     fn) mutable {
+                auto timer = std::make_shared<asio::steady_timer>(io_exec, dur);
+                timer->async_wait(
+                    [timer, fn = std::move(fn)](const asio::error_code&) mutable { fn(); });
+            };
 
-                // Bind tl_schedule_after — creates a steady_timer and posts
-                // the callable on expiry. The shared_ptr keeps the timer alive
-                // until it fires, even if the awaitable is destroyed.
-                detail::tl_schedule_after =
-                    [io_exec](std::chrono::steady_clock::duration    dur,
-                               std::move_only_function<void()>       fn) mutable {
-                        auto timer =
-                            std::make_shared<asio::steady_timer>(io_exec, dur);
-                        timer->async_wait(
-                            [timer, fn = std::move(fn)](const asio::error_code&) mutable {
-                                fn();
-                            });
-                    };
-
-                // Enter the I/O event loop. Blocks until io_ctx_ is stopped.
-                io_ctx_.run();
-            });
+            // Enter the I/O event loop. Blocks until io_ctx_ is stopped.
+            io_ctx_.run();
+        });
     }
 
     // Spawn the accept loop coroutines on the I/O context.
@@ -283,7 +285,11 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 
     // Signal the drain timer thread to exit if it hasn't already fired.
     if (drain_thread_.joinable()) {
-        try { drain_signal_.set_value(); } catch (const std::future_error&) {}
+        try {
+            drain_signal_.set_value();
+        }
+        catch (const std::future_error&) {
+        }
         drain_thread_.join();
     }
 
@@ -298,9 +304,9 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 void AsioExecutor::stop() noexcept
 {
     State expected = State::running;
-    if (!state_.compare_exchange_strong(expected, State::draining,
-                                        std::memory_order_acq_rel,
-                                        std::memory_order_relaxed)) {
+    if (!state_.compare_exchange_strong(expected, State::draining, std::memory_order_acq_rel,
+                                        std::memory_order_relaxed))
+    {
         // Not running: either idle, configured, already draining, or stopped.
         // stop() is idempotent in all of these states.
         return;
@@ -321,18 +327,17 @@ void AsioExecutor::stop() noexcept
     // 3. Start the drain timer thread.
     //    If in-flight coroutines don't finish within drain_timeout, force-stop.
     drain_signal_ = std::promise<void>{};
-    auto future  = drain_signal_.get_future();
-    auto timeout = config_.drain_timeout;
+    auto future   = drain_signal_.get_future();
+    auto timeout  = config_.drain_timeout;
 
-    drain_thread_ = std::thread(
-        [f = std::move(future), timeout, this]() mutable {
-            if (f.wait_for(timeout) == std::future_status::timeout) {
-                // Grace period expired — force-cancel remaining I/O operations.
-                io_ctx_.stop();
-            }
-            // If wait_for returned ready: run() signalled completion.
-            // io_ctx_.run() will return naturally — no force-stop needed.
-        });
+    drain_thread_ = std::thread([f = std::move(future), timeout, this]() mutable {
+        if (f.wait_for(timeout) == std::future_status::timeout) {
+            // Grace period expired — force-cancel remaining I/O operations.
+            io_ctx_.stop();
+        }
+        // If wait_for returned ready: run() signalled completion.
+        // io_ctx_.run() will return naturally — no force-stop needed.
+    });
 }
 
 // =============================================================================

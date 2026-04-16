@@ -17,13 +17,12 @@
 
 namespace aevox::detail {
 
-thread_local std::function<void(std::move_only_function<void()>)>
-    tl_post_to_cpu;
+thread_local std::function<void(std::move_only_function<void()>)> tl_post_to_cpu;
 
-thread_local std::function<void(std::move_only_function<void()>)>
-    tl_post_to_io;
+thread_local std::function<void(std::move_only_function<void()>)> tl_post_to_io;
 
-thread_local std::function<void(std::chrono::steady_clock::duration, std::move_only_function<void()>)>
+thread_local std::function<void(std::chrono::steady_clock::duration,
+                                std::move_only_function<void()>)>
     tl_schedule_after;
 
 } // namespace aevox::detail

@@ -53,7 +53,8 @@ int main()
         auto             port    = find_free_port();
         std::atomic<int> handled = 0;
 
-        auto ex = aevox::make_executor({.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 5s});
+        auto ex =
+            aevox::make_executor({.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 5s});
         auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
             handled.fetch_add(1, std::memory_order_relaxed);
             co_return;
@@ -81,8 +82,7 @@ int main()
         ex->stop();
         runner.join();
 
-        std::cout << "[AEV-006] Task dispatch: "
-                  << handled.load() << " handlers processed\n";
+        std::cout << "[AEV-006] Task dispatch: " << handled.load() << " handlers processed\n";
     }
 
     // -------------------------------------------------------------------------
@@ -95,7 +95,8 @@ int main()
         auto             port    = find_free_port();
         std::atomic<int> handled = 0;
 
-        auto ex = aevox::make_executor({.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 5s});
+        auto ex =
+            aevox::make_executor({.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 5s});
         auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
             co_await aevox::pool([] { /* no-op */ });
             handled.fetch_add(1, std::memory_order_relaxed);
@@ -123,8 +124,7 @@ int main()
         ex->stop();
         runner.join();
 
-        std::cout << "[AEV-006] pool() dispatch: "
-                  << handled.load() << " handlers processed\n";
+        std::cout << "[AEV-006] pool() dispatch: " << handled.load() << " handlers processed\n";
     }
 
     return 0;

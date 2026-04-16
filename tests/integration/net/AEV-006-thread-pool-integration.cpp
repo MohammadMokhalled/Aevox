@@ -9,9 +9,9 @@
 #include <aevox/executor.hpp>
 #include <aevox/task.hpp>
 
-#include <catch2/catch_test_macros.hpp>
-
 #include <asio.hpp>
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -52,8 +52,8 @@ TEST_CASE("AEV-006 integration: 1000 concurrent coroutines — all complete",
 {
     constexpr int N = 1000;
 
-    std::atomic<int>  handled{0};
-    std::latch        all_started{N};
+    std::atomic<int> handled{0};
+    std::latch       all_started{N};
 
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
@@ -81,16 +81,15 @@ TEST_CASE("AEV-006 integration: 1000 concurrent coroutines — all complete",
     REQUIRE(handled.load() == N);
 }
 
-TEST_CASE("AEV-006 integration: pool() does not block I/O threads",
-          "[integration][net]")
+TEST_CASE("AEV-006 integration: pool() does not block I/O threads", "[integration][net]")
 {
     // Send two connections. The first handler runs a 100ms CPU task via pool().
     // The second handler must be accepted and run concurrently — not blocked.
 
-    std::atomic<int>  order{0};
-    std::atomic<int>  h1_order{0};
-    std::atomic<int>  h2_order{0};
-    std::latch        h2_started{1};
+    std::atomic<int> order{0};
+    std::atomic<int> h1_order{0};
+    std::atomic<int> h2_order{0};
+    std::latch       h2_started{1};
 
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
@@ -105,7 +104,8 @@ TEST_CASE("AEV-006 integration: pool() does not block I/O threads",
                 std::this_thread::sleep_for(20ms);
             });
             h1_order = order.fetch_add(1, std::memory_order_relaxed) + 1;
-        } else {
+        }
+        else {
             // Handler 2: started while handler 1 is on the CPU pool.
             h2_started.count_down();
             h2_order = order.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -148,7 +148,8 @@ TEST_CASE("AEV-006 integration: thread-safety — 100 concurrent pool() calls",
         int val = co_await aevox::pool([&] {
             // Simulate brief CPU work.
             int x = 0;
-            for (int i = 0; i < 1000; ++i) x += i;
+            for (int i = 0; i < 1000; ++i)
+                x += i;
             return x;
         });
         sum.fetch_add(val, std::memory_order_relaxed);
@@ -191,8 +192,8 @@ TEST_CASE("AEV-006 integration: when_all — concurrent sleep-based tasks",
         };
 
         auto [a, b] = co_await aevox::when_all(task_a(), task_b());
-        result_a = a;
-        result_b = b;
+        result_a    = a;
+        result_b    = b;
         co_return;
     });
     REQUIRE(lr.has_value());

@@ -61,7 +61,7 @@ public:
     ~AsioExecutor() override;
 
     [[nodiscard]] std::expected<void, aevox::ExecutorError> listen(
-        std::uint16_t                                              port,
+        std::uint16_t                                             port,
         std::move_only_function<aevox::Task<void>(std::uint64_t)> handler) override;
 
     [[nodiscard]] std::expected<void, aevox::ExecutorError> run() override;
@@ -77,7 +77,7 @@ private:
     // -------------------------------------------------------------------------
     struct AcceptLoop
     {
-        asio::ip::tcp::acceptor                                    acceptor;
+        asio::ip::tcp::acceptor                                   acceptor;
         std::move_only_function<aevox::Task<void>(std::uint64_t)> handler;
     };
 
@@ -111,8 +111,7 @@ private:
 
     // Work guard: keeps io_ctx_ from returning when it runs out of posted work.
     // Reset by stop() to allow natural drain after acceptors are closed.
-    std::optional<asio::executor_work_guard<asio::io_context::executor_type>>
-        work_guard_;
+    std::optional<asio::executor_work_guard<asio::io_context::executor_type>> work_guard_;
 
     // Dedicated CPU thread pool for aevox::pool() offloads.
     // nullopt when config_.cpu_pool_threads == 0.

@@ -9,9 +9,9 @@
 #include <aevox/executor.hpp>
 #include <aevox/task.hpp>
 
-#include <catch2/catch_test_macros.hpp>
-
 #include <asio.hpp> // client-side TCP helper only
+
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -48,8 +48,7 @@ static void tcp_connect(std::uint16_t port)
 // Runs a test handler as a connection handler and blocks until it completes.
 // handler_fn is called once per connection with conn_id, completes, then
 // the executor is stopped.
-template<typename HandlerFn>
-void run_single(HandlerFn&& handler_fn)
+template <typename HandlerFn> void run_single(HandlerFn&& handler_fn)
 {
     auto port = find_free_port();
     auto ex   = aevox::make_executor(unit_config());
@@ -82,9 +81,7 @@ TEST_CASE("AEV-006: pool() — callable executes on CPU pool thread, not I/O thr
     run_single([&](std::uint64_t) -> aevox::Task<void> {
         io_thread_id = std::this_thread::get_id();
 
-        co_await aevox::pool([&]() {
-            cpu_thread_id = std::this_thread::get_id();
-        });
+        co_await aevox::pool([&]() { cpu_thread_id = std::this_thread::get_id(); });
 
         // Thread IDs must differ (I/O thread vs. CPU pool thread).
         CHECK(io_thread_id != cpu_thread_id);
@@ -92,9 +89,9 @@ TEST_CASE("AEV-006: pool() — callable executes on CPU pool thread, not I/O thr
     });
 
     // Also verify outside the handler that both were set (handler ran).
-    REQUIRE(io_thread_id  != std::thread::id{});
+    REQUIRE(io_thread_id != std::thread::id{});
     REQUIRE(cpu_thread_id != std::thread::id{});
-    REQUIRE(io_thread_id  != cpu_thread_id);
+    REQUIRE(io_thread_id != cpu_thread_id);
 }
 
 TEST_CASE("AEV-006: pool() — return value propagates correctly through Task", "[executor][pool]")
@@ -109,8 +106,7 @@ TEST_CASE("AEV-006: pool() — return value propagates correctly through Task", 
     REQUIRE(result == 42);
 }
 
-TEST_CASE("AEV-006: pool() — exception inside fn propagates to co_await site",
-          "[executor][pool]")
+TEST_CASE("AEV-006: pool() — exception inside fn propagates to co_await site", "[executor][pool]")
 {
     bool exception_caught = false;
 
@@ -121,11 +117,9 @@ TEST_CASE("AEV-006: pool() — exception inside fn propagates to co_await site",
 
     auto listen_result = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
         try {
-            co_await aevox::pool([]() -> int {
-                throw std::runtime_error{"cpu error"};
-                return 0;
-            });
-        } catch (const std::runtime_error& e) {
+            co_await aevox::pool([]() -> int { throw std::runtime_error{"cpu error"}; });
+        }
+        catch (const std::runtime_error& e) {
             exception_caught = (std::string{e.what()} == "cpu error");
         }
         co_return;
@@ -164,8 +158,7 @@ TEST_CASE("AEV-006: sleep() — coroutine resumes after duration without blockin
     REQUIRE(elapsed.count() >= 45); // some tolerance for scheduler granularity
 }
 
-TEST_CASE("AEV-006: sleep() — other coroutines can run while sleeping",
-          "[executor][sleep]")
+TEST_CASE("AEV-006: sleep() — other coroutines can run while sleeping", "[executor][sleep]")
 {
     std::atomic<int> counter{0};
 
@@ -211,21 +204,20 @@ TEST_CASE("AEV-006: when_all() — two tasks return correct results in declarati
     double double_result = 0.0;
 
     run_single([&](std::uint64_t) -> aevox::Task<void> {
-        auto make_int    = []() -> aevox::Task<int>    { co_return 7; };
+        auto make_int    = []() -> aevox::Task<int> { co_return 7; };
         auto make_double = []() -> aevox::Task<double> { co_return 3.14; };
 
-        auto [i, d] = co_await aevox::when_all(make_int(), make_double());
+        auto [i, d]   = co_await aevox::when_all(make_int(), make_double());
         int_result    = i;
         double_result = d;
         co_return;
     });
 
-    REQUIRE(int_result    == 7);
+    REQUIRE(int_result == 7);
     REQUIRE(double_result == 3.14); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
 }
 
-TEST_CASE("AEV-006: when_all() — tasks run concurrently, not sequentially",
-          "[executor][when_all]")
+TEST_CASE("AEV-006: when_all() — tasks run concurrently, not sequentially", "[executor][when_all]")
 {
     // Two tasks each sleep 20ms. If they run sequentially the total is ≥ 40ms.
     // Concurrently the total should be ≤ 35ms (with scheduler slack).
@@ -237,9 +229,9 @@ TEST_CASE("AEV-006: when_all() — tasks run concurrently, not sequentially",
             co_return ms;
         };
 
-        auto start = std::chrono::steady_clock::now();
+        auto start  = std::chrono::steady_clock::now();
         auto [a, b] = co_await aevox::when_all(sleeper(20), sleeper(20));
-        elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        elapsed     = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start);
 
         CHECK(a == 20);
@@ -275,7 +267,8 @@ TEST_CASE("AEV-006: when_all() — first exception propagates, others complete",
 
         try {
             co_await aevox::when_all(throw_task(), ok_task());
-        } catch (const std::runtime_error&) {
+        }
+        catch (const std::runtime_error&) {
             exception_caught = true;
         }
         // Wait a bit to allow the second task to complete naturally.
@@ -330,7 +323,7 @@ TEST_CASE("AEV-006: ExecutorConfig — cpu_pool_threads respected", "[executor][
 
     auto run_result = ex->run();
     REQUIRE(run_result.has_value());
-    REQUIRE(io_id  != std::thread::id{});
+    REQUIRE(io_id != std::thread::id{});
     REQUIRE(cpu_id != std::thread::id{});
-    REQUIRE(io_id  != cpu_id);
+    REQUIRE(io_id != cpu_id);
 }
