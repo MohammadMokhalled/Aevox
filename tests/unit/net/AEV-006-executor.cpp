@@ -297,7 +297,8 @@ TEST_CASE("AEV-006: when_all() - first exception propagates, others complete",
 
 TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
 {
-    SECTION("happy path - Task<void> completes without exception") {
+    SECTION("happy path - Task<void> completes without exception")
+    {
         bool ran = false;
 
         run_single([&](std::uint64_t) -> aevox::Task<void> {
@@ -312,7 +313,8 @@ TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
         REQUIRE(ran);
     }
 
-    SECTION("error path - exception inside Task propagates to co_await site") {
+    SECTION("error path - exception inside Task propagates to co_await site")
+    {
         bool caught = false;
 
         run_single([&](std::uint64_t) -> aevox::Task<void> {
@@ -334,17 +336,18 @@ TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
         REQUIRE(caught);
     }
 
-    SECTION("move semantics - moved-from Task has valid() == false") {
+    SECTION("move semantics - moved-from Task has valid() == false")
+    {
         bool original_valid_before = false;
         bool original_valid_after  = true; // expect false after move
         bool moved_valid           = false;
         int  result                = 0;
 
         run_single([&](std::uint64_t) -> aevox::Task<void> {
-            auto make = []() -> aevox::Task<int> { co_return 99; };
+            auto             make     = []() -> aevox::Task<int> { co_return 99; };
             aevox::Task<int> original = make();
 
-            original_valid_before = original.valid();
+            original_valid_before  = original.valid();
             aevox::Task<int> moved = std::move(original);
             original_valid_after   = original.valid();
             moved_valid            = moved.valid();
@@ -363,8 +366,7 @@ TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
 // sleep() — zero-duration (ADD §8.1)
 // =============================================================================
 
-TEST_CASE("AEV-006: sleep() - sleep(0) completes in next scheduler tick",
-          "[executor][sleep]")
+TEST_CASE("AEV-006: sleep() - sleep(0) completes in next scheduler tick", "[executor][sleep]")
 {
     std::chrono::milliseconds elapsed{0};
 

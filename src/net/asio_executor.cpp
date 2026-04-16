@@ -28,9 +28,8 @@ namespace {
 // Drives a single handler invocation to completion via symmetric transfer.
 // Uses aevox::detail::FireAndForget from <aevox/async.hpp> (included above).
 // Takes handler by reference — the AcceptLoop owns it and outlives the call.
-aevox::detail::FireAndForget
-dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>& handler,
-                 std::uint64_t                                               conn_id)
+aevox::detail::FireAndForget dispatch_handler(
+    std::move_only_function<aevox::Task<void>(std::uint64_t)>& handler, std::uint64_t conn_id)
 {
     co_await handler(conn_id);
 }
@@ -155,8 +154,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
         // Dispatch the handler to run on the I/O pool.
         // dispatch_handler uses FireAndForget (a plain coroutine without
         // await_transform) so it can co_await Task<void> directly.
-        asio::post(io_ctx_,
-                   [&loop, conn_id] { dispatch_handler(loop.handler, conn_id); });
+        asio::post(io_ctx_, [&loop, conn_id] { dispatch_handler(loop.handler, conn_id); });
     }
 }
 
