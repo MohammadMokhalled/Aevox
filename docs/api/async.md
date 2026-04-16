@@ -9,6 +9,7 @@ The async helpers in `<aevox/async.hpp>` extend the coroutine programming model 
 All three helpers:
 - Are **non-blocking** — they suspend the calling coroutine without occupying a thread.
 - Are **Asio-free** — no Asio types appear in the public header.
+- Return `[[nodiscard]]` `Task<T>` values — the compiler will warn if the returned task is not `co_await`-ed.
 - Are only valid on **executor-managed I/O threads** (i.e., inside a connection handler or a Task spawned from one).
 
 These helpers are **not** for use in `main()`, raw `std::thread` functions, or any context outside an active executor.
@@ -198,4 +199,9 @@ In debug builds, an `assert` fires on misuse if `NDEBUG` is not defined.
 ## See Also
 
 - [Executor](executor.md) — `make_executor()`, `ExecutorConfig`, `Executor` interface
-- [PRD §9.4](../architecture/index.md) — Thread pool + coroutine execution model design
+- [Task](task.md) — `aevox::Task<T>` coroutine return type
+- [API Overview](index.md)
+- [Architecture Overview](../architecture/index.md) — Thread pool + coroutine execution model design
+- PRD §9.3 — Execution model
+- PRD §9.4 — Async helpers design
+- ADD: `Tasks/architecture/AEV-006-arch.md`

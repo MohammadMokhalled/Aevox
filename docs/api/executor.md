@@ -57,6 +57,7 @@ int main() {
 ```cpp
 struct ExecutorConfig {
     std::size_t          thread_count{0};
+    std::size_t          cpu_pool_threads{4};
     std::chrono::seconds drain_timeout{30};
 };
 ```
@@ -66,6 +67,7 @@ Configuration for `make_executor()`. All fields have production-ready defaults.
 | Field | Default | Description |
 |---|---|---|
 | `thread_count` | `0` | Worker thread count. `0` resolves to `std::max(1u, hardware_concurrency())`. |
+| `cpu_pool_threads` | `4` | Thread count for the dedicated CPU thread pool used by `aevox::pool()`. Set to `0` to disable the dedicated CPU pool — `pool()` will post to the I/O pool instead. |
 | `drain_timeout` | `30s` | Grace period after `stop()`. In-flight coroutines are given this long to finish; after expiry the pool is force-stopped. |
 
 **Examples:**
@@ -76,8 +78,12 @@ auto ex = aevox::make_executor();
 // Custom thread count only
 auto ex = aevox::make_executor({.thread_count = 8});
 
-// Test config: small pool, short drain
+// Large CPU pool for image-processing workloads
+auto ex = aevox::make_executor({.cpu_pool_threads = 16});
+
+// Test config: small pool, no CPU pool, short drain
 auto ex = aevox::make_executor({.thread_count = 2,
+                                 .cpu_pool_threads = 0,
                                  .drain_timeout = std::chrono::seconds{2}});
 ```
 
@@ -204,17 +210,14 @@ enum class ExecutorError {
 
 ### `aevox::Task<T>`
 
-```cpp
-template<typename T = void>
-class Task;
-```
-
-The coroutine return type for all async Aevox operations. Defined entirely in terms of the C++ standard library — no Asio types appear in `task.hpp`.
+The coroutine return type for all async Aevox operations. See the dedicated [Task](task.md) reference page for the full API.
 
 **Header:** `#include <aevox/task.hpp>` (included transitively by `executor.hpp`)
 
+Quick reference:
+
 ```cpp
-// void task — most handlers
+// void task — most connection handlers
 aevox::Task<void> handle(std::uint64_t conn_id) {
     co_return;
 }
@@ -224,21 +227,12 @@ aevox::Task<int> compute_answer() {
     co_return 42;
 }
 
-// chain tasks with co_await
+// chain with co_await
 aevox::Task<void> outer() {
     int v = co_await compute_answer(); // v == 42
     co_return;
 }
 ```
-
-**Key properties:**
-
-| Property | Detail |
-|---|---|
-| Lazy | The coroutine body does not start until the Task is co_await-ed |
-| Move-only | Moved-from Task has `valid() == false`; do not await it |
-| Symmetric transfer | Deep co_await chains do not grow the call stack |
-| No Asio exposure | `task.hpp` contains only standard library types |
 
 ---
 
@@ -266,6 +260,8 @@ aevox::Task<void> outer() {
 ## See Also
 
 - [API Overview](index.md)
+- [Task](task.md) — `aevox::Task<T>` coroutine return type
+- [Async Helpers](async.md) — `pool()`, `sleep()`, `when_all()`
 - [Architecture Overview](../architecture/index.md)
 - PRD §5.5 — Layered Architecture
 - PRD §5.6 — Executor Abstraction (C++29 `std::net` migration path)
