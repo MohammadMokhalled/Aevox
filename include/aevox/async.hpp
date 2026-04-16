@@ -38,6 +38,18 @@
 namespace aevox {
 
 // =============================================================================
+// aevox::detail — INTERNAL. Not part of the public API.
+//
+// The types in this namespace (FireAndForget, PoolAwaitable, SleepAwaitable,
+// WhenAllState, WhenAllAwaitable, when_all_subtask, and the three tl_post_*
+// thread-local bridges) are implementation details of pool(), sleep(), and
+// when_all(). They are defined here — rather than in a separate .cpp — because
+// C++ requires template definitions to be fully visible at every instantiation
+// site. Do not name, specialise, or depend on these types directly; they may
+// change or be removed in any release without notice.
+// =============================================================================
+
+// =============================================================================
 // Thread-local executor bridges — declared here, defined in src/net/executor_context.cpp
 //
 // These are set by AsioExecutor for each I/O worker thread before io_ctx_.run().

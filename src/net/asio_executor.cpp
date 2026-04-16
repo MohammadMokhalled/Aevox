@@ -25,40 +25,14 @@
 
 namespace {
 
-// Fire-and-forget coroutine: starts immediately (suspend_never initial),
-// self-destructs on completion (suspend_never final).
-// Its promise defines no await_transform, so any awaitable — including
-// aevox::Task<void> — can be co_await-ed inside its body.
-struct FireAndForget
-{
-    struct promise_type
-    {
-        FireAndForget get_return_object() noexcept
-        {
-            return {};
-        }
-        std::suspend_never initial_suspend() noexcept
-        {
-            return {};
-        }
-        std::suspend_never final_suspend() noexcept
-        {
-            return {};
-        }
-        void return_void() noexcept {}
-        void unhandled_exception() noexcept
-        {
-            std::terminate();
-        }
-    };
-};
-
 // Drives a single handler invocation to completion via symmetric transfer.
-// Called on a thread-pool thread (posted via tl_post_to_io / asio::post).
-FireAndForget dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>* handler,
-                               std::uint64_t                                              conn_id)
+// Uses aevox::detail::FireAndForget from <aevox/async.hpp> (included above).
+// Takes handler by reference — the AcceptLoop owns it and outlives the call.
+aevox::detail::FireAndForget
+dispatch_handler(std::move_only_function<aevox::Task<void>(std::uint64_t)>& handler,
+                 std::uint64_t                                               conn_id)
 {
-    co_await (*handler)(conn_id);
+    co_await handler(conn_id);
 }
 
 } // anonymous namespace
@@ -182,7 +156,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
         // dispatch_handler uses FireAndForget (a plain coroutine without
         // await_transform) so it can co_await Task<void> directly.
         asio::post(io_ctx_,
-                   [handler = &loop.handler, conn_id] { dispatch_handler(handler, conn_id); });
+                   [&loop, conn_id] { dispatch_handler(loop.handler, conn_id); });
     }
 }
 
