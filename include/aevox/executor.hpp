@@ -12,6 +12,7 @@
 // PRD §5.5, §5.6 — Executor abstraction, future-proof networking
 
 #include <aevox/task.hpp>
+#include <aevox/tcp_stream.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -116,21 +117,26 @@ enum class ExecutorError : std::uint8_t
  * @brief Concept satisfied by any callable that handles a new TCP connection.
  *
  * The executor invokes the handler exactly once per accepted connection, passing
- * a monotonically increasing 64-bit connection ID. The handler must return an
- * `aevox::Task<void>` coroutine. Callbacks are not permitted (PRD §6.5).
+ * a monotonically increasing 64-bit connection ID and an owned `TcpStream` for
+ * the accepted socket. The handler must return an `aevox::Task<void>` coroutine.
+ * Callbacks are not permitted (PRD §6.5).
+ *
+ * The `TcpStream` is passed by value — the handler takes ownership. The executor
+ * does not use the socket after the handler is invoked.
  *
  * @code
- * auto handler = [](std::uint64_t id) -> aevox::Task<void> {
- *     // handle connection `id`
+ * auto handler = [](std::uint64_t id, aevox::TcpStream stream) -> aevox::Task<void> {
+ *     auto result = co_await stream.read();
+ *     // ... parse and respond ...
  *     co_return;
  * };
  * static_assert(aevox::ConnectionHandler<decltype(handler)>);
  * @endcode
  */
 template <typename F>
-concept ConnectionHandler = requires(F f, std::uint64_t conn_id) {
+concept ConnectionHandler = requires(F f, std::uint64_t conn_id, aevox::TcpStream stream) {
     {
-        f(conn_id)
+        f(conn_id, std::move(stream))
     } -> std::same_as<Task<void>>;
 };
 
@@ -150,8 +156,9 @@ concept ConnectionHandler = requires(F f, std::uint64_t conn_id) {
  * **Typical usage:**
  * @code
  * auto ex = aevox::make_executor();
- * ex->listen(8080, [](std::uint64_t id) -> aevox::Task<void> {
- *     // handle connection `id`
+ * ex->listen(8080, [](std::uint64_t id, aevox::TcpStream stream) -> aevox::Task<void> {
+ *     auto result = co_await stream.read();
+ *     // ... parse and respond ...
  *     co_return;
  * });
  * ex->run();  // blocks until stop() is called
@@ -184,15 +191,17 @@ public:
      *                 ephemeral port (useful in tests — query the actual port via
      *                 the OS after the call succeeds).
      * @param handler  Invoked once per accepted connection with a monotonically
-     *                 increasing connection ID. The executor takes ownership of
-     *                 the handler. The caller does not need to keep it alive.
+     *                 increasing connection ID and an owned `TcpStream`. The executor
+     *                 transfers socket ownership to the handler. The caller does not
+     *                 need to keep the handler alive after this call.
      * @return         `std::expected<void, ExecutorError>`:
      *                 - `ExecutorError::bind_failed` if the address is unavailable.
      *                 - `ExecutorError::listen_failed` on syscall failure.
      *                 - Empty (success) otherwise.
      */
     [[nodiscard]] virtual std::expected<void, ExecutorError> listen(
-        std::uint16_t port, std::move_only_function<Task<void>(std::uint64_t)> handler) = 0;
+        std::uint16_t                                                 port,
+        std::move_only_function<Task<void>(std::uint64_t, TcpStream)> handler) = 0;
 
     /**
      * @brief Runs the event loop, blocking until `stop()` is called.

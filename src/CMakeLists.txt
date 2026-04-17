@@ -13,10 +13,15 @@
 #   Changing these to PUBLIC would silently break the C++29 std::net migration path.
 
 find_package(asio CONFIG REQUIRED)
+find_package(llhttp CONFIG REQUIRED)
+
+add_subdirectory(http)   # AEV-003: aevox_http OBJECT library (HttpParser + llhttp)
 
 add_library(aevox_core STATIC
     net/asio_executor.cpp      # AEV-001: Asio-backed executor + accept loop
     net/executor_context.cpp   # AEV-006: thread_local executor bridge definitions
+    net/asio_tcp_stream.cpp    # AEV-003: TcpStream pimpl implementation
+    $<TARGET_OBJECTS:aevox_http>
 )
 
 target_include_directories(aevox_core
@@ -44,6 +49,10 @@ target_compile_definitions(aevox_core
 )
 
 # Asio link — PRIVATE: keeps asio:: include paths out of aevox_core consumers.
+# llhttp link — PRIVATE: llhttp types must not appear in public headers (ADR compliance).
+# Note: OBJECT library (aevox_http) does not propagate its PRIVATE deps; link here directly.
 target_link_libraries(aevox_core
-    PRIVATE asio::asio
+    PRIVATE
+        asio::asio
+        llhttp::llhttp_static
 )

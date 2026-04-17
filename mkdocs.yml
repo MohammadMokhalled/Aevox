@@ -19,12 +19,16 @@ theme:
       primary: indigo
       accent: indigo
 
+extra_javascript:
+  - https://unpkg.com/mermaid@10/dist/mermaid.min.js
+
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
   - API Reference:
       - Overview: api/index.md
       - Executor: api/executor.md
+      - TcpStream: api/tcp_stream.md
       - Task: api/task.md
       - Async Helpers: api/async.md
   - Architecture:
@@ -36,7 +40,11 @@ markdown_extensions:
       anchor_linenums: true
       line_spans: __span
       pygments_lang_class: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.tabbed:

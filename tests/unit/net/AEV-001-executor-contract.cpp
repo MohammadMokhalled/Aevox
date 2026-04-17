@@ -126,7 +126,8 @@ TEST_CASE("AEV-001: Executor - listen() on port 0 succeeds", "[net]")
 {
     auto ex = aevox::make_executor(test_config());
 
-    auto result = ex->listen(0, [](std::uint64_t) -> aevox::Task<void> { co_return; });
+    auto result =
+        ex->listen(0, [](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> { co_return; });
 
     REQUIRE(result.has_value());
 }
@@ -155,20 +156,23 @@ TEST_CASE("AEV-001: Executor - listen() twice on same port returns bind_failed",
     // verifies that the listen() does not crash — the exact error vs. success
     // depends on OS policy. We treat both as acceptable for unit testing.
     auto ex = aevox::make_executor(test_config());
-    auto r1 = ex->listen(0, [](std::uint64_t) -> aevox::Task<void> { co_return; });
+    auto r1 =
+        ex->listen(0, [](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> { co_return; });
     REQUIRE(r1.has_value()); // first listen must succeed
 
     // Second listen on port 0 always succeeds (different OS-assigned port).
     // This test verifies no crash on multiple listen() calls.
-    auto r2 = ex->listen(0, [](std::uint64_t) -> aevox::Task<void> { co_return; });
+    auto r2 =
+        ex->listen(0, [](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> { co_return; });
     REQUIRE(r2.has_value());
 }
 
 TEST_CASE("AEV-001: Executor - run() + stop() from another thread terminates cleanly", "[net]")
 {
-    auto port          = find_free_port();
-    auto ex            = aevox::make_executor(test_config());
-    auto listen_result = ex->listen(port, [](std::uint64_t) -> aevox::Task<void> { co_return; });
+    auto port = find_free_port();
+    auto ex   = aevox::make_executor(test_config());
+    auto listen_result =
+        ex->listen(port, [](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> { co_return; });
     REQUIRE(listen_result.has_value());
 
     // Trigger one real accept cycle, then stop() — verifies the accept path fires.

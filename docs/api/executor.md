@@ -2,8 +2,8 @@
 
 > The async I/O execution layer — manages the thread pool, TCP acceptors, and coroutine dispatch. Every Aevox server starts here.
 
-**Headers:** `#include <aevox/executor.hpp>` · `#include <aevox/task.hpp>`
-**Task:** AEV-001 | **ADD:** `Tasks/architecture/AEV-001-arch.md`
+**Headers:** `#include <aevox/executor.hpp>` · `#include <aevox/task.hpp>` · `#include <aevox/tcp_stream.hpp>` (included transitively)  
+**Tasks:** AEV-001, AEV-003 | **ADDs:** `Tasks/architecture/AEV-001-arch.md`, `Tasks/architecture/AEV-003-arch.md`
 
 ---
 
@@ -28,16 +28,18 @@ The Executor does **not** manage HTTP parsing, routing, or request handling. Tho
 
 ```cpp
 #include <aevox/executor.hpp>
+#include <aevox/tcp_stream.hpp>
 #include <print>
 
 int main() {
     auto executor = aevox::make_executor(); // hardware_concurrency() threads, 30s drain
 
-    auto result = executor->listen(8080, [](std::uint64_t conn_id) -> aevox::Task<void> {
-        std::println("New connection: {}", conn_id);
-        // read, parse, respond — higher-level code goes here
-        co_return;
-    });
+    auto result = executor->listen(8080,
+        [](std::uint64_t conn_id, aevox::TcpStream stream) -> aevox::Task<void> {
+            std::println("New connection: {}", conn_id);
+            // read, parse, respond — use stream.read() / stream.write()
+            co_return;
+        });
 
     if (!result) {
         std::println(stderr, "Failed to listen: {}", aevox::to_string(result.error()));
@@ -111,7 +113,7 @@ Abstract interface implemented by the framework. Obtain via `make_executor()` �
 ```cpp
 [[nodiscard]] virtual std::expected<void, ExecutorError>
 listen(std::uint16_t port,
-       std::move_only_function<Task<void>(std::uint64_t)> handler) = 0;
+       std::move_only_function<Task<void>(std::uint64_t, TcpStream)> handler) = 0;
 ```
 
 Binds to a TCP port and registers a connection handler. Must be called before `run()`. May be called multiple times to listen on multiple ports.
@@ -121,7 +123,7 @@ Binds to a TCP port and registers a connection handler. Must be called before `r
 | Parameter | Description |
 |---|---|
 | `port` | TCP port (1–65535). Port `0` lets the OS choose an ephemeral port (useful in tests). |
-| `handler` | Invoked once per accepted connection with a monotonically increasing `uint64_t` connection ID. The executor takes ownership. |
+| `handler` | Invoked once per accepted connection with a monotonically increasing `conn_id` and an owned `TcpStream`. The executor takes ownership of the handler. |
 
 **Returns** `std::expected<void, ExecutorError>`:
 
@@ -132,7 +134,11 @@ Binds to a TCP port and registers a connection handler. Must be called before `r
 
 **Example:**
 ```cpp
-auto r = executor->listen(8080, my_handler);
+auto r = executor->listen(8080,
+    [](std::uint64_t conn_id, aevox::TcpStream stream) -> aevox::Task<void> {
+        // use stream.read() / stream.write() here
+        co_return;
+    });
 if (!r) {
     std::println(stderr, "listen failed: {}", aevox::to_string(r.error()));
 }
@@ -208,6 +214,20 @@ enum class ExecutorError {
 
 ---
 
+### `aevox::ConnectionHandler` concept
+
+```cpp
+template <typename F>
+concept ConnectionHandler =
+    requires(F f, std::uint64_t conn_id, aevox::TcpStream stream) {
+        { f(conn_id, std::move(stream)) } -> std::same_as<Task<void>>;
+    };
+```
+
+Constrains the handler lambda passed to `listen()`. The handler must accept `(uint64_t, TcpStream)` and return `Task<void>`. A static_assert fires at the call site if the constraint is not met.
+
+---
+
 ### `aevox::Task<T>`
 
 The coroutine return type for all async Aevox operations. See the dedicated [Task](task.md) reference page for the full API.
@@ -218,7 +238,8 @@ Quick reference:
 
 ```cpp
 // void task — most connection handlers
-aevox::Task<void> handle(std::uint64_t conn_id) {
+aevox::Task<void> handle(std::uint64_t, aevox::TcpStream stream) {
+    auto data = co_await stream.read();
     co_return;
 }
 
@@ -228,7 +249,7 @@ aevox::Task<int> compute_answer() {
 }
 
 // chain with co_await
-aevox::Task<void> outer() {
+aevox::Task<void> outer(aevox::TcpStream stream) {
     int v = co_await compute_answer(); // v == 42
     co_return;
 }
@@ -260,10 +281,11 @@ aevox::Task<void> outer() {
 ## See Also
 
 - [API Overview](index.md)
+- [TcpStream](tcp_stream.md) — async TCP stream passed to every connection handler
 - [Task](task.md) — `aevox::Task<T>` coroutine return type
 - [Async Helpers](async.md) — `pool()`, `sleep()`, `when_all()`
 - [Architecture Overview](../architecture/index.md)
 - PRD §5.5 — Layered Architecture
 - PRD §5.6 — Executor Abstraction (C++29 `std::net` migration path)
 - PRD §9 — Thread Pool + Coroutine Execution Model
-- ADD: `Tasks/architecture/AEV-001-arch.md`
+- ADD: `Tasks/architecture/AEV-001-arch.md`, `Tasks/architecture/AEV-003-arch.md`

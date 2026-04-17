@@ -78,7 +78,7 @@ TEST_CASE("AEV-006: pool() - callable executes on CPU pool thread, not I/O threa
     std::thread::id io_thread_id{};
     std::thread::id cpu_thread_id{};
 
-    run_single([&](std::uint64_t) -> aevox::Task<void> {
+    run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         io_thread_id = std::this_thread::get_id();
 
         co_await aevox::pool([&]() { cpu_thread_id = std::this_thread::get_id(); });
@@ -98,7 +98,7 @@ TEST_CASE("AEV-006: pool() - return value propagates correctly through Task", "[
 {
     int result = 0;
 
-    run_single([&](std::uint64_t) -> aevox::Task<void> {
+    run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         result = co_await aevox::pool([] { return 42; });
         co_return;
     });
@@ -115,15 +115,16 @@ TEST_CASE("AEV-006: pool() - exception inside fn propagates to co_await site", "
     auto ex   = aevox::make_executor(unit_config());
     auto port = find_free_port();
 
-    auto listen_result = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
-        try {
-            co_await aevox::pool([]() -> int { throw std::runtime_error{"cpu error"}; });
-        }
-        catch (const std::runtime_error& e) {
-            exception_caught = (std::string{e.what()} == "cpu error");
-        }
-        co_return;
-    });
+    auto listen_result =
+        ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+            try {
+                co_await aevox::pool([]() -> int { throw std::runtime_error{"cpu error"}; });
+            }
+            catch (const std::runtime_error& e) {
+                exception_caught = (std::string{e.what()} == "cpu error");
+            }
+            co_return;
+        });
     REQUIRE(listen_result.has_value());
 
     std::jthread stopper{[&ex, port] {
@@ -147,7 +148,7 @@ TEST_CASE("AEV-006: sleep() - coroutine resumes after duration without blocking 
 {
     std::chrono::milliseconds elapsed{0};
 
-    run_single([&](std::uint64_t) -> aevox::Task<void> {
+    run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         auto start = std::chrono::steady_clock::now();
         co_await aevox::sleep(50ms);
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -168,7 +169,7 @@ TEST_CASE("AEV-006: sleep() - other coroutines can run while sleeping", "[execut
     std::latch both_started{2};
 
     // Handler 1: sleeps for 50ms.
-    auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         both_started.count_down();
         co_await aevox::sleep(50ms);
         counter.fetch_add(1, std::memory_order_relaxed);
@@ -203,7 +204,7 @@ TEST_CASE("AEV-006: when_all() - two tasks return correct results in declaration
     int    int_result    = 0;
     double double_result = 0.0;
 
-    run_single([&](std::uint64_t) -> aevox::Task<void> {
+    run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         auto make_int    = []() -> aevox::Task<int> { co_return 7; };
         auto make_double = []() -> aevox::Task<double> { co_return 3.14; };
 
@@ -223,7 +224,7 @@ TEST_CASE("AEV-006: when_all() - tasks run concurrently, not sequentially", "[ex
     // Concurrently the total should be ≤ 35ms (with scheduler slack).
     std::chrono::milliseconds elapsed{0};
 
-    run_single([&](std::uint64_t) -> aevox::Task<void> {
+    run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         auto sleeper = [](int ms) -> aevox::Task<int> {
             co_await aevox::sleep(std::chrono::milliseconds{ms});
             co_return ms;
@@ -254,7 +255,7 @@ TEST_CASE("AEV-006: when_all() - first exception propagates, others complete",
     auto ex   = aevox::make_executor(unit_config());
     auto port = find_free_port();
 
-    auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         auto throw_task = [&]() -> aevox::Task<int> {
             co_await aevox::sleep(5ms);
             throw std::runtime_error{"task1 error"};
@@ -301,7 +302,7 @@ TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
     {
         bool ran = false;
 
-        run_single([&](std::uint64_t) -> aevox::Task<void> {
+        run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
             auto subtask = [&]() -> aevox::Task<void> {
                 ran = true;
                 co_return;
@@ -317,7 +318,7 @@ TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
     {
         bool caught = false;
 
-        run_single([&](std::uint64_t) -> aevox::Task<void> {
+        run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
             // Conditional throw avoids MSVC C4702 (unreachable code after throw).
             auto thrower = [](bool should_throw) -> aevox::Task<int> {
                 if (should_throw)
@@ -343,7 +344,7 @@ TEST_CASE("AEV-006: Task<T> - basic coroutine mechanics", "[executor][task]")
         bool moved_valid           = false;
         int  result                = 0;
 
-        run_single([&](std::uint64_t) -> aevox::Task<void> {
+        run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
             auto             make     = []() -> aevox::Task<int> { co_return 99; };
             aevox::Task<int> original = make();
 
@@ -370,7 +371,7 @@ TEST_CASE("AEV-006: sleep() - sleep(0) completes in next scheduler tick", "[exec
 {
     std::chrono::milliseconds elapsed{0};
 
-    run_single([&](std::uint64_t) -> aevox::Task<void> {
+    run_single([&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         auto start = std::chrono::steady_clock::now();
         co_await aevox::sleep(std::chrono::milliseconds{0});
         elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -399,7 +400,7 @@ TEST_CASE("AEV-006: ExecutorConfig - cpu_pool_threads respected", "[executor][co
     auto ex   = aevox::make_executor(cfg);
     auto port = find_free_port();
 
-    auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         io_id = std::this_thread::get_id();
         co_await aevox::pool([&] { cpu_id = std::this_thread::get_id(); });
         co_return;

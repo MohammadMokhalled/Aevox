@@ -23,7 +23,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::Task<T>` and `aevox::Task<void>` are now `[[nodiscard]]` — the compiler will
   warn when a coroutine return value is discarded without being `co_await`-ed (AEV-006)
 
+### Changed
+- `aevox::ConnectionHandler` concept now requires `Task<void>(std::uint64_t, TcpStream)`;
+  `TcpStream` is passed alongside `conn_id` to every connection handler (AEV-003)
+- `aevox::Executor::listen()` now passes an owned `TcpStream` alongside `conn_id` to the
+  handler; existing handlers must add the `TcpStream` parameter (AEV-003)
+
 ### Added
+- `aevox::TcpStream` — move-only async TCP stream; `read()` and `write()` are
+  `co_await`-able coroutines; Asio socket confined to `src/net/asio_tcp_stream.cpp` (AEV-003)
+- `aevox::IoError` — `Eof`, `Cancelled`, `Reset`, `Timeout`, `Unknown` error codes for
+  TCP I/O operations (AEV-003)
+- `aevox::detail::HttpParser` — internal HTTP/1.1 request parser backed by llhttp;
+  incremental feed model via `feed(span<const byte>)` returning `expected<ParsedRequest, ParseError>`;
+  llhttp types confined to `src/http/http_parser.cpp` (AEV-003)
 - `aevox::pool(fn)` — dispatches CPU-bound callable to dedicated CPU thread pool, returns
   `Task<R>`; suspends calling coroutine without blocking I/O thread (AEV-006)
 - `aevox::sleep(duration)` — non-blocking coroutine timer; suspends for at least `duration`
