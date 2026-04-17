@@ -42,7 +42,7 @@ int main()
     auto ex = aevox::make_executor({.thread_count = 2, .drain_timeout = 5s});
     auto lr = ex->listen(
         port,
-        [&handled](std::uint64_t)
+        [&handled](std::uint64_t, aevox::TcpStream)
             -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
             handled.fetch_add(1, std::memory_order_relaxed);
             co_return;

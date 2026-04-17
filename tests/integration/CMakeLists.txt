@@ -5,3 +5,4 @@
 # Location convention: tests/integration/{module}/{TASK-ID}-{slug}.cpp
 
 add_subdirectory(net)   # AEV-001: TCP accept loop integration tests
+add_subdirectory(http)  # AEV-003: HttpParser + TcpStream roundtrip integration tests

@@ -58,7 +58,7 @@ TEST_CASE("AEV-006 integration: 1000 concurrent coroutines - all complete",
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
 
-    auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         all_started.count_down();
         // Tiny sleep to create a concurrent coroutine pile.
         co_await aevox::sleep(1ms);
@@ -94,7 +94,7 @@ TEST_CASE("AEV-006 integration: pool() does not block I/O threads", "[integratio
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
 
-    auto lr = ex->listen(port, [&](std::uint64_t id) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t id, aevox::TcpStream) -> aevox::Task<void> {
         if (id == 0) {
             // Handler 1: CPU offload — should NOT block I/O threads.
             co_await aevox::pool([&] {
@@ -143,7 +143,7 @@ TEST_CASE("AEV-006 integration: thread-safety - 100 concurrent pool() calls",
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
 
-    auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         // Each handler calls pool() with a simple computation.
         int val = co_await aevox::pool([&] {
             // Simulate brief CPU work.
@@ -181,7 +181,7 @@ TEST_CASE("AEV-006 integration: when_all - concurrent sleep-based tasks",
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
 
-    auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         auto task_a = [&]() -> aevox::Task<std::string> {
             co_await aevox::sleep(15ms);
             co_return std::string{"hello"};

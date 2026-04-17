@@ -55,7 +55,7 @@ int main()
 
         auto ex =
             aevox::make_executor({.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 5s});
-        auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+        auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
             handled.fetch_add(1, std::memory_order_relaxed);
             co_return;
         });
@@ -97,7 +97,7 @@ int main()
 
         auto ex =
             aevox::make_executor({.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 5s});
-        auto lr = ex->listen(port, [&](std::uint64_t) -> aevox::Task<void> {
+        auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
             co_await aevox::pool([] { /* no-op */ });
             handled.fetch_add(1, std::memory_order_relaxed);
             co_return;

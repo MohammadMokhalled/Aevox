@@ -68,7 +68,7 @@ TEST_CASE("AEV-001: integration - single client connect triggers handler corouti
     auto ex = aevox::make_executor(int_test_config());
     auto lr = ex->listen(
         port,
-        [&](std::uint64_t)
+        [&](std::uint64_t, aevox::TcpStream)
             -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
             {
                 std::lock_guard lk(handler_mtx);
@@ -112,7 +112,7 @@ TEST_CASE("AEV-001: integration - handler receives monotonically increasing conn
     auto ex = aevox::make_executor(int_test_config());
     auto lr = ex->listen(
         port,
-        [&](std::uint64_t id)
+        [&](std::uint64_t id, aevox::TcpStream)
             -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
             int idx = count.fetch_add(1, std::memory_order_relaxed);
             if (idx < n)
@@ -162,7 +162,7 @@ TEST_CASE("AEV-001: integration - 1000 sequential connections all dispatched wit
     auto ex = aevox::make_executor({.thread_count = 4, .drain_timeout = 5s});
     auto lr = ex->listen(
         port,
-        [&](std::uint64_t)
+        [&](std::uint64_t, aevox::TcpStream)
             -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
             (void)handled.fetch_add(1, std::memory_order_relaxed);
             {
@@ -206,7 +206,7 @@ TEST_CASE("AEV-001: integration - stop() drains in-flight handlers before run() 
     auto ex = aevox::make_executor(int_test_config());
     auto lr = ex->listen(
         port,
-        [&](std::uint64_t)
+        [&](std::uint64_t, aevox::TcpStream)
             -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
             handler_started.store(true, std::memory_order_release);
             handler_started.notify_all();

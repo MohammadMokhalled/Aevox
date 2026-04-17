@@ -5,3 +5,4 @@
 # Location convention: tests/unit/{module}/{TASK-ID}-{slug}.cpp
 
 add_subdirectory(net)   # AEV-001: Executor interface + Task<T> unit tests
+add_subdirectory(http)  # AEV-003: HttpParser unit tests

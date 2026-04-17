@@ -28,10 +28,12 @@ namespace {
 // Drives a single handler invocation to completion via symmetric transfer.
 // Uses aevox::detail::FireAndForget from <aevox/async.hpp> (included above).
 // Takes handler by reference — the AcceptLoop owns it and outlives the call.
+// TcpStream is passed by value (move) — handler takes ownership of the socket.
 aevox::detail::FireAndForget dispatch_handler(
-    std::move_only_function<aevox::Task<void>(std::uint64_t)>& handler, std::uint64_t conn_id)
+    std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)>& handler,
+    std::uint64_t conn_id, aevox::TcpStream stream)
 {
-    co_await handler(conn_id);
+    co_await handler(conn_id, std::move(stream));
 }
 
 } // anonymous namespace
@@ -90,7 +92,8 @@ AsioExecutor::~AsioExecutor()
 // =============================================================================
 
 std::expected<void, aevox::ExecutorError> AsioExecutor::listen(
-    std::uint16_t port, std::move_only_function<aevox::Task<void>(std::uint64_t)> handler)
+    std::uint16_t port,
+    std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)> handler)
 {
     // Guard: listen() is only valid before run() starts.
     auto s = state_.load(std::memory_order_acquire);
@@ -151,10 +154,17 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
 
         auto conn_id = next_conn_id_.fetch_add(1, std::memory_order_relaxed);
 
+        // Construct TcpStream from the accepted socket.
+        // AsioTcpStream::make() calls TcpStream's private constructor via the friend declaration.
+        auto stream = aevox::net::AsioTcpStream::make(std::move(socket), io_ctx_);
+
         // Dispatch the handler to run on the I/O pool.
         // dispatch_handler uses FireAndForget (a plain coroutine without
         // await_transform) so it can co_await Task<void> directly.
-        asio::post(io_ctx_, [&loop, conn_id] { dispatch_handler(loop.handler, conn_id); });
+        // TcpStream is captured by move — the lambda takes ownership of the socket.
+        asio::post(io_ctx_, [&loop, conn_id, stream = std::move(stream)]() mutable {
+            dispatch_handler(loop.handler, conn_id, std::move(stream));
+        });
     }
 }
 
