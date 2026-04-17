@@ -134,10 +134,11 @@ enum class ExecutorError : std::uint8_t
  * @endcode
  */
 template <typename F>
-concept ConnectionHandler =
-    requires(F f, std::uint64_t conn_id, aevox::TcpStream stream) {
-        { f(conn_id, std::move(stream)) } -> std::same_as<Task<void>>;
-    };
+concept ConnectionHandler = requires(F f, std::uint64_t conn_id, aevox::TcpStream stream) {
+    {
+        f(conn_id, std::move(stream))
+    } -> std::same_as<Task<void>>;
+};
 
 // =============================================================================
 // Executor — abstract interface
@@ -199,7 +200,7 @@ public:
      *                 - Empty (success) otherwise.
      */
     [[nodiscard]] virtual std::expected<void, ExecutorError> listen(
-        std::uint16_t port,
+        std::uint16_t                                                 port,
         std::move_only_function<Task<void>(std::uint64_t, TcpStream)> handler) = 0;
 
     /**

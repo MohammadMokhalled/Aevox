@@ -115,15 +115,16 @@ TEST_CASE("AEV-006: pool() - exception inside fn propagates to co_await site", "
     auto ex   = aevox::make_executor(unit_config());
     auto port = find_free_port();
 
-    auto listen_result = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
-        try {
-            co_await aevox::pool([]() -> int { throw std::runtime_error{"cpu error"}; });
-        }
-        catch (const std::runtime_error& e) {
-            exception_caught = (std::string{e.what()} == "cpu error");
-        }
-        co_return;
-    });
+    auto listen_result =
+        ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+            try {
+                co_await aevox::pool([]() -> int { throw std::runtime_error{"cpu error"}; });
+            }
+            catch (const std::runtime_error& e) {
+                exception_caught = (std::string{e.what()} == "cpu error");
+            }
+            co_return;
+        });
     REQUIRE(listen_result.has_value());
 
     std::jthread stopper{[&ex, port] {

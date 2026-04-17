@@ -25,15 +25,13 @@
 
 struct aevox::TcpStream::Impl
 {
-    asio::ip::tcp::socket socket;  // owns the accepted TCP connection
+    asio::ip::tcp::socket socket; // owns the accepted TCP connection
     asio::io_context&     io_ctx; // non-owning ref to executor's io_context
 
     // Thread-safety: not thread-safe — used by one connection coroutine.
     // Move semantics: not movable after construction (socket is move-only).
     // Ownership: owned by TcpStream via unique_ptr<Impl>.
-    Impl(asio::ip::tcp::socket s, asio::io_context& ctx)
-        : socket{std::move(s)}, io_ctx{ctx}
-    {}
+    Impl(asio::ip::tcp::socket s, asio::io_context& ctx) : socket{std::move(s)}, io_ctx{ctx} {}
 };
 
 // =============================================================================
@@ -77,30 +75,31 @@ struct ReadAwaitable
         // reinterpret_cast: vector<byte>::data() → char* for Asio buffer.
         // Well-defined per C++23 [basic.types.general]: std::byte is a distinct
         // type alias for unsigned char; aliasing via char* is explicitly permitted.
-        socket_.async_read_some(
-            asio::buffer(reinterpret_cast<char*>(buffer_.data()), buffer_.size()),
-            [this, caller, post_to_io](asio::error_code ec, std::size_t n) mutable {
-                if (!ec) {
-                    buffer_.resize(n);
-                }
-                else if (ec == asio::error::eof) {
-                    error_ = aevox::IoError::Eof;
-                    buffer_.clear();
-                }
-                else if (ec == asio::error::operation_aborted) {
-                    error_ = aevox::IoError::Cancelled;
-                }
-                else if (ec == asio::error::connection_reset) {
-                    error_ = aevox::IoError::Reset;
-                }
-                else {
-                    error_ = aevox::IoError::Unknown;
-                }
-                // Resume the read() coroutine on the I/O pool.
-                // The post establishes happens-before between the writes above
-                // and the await_resume() read below (Asio completion ordering).
-                post_to_io([caller]() mutable { caller.resume(); });
-            });
+        socket_.async_read_some(asio::buffer(reinterpret_cast<char*>(buffer_.data()),
+                                             buffer_.size()),
+                                [this, caller, post_to_io](asio::error_code ec,
+                                                           std::size_t      n) mutable {
+                                    if (!ec) {
+                                        buffer_.resize(n);
+                                    }
+                                    else if (ec == asio::error::eof) {
+                                        error_ = aevox::IoError::Eof;
+                                        buffer_.clear();
+                                    }
+                                    else if (ec == asio::error::operation_aborted) {
+                                        error_ = aevox::IoError::Cancelled;
+                                    }
+                                    else if (ec == asio::error::connection_reset) {
+                                        error_ = aevox::IoError::Reset;
+                                    }
+                                    else {
+                                        error_ = aevox::IoError::Unknown;
+                                    }
+                                    // Resume the read() coroutine on the I/O pool.
+                                    // The post establishes happens-before between the writes above
+                                    // and the await_resume() read below (Asio completion ordering).
+                                    post_to_io([caller]() mutable { caller.resume(); });
+                                });
     }
 
     [[nodiscard]] std::expected<std::vector<std::byte>, aevox::IoError> await_resume()
@@ -145,24 +144,23 @@ struct WriteAwaitable
 
         // reinterpret_cast: span<const byte>::data() → const char* for Asio.
         // Well-defined per C++23 [basic.types.general]: aliasing via const char* is permitted.
-        asio::async_write(
-            socket_,
-            asio::buffer(reinterpret_cast<const char*>(data_.data()), data_.size()),
-            [this, caller, post_to_io](asio::error_code ec, std::size_t) mutable {
-                if (!ec) {
-                    // success — error_ stays empty
-                }
-                else if (ec == asio::error::operation_aborted) {
-                    error_ = aevox::IoError::Cancelled;
-                }
-                else if (ec == asio::error::connection_reset) {
-                    error_ = aevox::IoError::Reset;
-                }
-                else {
-                    error_ = aevox::IoError::Unknown;
-                }
-                post_to_io([caller]() mutable { caller.resume(); });
-            });
+        asio::async_write(socket_,
+                          asio::buffer(reinterpret_cast<const char*>(data_.data()), data_.size()),
+                          [this, caller, post_to_io](asio::error_code ec, std::size_t) mutable {
+                              if (!ec) {
+                                  // success — error_ stays empty
+                              }
+                              else if (ec == asio::error::operation_aborted) {
+                                  error_ = aevox::IoError::Cancelled;
+                              }
+                              else if (ec == asio::error::connection_reset) {
+                                  error_ = aevox::IoError::Reset;
+                              }
+                              else {
+                                  error_ = aevox::IoError::Unknown;
+                              }
+                              post_to_io([caller]() mutable { caller.resume(); });
+                          });
     }
 
     [[nodiscard]] std::expected<void, aevox::IoError> await_resume()
@@ -184,9 +182,9 @@ namespace aevox {
 
 TcpStream::TcpStream(std::unique_ptr<Impl> impl) noexcept : impl_{std::move(impl)} {}
 
-TcpStream::TcpStream(TcpStream&&) noexcept = default;
+TcpStream::TcpStream(TcpStream&&) noexcept            = default;
 TcpStream& TcpStream::operator=(TcpStream&&) noexcept = default;
-TcpStream::~TcpStream() = default;
+TcpStream::~TcpStream()                               = default;
 
 bool TcpStream::valid() const noexcept
 {
@@ -242,8 +240,7 @@ namespace aevox::net {
 
 aevox::TcpStream AsioTcpStream::make(asio::ip::tcp::socket socket, asio::io_context& io_ctx)
 {
-    return aevox::TcpStream{
-        std::make_unique<aevox::TcpStream::Impl>(std::move(socket), io_ctx)};
+    return aevox::TcpStream{std::make_unique<aevox::TcpStream::Impl>(std::move(socket), io_ctx)};
 }
 
 } // namespace aevox::net

@@ -148,8 +148,8 @@ public:
      * @note Valid only on executor-managed I/O threads.
      * @note `[[nodiscard]]` — discarding the result silently drops received data.
      */
-    [[nodiscard]] Task<std::expected<std::vector<std::byte>, IoError>>
-    read(std::size_t max_bytes = 65536);
+    [[nodiscard]] Task<std::expected<std::vector<std::byte>, IoError>> read(
+        std::size_t max_bytes = 65536);
 
     /**
      * @brief Writes all bytes in `data` to the socket.
@@ -173,8 +173,7 @@ public:
      * @note `[[nodiscard]]` — unchecked write errors leave the connection in an
      *       unknown state.
      */
-    [[nodiscard]] Task<std::expected<void, IoError>>
-    write(std::span<const std::byte> data);
+    [[nodiscard]] Task<std::expected<void, IoError>> write(std::span<const std::byte> data);
 
 private:
     // Pimpl: hides asio::ip::tcp::socket and io_context reference.

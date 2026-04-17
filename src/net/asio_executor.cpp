@@ -92,7 +92,7 @@ AsioExecutor::~AsioExecutor()
 // =============================================================================
 
 std::expected<void, aevox::ExecutorError> AsioExecutor::listen(
-    std::uint16_t port,
+    std::uint16_t                                                               port,
     std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)> handler)
 {
     // Guard: listen() is only valid before run() starts.

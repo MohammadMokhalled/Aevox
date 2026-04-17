@@ -4,8 +4,6 @@
 // Uses real aevox::Executor + aevox::TcpStream + aevox::detail::HttpParser.
 // No mocks. All tests run with thread_count=2, drain_timeout=3s.
 
-#include "http/http_parser.hpp"
-
 #include <aevox/executor.hpp>
 #include <aevox/task.hpp>
 
@@ -20,6 +18,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#include "http/http_parser.hpp"
 
 using namespace std::chrono_literals;
 
@@ -73,7 +73,8 @@ TEST_CASE("AEV-003 integration: GET request roundtrip via loopback", "[integrati
         aevox::detail::HttpParser parser;
         for (;;) {
             auto data = co_await stream.read();
-            if (!data.has_value()) co_return;
+            if (!data.has_value())
+                co_return;
 
             auto res = parser.feed(std::span{*data});
             if (res.has_value()) {
@@ -82,7 +83,8 @@ TEST_CASE("AEV-003 integration: GET request roundtrip via loopback", "[integrati
                 done.count_down();
                 co_return;
             }
-            if (res.error() != aevox::detail::ParseError::Incomplete) co_return;
+            if (res.error() != aevox::detail::ParseError::Incomplete)
+                co_return;
         }
     });
     REQUIRE(lr.has_value());
@@ -112,33 +114,33 @@ TEST_CASE("AEV-003 integration: POST with body roundtrip via loopback", "[integr
 
     auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream stream) -> aevox::Task<void> {
         aevox::detail::HttpParser parser;
-        std::vector<std::byte> buf;
+        std::vector<std::byte>    buf;
         for (;;) {
             auto data = co_await stream.read();
-            if (!data.has_value()) co_return;
+            if (!data.has_value())
+                co_return;
 
             buf.insert(buf.end(), data->begin(), data->end());
             auto res = parser.feed(std::span{buf});
             if (res.has_value()) {
-                got_body = std::string(
-                    reinterpret_cast<const char*>(res->body.data()),
-                    res->body.size());
+                got_body =
+                    std::string(reinterpret_cast<const char*>(res->body.data()), res->body.size());
                 done.count_down();
                 co_return;
             }
-            if (res.error() != aevox::detail::ParseError::Incomplete) co_return;
+            if (res.error() != aevox::detail::ParseError::Incomplete)
+                co_return;
         }
     });
     REQUIRE(lr.has_value());
 
     std::jthread driver{[&ex, port, &done] {
         std::this_thread::sleep_for(10ms);
-        tcp_send(port,
-            "POST /data HTTP/1.1\r\n"
-            "Host: localhost\r\n"
-            "Content-Length: 5\r\n"
-            "\r\n"
-            "hello");
+        tcp_send(port, "POST /data HTTP/1.1\r\n"
+                       "Host: localhost\r\n"
+                       "Content-Length: 5\r\n"
+                       "\r\n"
+                       "hello");
         done.wait();
         ex->stop();
     }};
@@ -165,17 +167,19 @@ TEST_CASE("AEV-003 integration: pipelined keep-alive requests", "[integration][h
 
     auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream stream) -> aevox::Task<void> {
         aevox::detail::HttpParser parser;
-        std::vector<std::byte> accumulator;
+        std::vector<std::byte>    accumulator;
 
         while (request_count.load() < 2) {
             auto data = co_await stream.read();
-            if (!data.has_value()) break;
+            if (!data.has_value())
+                break;
 
             accumulator.insert(accumulator.end(), data->begin(), data->end());
             auto res = parser.feed(std::span{accumulator});
             if (res.has_value()) {
                 int idx = request_count.fetch_add(1);
-                if (idx < 2) targets[idx] = std::string{res->target};
+                if (idx < 2)
+                    targets[idx] = std::string{res->target};
                 accumulator.clear();
                 parser.reset();
                 if (request_count.load() >= 2) {
@@ -185,7 +189,8 @@ TEST_CASE("AEV-003 integration: pipelined keep-alive requests", "[integration][h
             }
             // ParseError::Incomplete is fine — keep reading.
         }
-        if (request_count.load() >= 2) done.count_down();
+        if (request_count.load() >= 2)
+            done.count_down();
     });
     REQUIRE(lr.has_value());
 
@@ -200,7 +205,7 @@ TEST_CASE("AEV-003 integration: pipelined keep-alive requests", "[integration][h
         std::string_view req1 = "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n";
         std::string_view req2 = "GET /second HTTP/1.1\r\nHost: localhost\r\n\r\n";
         asio::write(s, asio::buffer(req1.data(), req1.size()), ec);
-        std::this_thread::sleep_for(10ms);  // let server process req1 first
+        std::this_thread::sleep_for(10ms); // let server process req1 first
         asio::write(s, asio::buffer(req2.data(), req2.size()), ec);
 
         done.wait();
@@ -279,7 +284,7 @@ TEST_CASE("AEV-003 integration: connection EOF mid-request", "[integration][http
 
     std::jthread driver{[&ex, port, &done] {
         std::this_thread::sleep_for(10ms);
-        tcp_connect_close(port);  // connect then immediately close — EOF
+        tcp_connect_close(port); // connect then immediately close — EOF
         done.wait();
         ex->stop();
     }};

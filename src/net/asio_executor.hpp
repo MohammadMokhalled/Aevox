@@ -15,8 +15,9 @@
 //
 // Design: ADD §3, §4 (AEV-001-arch.md Rev.2, AEV-006-arch.md §4.2)
 
-#include <aevox/executor.hpp>    // public interface we implement
-#include "asio_tcp_stream.hpp"   // AsioTcpStream::make() — used by run_accept_loop()
+#include <aevox/executor.hpp> // public interface we implement
+
+#include "asio_tcp_stream.hpp" // AsioTcpStream::make() — used by run_accept_loop()
 
 // Standalone Asio — ASIO_STANDALONE and ASIO_NO_DEPRECATED defined via CMake.
 // These macros are set PRIVATELY on aevox_core, so they never reach consumers.
@@ -62,8 +63,9 @@ public:
     ~AsioExecutor() override;
 
     [[nodiscard]] std::expected<void, aevox::ExecutorError> listen(
-        std::uint16_t                                             port,
-        std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)> handler) override;
+        std::uint16_t                                                               port,
+        std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)> handler)
+        override;
 
     [[nodiscard]] std::expected<void, aevox::ExecutorError> run() override;
 
@@ -78,7 +80,7 @@ private:
     // -------------------------------------------------------------------------
     struct AcceptLoop
     {
-        asio::ip::tcp::acceptor                                   acceptor;
+        asio::ip::tcp::acceptor                                                     acceptor;
         std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)> handler;
     };
 
