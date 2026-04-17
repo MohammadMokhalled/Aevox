@@ -221,7 +221,7 @@ TEST_CASE("AEV-003 integration: pipelined keep-alive requests", "[integration][h
 
 // =============================================================================
 
-TEST_CASE("AEV-003 integration: malformed request — 400 path", "[integration][http]")
+TEST_CASE("AEV-003 integration: malformed request - 400 path", "[integration][http]")
 {
     std::atomic<bool> got_bad_request{false};
     std::latch        done{1};
