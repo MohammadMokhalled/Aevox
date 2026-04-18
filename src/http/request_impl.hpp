@@ -22,8 +22,6 @@
 
 #include <aevox/request.hpp>
 
-#include "http/http_parser.hpp"
-
 #include <algorithm>
 #include <any>
 #include <cctype>
@@ -32,13 +30,16 @@
 #include <unordered_map>
 #include <vector>
 
+#include "http/http_parser.hpp"
+
 namespace aevox {
 
 // =============================================================================
 // Request::Impl
 // =============================================================================
 
-struct Request::Impl {
+struct Request::Impl
+{
     /// Raw TCP read buffer — owns the memory that parsed string_views point into.
     std::vector<std::byte> buffer;
 
@@ -63,12 +64,9 @@ struct Request::Impl {
 
     /// Constructs Impl, taking ownership of buffer and the parsed request.
     /// Computes path_view and query_view from parsed.target by splitting at '?'.
-    Impl(std::vector<std::byte> buf,
-         aevox::detail::ParsedRequest pr,
+    Impl(std::vector<std::byte> buf, aevox::detail::ParsedRequest pr,
          std::unordered_map<std::string, std::string> initial_params = {})
-        : buffer{std::move(buf)}
-        , parsed{std::move(pr)}
-        , params{std::move(initial_params)}
+        : buffer{std::move(buf)}, parsed{std::move(pr)}, params{std::move(initial_params)}
     {
         // Split parsed.target on the first '?' to compute path and query views.
         // Both path_view and query_view are views into buffer (via parsed.target).
@@ -76,7 +74,8 @@ struct Request::Impl {
         if (pos == std::string_view::npos) {
             path_view  = parsed.target;
             query_view = {};
-        } else {
+        }
+        else {
             path_view  = parsed.target.substr(0, pos);
             query_view = parsed.target.substr(pos + 1);
         }
@@ -89,8 +88,7 @@ struct Request::Impl {
 
 template <typename T>
     requires aevox::ParamConvertible<T>
-[[nodiscard]] std::expected<T, ParamError>
-Request::param(std::string_view name) const noexcept
+[[nodiscard]] std::expected<T, ParamError> Request::param(std::string_view name) const noexcept
 {
     // Look up the parameter by name in the router-injected params map.
     auto it = impl_->params.find(std::string{name});
@@ -104,10 +102,12 @@ Request::param(std::string_view name) const noexcept
         // Zero-copy: return a view into the params map entry.
         // Lifetime: tied to this Request (params map is owned by Impl).
         return std::string_view{raw};
-    } else if constexpr (std::same_as<T, std::string>) {
+    }
+    else if constexpr (std::same_as<T, std::string>) {
         // Owning copy.
         return raw;
-    } else {
+    }
+    else {
         // Arithmetic type (integral or floating_point) — use from_chars.
         T result{};
         const auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), result);
@@ -124,8 +124,7 @@ Request::param(std::string_view name) const noexcept
 
 template <typename T>
     requires aevox::Deserializable<T>
-[[nodiscard]] aevox::Task<std::expected<T, BodyParseError>>
-Request::json() const
+[[nodiscard]] aevox::Task<std::expected<T, BodyParseError>> Request::json() const
 {
     // v0.1 stub — real implementation wired by AEV-009 via Impl::do_json_parse().
     co_return std::unexpected(BodyParseError::NotImplemented);
@@ -135,16 +134,14 @@ Request::json() const
 // Template definitions — set<T>() and get<T>()
 // =============================================================================
 
-template <typename T>
-void Request::set(std::string_view key, T&& value)
+template <typename T> void Request::set(std::string_view key, T&& value)
 {
     // Store by value in the context bag. std::string key ensures the key
     // outlives the set() call site (no dangling view risk).
     impl_->context.insert_or_assign(std::string{key}, std::any{std::forward<T>(value)});
 }
 
-template <typename T>
-[[nodiscard]] std::optional<T> Request::get(std::string_view key) const
+template <typename T> [[nodiscard]] std::optional<T> Request::get(std::string_view key) const
 {
     auto it = impl_->context.find(std::string{key});
     if (it == impl_->context.end()) {
@@ -189,9 +186,8 @@ inline Request make_request_from_impl(std::unique_ptr<Request::Impl> impl) noexc
 /// construction to inject params via impl->params = std::move(params).
 /// Used by tests and ConnectionHandler. Friend of Request.
 /// Not noexcept because std::make_unique<Impl> may throw std::bad_alloc.
-inline Request make_request_from_impl(
-    std::vector<std::byte>       buffer,
-    aevox::detail::ParsedRequest parsed)
+inline Request make_request_from_impl(std::vector<std::byte>       buffer,
+                                      aevox::detail::ParsedRequest parsed)
 {
     return make_request_from_impl(
         std::make_unique<Request::Impl>(std::move(buffer), std::move(parsed)));

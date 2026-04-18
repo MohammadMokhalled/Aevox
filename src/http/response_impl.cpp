@@ -45,22 +45,25 @@ Response::Response(int status, std::string body_str, std::string ct_value)
 
 int Response::status_code() const noexcept
 {
-    if (!impl_) return 0;
+    if (!impl_)
+        return 0;
     return impl_->status_code;
 }
 
 std::string_view Response::body_view() const noexcept
 {
-    if (!impl_) return {};
+    if (!impl_)
+        return {};
     return impl_->body;
 }
 
-std::optional<std::string_view>
-Response::get_header(std::string_view name) const noexcept
+std::optional<std::string_view> Response::get_header(std::string_view name) const noexcept
 {
-    if (!impl_) return std::nullopt;
+    if (!impl_)
+        return std::nullopt;
     auto it = impl_->headers.find(std::string{name});
-    if (it == impl_->headers.end()) return std::nullopt;
+    if (it == impl_->headers.end())
+        return std::nullopt;
     return std::string_view{it->second};
 }
 

@@ -20,7 +20,8 @@ namespace aevox {
 // Response::Impl
 // =============================================================================
 
-struct Response::Impl {
+struct Response::Impl
+{
     /// HTTP status code (e.g. 200, 404). 0 for a moved-from Response.
     int status_code{0};
 
@@ -43,9 +44,7 @@ template <typename T>
     // v0.1 stub — AEV-009 wires in real glaze serialization via
     // Response::Impl::do_json_serialize(). The sentinel body makes it obvious
     // at runtime that the stub is active. Do not use this output as real JSON.
-    return Response{200,
-                    R"({"error":"not_implemented"})",
-                    "application/json"};
+    return Response{200, R"({"error":"not_implemented"})", "application/json"};
 }
 
 } // namespace aevox

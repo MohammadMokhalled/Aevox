@@ -43,7 +43,8 @@ namespace aevox {
  * Returned by `Request::method()`. The parser maps the raw method string to
  * this enum — unknown verbs yield `HttpMethod::Unknown`.
  */
-enum class HttpMethod : std::uint8_t {
+enum class HttpMethod : std::uint8_t
+{
     GET,
     POST,
     PUT,
@@ -73,7 +74,8 @@ enum class HttpMethod : std::uint8_t {
  *
  * Returned via `std::expected`. Never thrown.
  */
-enum class ParamError : std::uint8_t {
+enum class ParamError : std::uint8_t
+{
     NotFound,      ///< No path parameter with the given name was captured by the router.
     BadConversion, ///< The raw string could not be converted to the requested type T.
 };
@@ -87,7 +89,8 @@ enum class ParamError : std::uint8_t {
  *
  * `NotImplemented` is the only value returned in v0.1. AEV-009 extends this.
  */
-enum class BodyParseError : std::uint8_t {
+enum class BodyParseError : std::uint8_t
+{
     NotImplemented, ///< JSON parsing is not wired in v0.1; replaced by AEV-009.
     BadJson,        ///< The body is not valid JSON (reserved for AEV-009).
     TypeMismatch,   ///< JSON does not match the target type schema (reserved for AEV-009).
@@ -99,7 +102,7 @@ enum class BodyParseError : std::uint8_t {
 
 namespace detail {
 class ConnectionHandler; // forward declaration — the only authorized constructor caller
-struct ParsedRequest;   // forward declaration — full definition in src/http/http_parser.hpp
+struct ParsedRequest;    // forward declaration — full definition in src/http/http_parser.hpp
 } // namespace detail
 
 /**
@@ -127,7 +130,8 @@ struct ParsedRequest;   // forward declaration — full definition in src/http/h
  * Move-only. A moved-from `Request` is valid but empty: `valid() == false`.
  * Calling any accessor on a moved-from `Request` is undefined behaviour.
  */
-class Request {
+class Request
+{
 public:
     // Non-copyable — the owned buffer must not be duplicated silently.
     Request(const Request&)            = delete;
@@ -208,8 +212,7 @@ public:
      *              The returned view is zero-copy into the owned buffer.
      * @note        `[[nodiscard]]` — silently discarding the optional is almost always a bug.
      */
-    [[nodiscard]] std::optional<std::string_view>
-    header(std::string_view name) const noexcept;
+    [[nodiscard]] std::optional<std::string_view> header(std::string_view name) const noexcept;
 
     // -------------------------------------------------------------------------
     // Body access
@@ -257,8 +260,7 @@ public:
      */
     template <typename T>
         requires aevox::ParamConvertible<T>
-    [[nodiscard]] std::expected<T, ParamError>
-    param(std::string_view name) const noexcept;
+    [[nodiscard]] std::expected<T, ParamError> param(std::string_view name) const noexcept;
 
     // -------------------------------------------------------------------------
     // Async JSON body parsing
@@ -282,8 +284,7 @@ public:
      */
     template <typename T>
         requires aevox::Deserializable<T>
-    [[nodiscard]] aevox::Task<std::expected<T, BodyParseError>>
-    json() const;
+    [[nodiscard]] aevox::Task<std::expected<T, BodyParseError>> json() const;
 
     // -------------------------------------------------------------------------
     // Middleware context store
@@ -301,8 +302,7 @@ public:
      * @param  value  Value to store. Stored by move if possible, else by copy.
      * @note   Thread-safety: same as `Request` — not thread-safe.
      */
-    template <typename T>
-    void set(std::string_view key, T&& value);
+    template <typename T> void set(std::string_view key, T&& value);
 
     /**
      * @brief Retrieves a typed value from the per-request middleware context bag.
@@ -316,8 +316,7 @@ public:
      * @return     `std::optional<T>` with the stored value, or `std::nullopt`.
      * @note   Zero-cost absent case — no exception, no RTTI beyond `std::any`.
      */
-    template <typename T>
-    [[nodiscard]] std::optional<T> get(std::string_view key) const;
+    template <typename T> [[nodiscard]] std::optional<T> get(std::string_view key) const;
 
 private:
     // Impl is private — the full layout is defined in src/http/request_impl.hpp.
@@ -349,9 +348,7 @@ private:
     /// Constructs Impl from raw parts (buffer + parsed request). Used by tests.
     /// params are NOT injected here — call get_mutable_request_impl() to set them.
     /// Not noexcept — std::make_unique<Impl> may throw std::bad_alloc.
-    friend Request make_request_from_impl(
-        std::vector<std::byte>,
-        detail::ParsedRequest);
+    friend Request make_request_from_impl(std::vector<std::byte>, detail::ParsedRequest);
 
     /// Read-only Impl access for internal inspection (tests, AEV-004).
     friend const Impl* get_request_impl(const Request&) noexcept;

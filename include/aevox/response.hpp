@@ -35,7 +35,8 @@ namespace aevox {
  *
  * `NotImplemented` is the only value produced in v0.1. AEV-009 extends this.
  */
-enum class SerializeError : std::uint8_t {
+enum class SerializeError : std::uint8_t
+{
     NotImplemented,   ///< JSON serialization is not wired in v0.1; replaced by AEV-009.
     TypeNotSupported, ///< The type T cannot be serialized (reserved for AEV-009).
 };
@@ -61,7 +62,8 @@ enum class SerializeError : std::uint8_t {
  * Move-only. A moved-from `Response` is valid but empty: `status_code() == 0`,
  * headers empty, body empty.
  */
-class Response {
+class Response
+{
 public:
     Response(const Response&)            = delete;
     Response& operator=(const Response&) = delete;
@@ -107,8 +109,7 @@ public:
      *              or `std::nullopt` if the header is not set.
      * @note        The returned view is valid for the lifetime of this Response.
      */
-    [[nodiscard]] std::optional<std::string_view>
-    get_header(std::string_view name) const noexcept;
+    [[nodiscard]] std::optional<std::string_view> get_header(std::string_view name) const noexcept;
 
     // -------------------------------------------------------------------------
     // Fluent builder — lvalue and rvalue overloads
@@ -131,7 +132,7 @@ public:
      * @param ct  MIME type string.
      * @return    This Response by value (moved).
      */
-    [[nodiscard]] Response  content_type(std::string_view ct) &&;
+    [[nodiscard]] Response content_type(std::string_view ct) &&;
 
     /**
      * @brief Sets an arbitrary response header (lvalue overload).
@@ -153,7 +154,7 @@ public:
      * @param value  Header field value.
      * @return       This Response by value (moved).
      */
-    [[nodiscard]] Response  header(std::string_view name, std::string_view value) &&;
+    [[nodiscard]] Response header(std::string_view name, std::string_view value) &&;
 
     // -------------------------------------------------------------------------
     // Static factory methods

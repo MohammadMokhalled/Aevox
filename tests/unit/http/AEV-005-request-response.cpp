@@ -6,20 +6,20 @@
 // makes Request::Impl and the private constructor visible in this TU.
 // This is an intentional framework-internal test pattern (see ADD §8).
 
-#include <catch2/catch_test_macros.hpp>
-
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
 
-// Internal headers — gives access to Request::Impl and template definitions.
-#include "http/request_impl.hpp"
-#include "http/response_impl.hpp"
+#include <catch2/catch_test_macros.hpp>
 
+// Internal headers — gives access to Request::Impl and template definitions.
 #include <coroutine>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "http/request_impl.hpp"
+#include "http/response_impl.hpp"
 
 // =============================================================================
 // Test helpers
@@ -39,7 +39,8 @@ static std::vector<std::byte> make_buffer(std::string_view s)
 /// and std::byte has the same aliasing permissions.
 static std::string_view bytes_as_string_view(const std::vector<std::byte>& v) noexcept
 {
-    return {reinterpret_cast<const char*>(v.data()), v.size()}; // NOLINT: well-defined per [basic.types]/2
+    return {reinterpret_cast<const char*>(v.data()),
+            v.size()}; // NOLINT: well-defined per [basic.types]/2
 }
 
 /// Constructs a test Request with the given buffer, parsed request, and params.
@@ -49,14 +50,13 @@ static std::string_view bytes_as_string_view(const std::vector<std::byte>& v) no
 ///      the friend function defined in request_impl.hpp.
 ///   2. get_mutable_request_impl() returns a non-const Impl pointer (friend fn)
 ///      so we can inject the path params after construction without naming Impl.
-static aevox::Request make_test_request(
-    std::vector<std::byte>                       buffer,
-    aevox::detail::ParsedRequest                 parsed,
-    std::unordered_map<std::string, std::string> params = {})
+static aevox::Request make_test_request(std::vector<std::byte>                       buffer,
+                                        aevox::detail::ParsedRequest                 parsed,
+                                        std::unordered_map<std::string, std::string> params = {})
 {
     auto req = aevox::make_request_from_impl(std::move(buffer), std::move(parsed));
     if (!params.empty()) {
-        auto* impl = aevox::get_mutable_request_impl(req);
+        auto* impl   = aevox::get_mutable_request_impl(req);
         impl->params = std::move(params);
     }
     return req;
@@ -74,8 +74,7 @@ static aevox::Request make_test_request(
 /// This works for the v0.1 json<T>() stub because the body co_returns immediately
 /// without suspending. Do not use this helper for Tasks that genuinely suspend on
 /// I/O — it would block the calling thread.
-template <typename T>
-static T drive_task(aevox::Task<T> task)
+template <typename T> static T drive_task(aevox::Task<T> task)
 {
     // Task is lazy (initial_suspend = suspend_always). Steps:
     //   1. await_suspend(noop_coroutine()) registers noop as continuation
@@ -114,8 +113,7 @@ TEST_CASE("AEV-005: Request - header access - happy path, existing header return
     CHECK(*result == "example.com");
 }
 
-TEST_CASE("AEV-005: Request - header access - missing header returns nullopt",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - header access - missing header returns nullopt", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -128,8 +126,7 @@ TEST_CASE("AEV-005: Request - header access - missing header returns nullopt",
     CHECK(!result.has_value());
 }
 
-TEST_CASE("AEV-005: Request - header access - lookup is case-insensitive",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - header access - lookup is case-insensitive", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -157,8 +154,7 @@ TEST_CASE("AEV-005: Request - header access - lookup is case-insensitive",
 // Request tests — param<T>()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - param<int> - happy path converts correctly",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - param<int> - happy path converts correctly", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -174,8 +170,7 @@ TEST_CASE("AEV-005: Request - param<int> - happy path converts correctly",
     CHECK(*result == 42);
 }
 
-TEST_CASE("AEV-005: Request - param<string_view> - zero-copy, no allocation",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - param<string_view> - zero-copy, no allocation", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -219,8 +214,7 @@ TEST_CASE("AEV-005: Request - param<int> - non-numeric string returns BadConvers
     CHECK(result.error() == aevox::ParamError::BadConversion);
 }
 
-TEST_CASE("AEV-005: Request - param<T> - missing param returns NotFound",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - param<T> - missing param returns NotFound", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -238,14 +232,12 @@ TEST_CASE("AEV-005: Request - param<T> - missing param returns NotFound",
 // Request tests — body()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - body() - returns correct span into owned buffer",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - body() - returns correct span into owned buffer", "[http][request]")
 {
     // body() returns the span stored in ParsedRequest::body, which is a span
     // into the parser's chunk_buf (not into our owned buffer). For the test we
     // use a static array as a stand-in chunk_buf.
-    static const std::byte body_data[]{
-        std::byte{'h'}, std::byte{'i'}};
+    static const std::byte body_data[]{std::byte{'h'}, std::byte{'i'}};
 
     aevox::detail::ParsedRequest pr;
     pr.method = "POST";
@@ -264,15 +256,14 @@ TEST_CASE("AEV-005: Request - body() - returns correct span into owned buffer",
 // Request tests — json<T>()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - json<T>() - returns NotImplemented in v0.1",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - json<T>() - returns NotImplemented in v0.1", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "POST";
     pr.target = "/";
 
-    auto req    = make_test_request({}, std::move(pr));
-    auto task   = req.json<int>();
+    auto req  = make_test_request({}, std::move(pr));
+    auto task = req.json<int>();
 
     // Drive the lazy coroutine to completion synchronously.
     auto result = drive_task(std::move(task));
@@ -285,8 +276,7 @@ TEST_CASE("AEV-005: Request - json<T>() - returns NotImplemented in v0.1",
 // Request tests — method(), path(), query()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - method() - GET parsed correctly",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - method() - GET parsed correctly", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -296,13 +286,12 @@ TEST_CASE("AEV-005: Request - method() - GET parsed correctly",
     CHECK(req.method() == aevox::HttpMethod::GET);
 }
 
-TEST_CASE("AEV-005: Request - path() - splits target at question mark",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - path() - splits target at question mark", "[http][request]")
 {
     // We need the target string_view to be backed by a stable buffer.
     // Use the owned buffer for this.
     const std::string_view raw = "/users/42?sort=asc";
-    auto buf = make_buffer(raw);
+    auto                   buf = make_buffer(raw);
 
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -313,11 +302,10 @@ TEST_CASE("AEV-005: Request - path() - splits target at question mark",
     CHECK(req.path() == "/users/42");
 }
 
-TEST_CASE("AEV-005: Request - query() - returns portion after question mark",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - query() - returns portion after question mark", "[http][request]")
 {
     const std::string_view raw = "/users?sort=asc&page=2";
-    auto buf = make_buffer(raw);
+    auto                   buf = make_buffer(raw);
 
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -327,11 +315,10 @@ TEST_CASE("AEV-005: Request - query() - returns portion after question mark",
     CHECK(req.query() == "sort=asc&page=2");
 }
 
-TEST_CASE("AEV-005: Request - query() - empty when no query string present",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - query() - empty when no query string present", "[http][request]")
 {
     const std::string_view raw = "/users/42";
-    auto buf = make_buffer(raw);
+    auto                   buf = make_buffer(raw);
 
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -345,8 +332,7 @@ TEST_CASE("AEV-005: Request - query() - empty when no query string present",
 // Request tests — context store (set / get)
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - context store - set and get roundtrip typed value",
-          "[http][request]")
+TEST_CASE("AEV-005: Request - context store - set and get roundtrip typed value", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -407,8 +393,7 @@ TEST_CASE("AEV-005: Response - not_found() sets status 404", "[http][response]")
     CHECK(res.status_code() == 404);
 }
 
-TEST_CASE("AEV-005: Response - bad_request() sets status 400 with body",
-          "[http][response]")
+TEST_CASE("AEV-005: Response - bad_request() sets status 400 with body", "[http][response]")
 {
     auto res = aevox::Response::bad_request("invalid input");
     CHECK(res.status_code() == 400);
@@ -433,8 +418,7 @@ TEST_CASE("AEV-005: Response - forbidden() sets status 403", "[http][response]")
     CHECK(res.status_code() == 403);
 }
 
-TEST_CASE("AEV-005: Response - json(string) sets Content-Type application/json",
-          "[http][response]")
+TEST_CASE("AEV-005: Response - json(string) sets Content-Type application/json", "[http][response]")
 {
     auto res = aevox::Response::json(std::string{R"({"key":"value"})"});
     CHECK(res.status_code() == 200);
@@ -446,10 +430,12 @@ TEST_CASE("AEV-005: Response - json(string) sets Content-Type application/json",
     CHECK(*ct == "application/json");
 }
 
-TEST_CASE("AEV-005: Response - json<T>() produces sentinel body in v0.1",
-          "[http][response]")
+TEST_CASE("AEV-005: Response - json<T>() produces sentinel body in v0.1", "[http][response]")
 {
-    struct MyType { int x; };
+    struct MyType
+    {
+        int x;
+    };
     auto res = aevox::Response::json(MyType{42});
 
     CHECK(res.status_code() == 200);
@@ -491,8 +477,7 @@ TEST_CASE("AEV-005: Response - content_type() fluent rvalue overload chains on t
     CHECK(*ct == "text/html");
 }
 
-TEST_CASE("AEV-005: Response - header() fluent lvalue overload sets header",
-          "[http][response]")
+TEST_CASE("AEV-005: Response - header() fluent lvalue overload sets header", "[http][response]")
 {
     auto res = aevox::Response::ok();
     // The lvalue overload mutates in place and returns *this for chaining.
