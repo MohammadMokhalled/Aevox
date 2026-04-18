@@ -31,6 +31,7 @@ nav:
       - TcpStream: api/tcp_stream.md
       - Task: api/task.md
       - Async Helpers: api/async.md
+      - Request and Response: api/request-response.md
   - Architecture:
       - Overview: architecture/index.md
   - Changelog: changelog.md

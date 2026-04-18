@@ -8,6 +8,20 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `aevox::Request` and `aevox::Response` public API types with typed path-parameter
+  extraction (`param<T>`), case-insensitive header lookup, raw body access (`body()`),
+  middleware context store (`set<T>`/`get<T>`), fluent response builder
+  (`content_type()`/`header()`), factory methods (`ok`/`created`/`not_found`/
+  `bad_request`/`unauthorized`/`forbidden`/`json`/`stream`), and JSON stub
+  (real implementation wired in AEV-009) (AEV-005)
+- `aevox::HttpMethod` enum (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`,
+  `OPTIONS`, `Unknown`) and `to_string(HttpMethod)` (AEV-005)
+- `aevox::ParamError`, `aevox::BodyParseError`, `aevox::SerializeError` error
+  enums for typed extraction and JSON parse/serialize paths (AEV-005)
+- `include/aevox/concepts.hpp` — `ParamConvertible`, `Serializable`,
+  `Deserializable` concept stubs; real glaze-backed constraints wired in AEV-009 (AEV-005)
+
 ### Infrastructure
 - GitHub Actions CI pipeline: Linux (GCC 13), Windows (MSVC 2022), ASan + UBSan,
   and clang-format on every PR (AEV-007)

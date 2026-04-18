@@ -15,7 +15,9 @@
 find_package(llhttp CONFIG REQUIRED)
 
 add_library(aevox_http OBJECT
-    http_parser.cpp   # AEV-003: HttpParser implementation (llhttp callbacks + Impl)
+    http_parser.cpp      # AEV-003: HttpParser implementation (llhttp callbacks + Impl)
+    request_impl.cpp     # AEV-005: Request non-template methods + explicit instantiations
+    response_impl.cpp    # AEV-005: Response factory methods + builder methods
 )
 
 target_include_directories(aevox_http
