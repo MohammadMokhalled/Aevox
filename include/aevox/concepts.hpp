@@ -27,11 +27,8 @@ namespace aevox {
  * and `std::string` (owned copy).
  */
 template <typename T>
-concept ParamConvertible =
-    std::integral<T> ||
-    std::floating_point<T> ||
-    std::same_as<T, std::string_view> ||
-    std::same_as<T, std::string>;
+concept ParamConvertible = std::integral<T> || std::floating_point<T> ||
+                           std::same_as<T, std::string_view> || std::same_as<T, std::string>;
 
 /**
  * @brief Placeholder concept: any type is serializable to JSON in v0.1.
