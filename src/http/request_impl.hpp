@@ -159,6 +159,20 @@ template <typename T>
 }
 
 // =============================================================================
+// AEV-004 Router — path parameter injection
+// =============================================================================
+//
+// set_params() was removed from the public header (M1 fix: avoids pulling
+// <unordered_map> into a public header). AEV-004 (Router) injects captured
+// path parameters directly through its friend-class access to Request::Impl:
+//
+//   req.impl_->params = std::move(captured_params);
+//
+// This is valid because `friend class Router` (declared in request.hpp) grants
+// the Router class access to all private members of Request, including impl_.
+// Since the Router includes this header, Impl is complete at that point.
+
+// =============================================================================
 // Internal factory helpers (friend of Request — see request.hpp)
 // =============================================================================
 
@@ -170,11 +184,33 @@ inline Request make_request_from_impl(std::unique_ptr<Request::Impl> impl) noexc
     return Request{std::move(impl)};
 }
 
+/// Creates a Request from a raw byte buffer and a parsed request.
+/// Path parameters are NOT set here — call get_mutable_request_impl() after
+/// construction to inject params via impl->params = std::move(params).
+/// Used by tests and ConnectionHandler. Friend of Request.
+/// Not noexcept because std::make_unique<Impl> may throw std::bad_alloc.
+inline Request make_request_from_impl(
+    std::vector<std::byte>       buffer,
+    aevox::detail::ParsedRequest parsed)
+{
+    return make_request_from_impl(
+        std::make_unique<Request::Impl>(std::move(buffer), std::move(parsed)));
+}
 
-/// Returns a raw pointer to the Request's Impl for internal inspection (tests).
+/// Returns a read-only pointer to Request's Impl for internal inspection (tests).
 /// Returns nullptr for a moved-from Request.
 /// Friend of Request — declared in request.hpp (in aevox namespace, not detail).
 inline const Request::Impl* get_request_impl(const Request& req) noexcept
+{
+    return req.impl_.get();
+}
+
+/// Returns a mutable pointer to Request's Impl for internal param injection.
+/// Used by tests (to set params after construction) and AEV-004 Router
+/// (which uses friend class Router to directly write req.impl_->params).
+/// Returns nullptr for a moved-from Request.
+/// Friend of Request — declared in request.hpp (in aevox namespace, not detail).
+inline Request::Impl* get_mutable_request_impl(Request& req) noexcept
 {
     return req.impl_.get();
 }

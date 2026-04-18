@@ -120,7 +120,7 @@ public:
      * @param ct  MIME type string (e.g. `"application/json"`, `"text/plain"`).
      * @return    Reference to this Response for chaining.
      */
-    Response& content_type(std::string_view ct) &;
+    [[nodiscard]] Response& content_type(std::string_view ct) &;
 
     /**
      * @brief Sets the Content-Type header (rvalue overload — consumes and returns).
@@ -144,7 +144,7 @@ public:
      * @param value  Header field value.
      * @return       Reference to this Response for chaining.
      */
-    Response& header(std::string_view name, std::string_view value) &;
+    [[nodiscard]] Response& header(std::string_view name, std::string_view value) &;
 
     /**
      * @brief Sets an arbitrary response header (rvalue overload).
@@ -174,6 +174,8 @@ public:
      *
      * @param body  Optional response body. Defaults to empty.
      * @return      Response with status 201.
+     * @note        Sets Content-Type: text/plain by default. Override with
+     *              `.content_type("application/json")` or similar if needed.
      */
     [[nodiscard]] static Response created(std::string_view body = {});
 
@@ -182,6 +184,8 @@ public:
      *
      * @param body  Optional response body. Defaults to empty.
      * @return      Response with status 404.
+     * @note        Sets Content-Type: text/plain by default. Override with
+     *              `.content_type(...)` if the body is structured (e.g. JSON).
      */
     [[nodiscard]] static Response not_found(std::string_view body = {});
 
@@ -190,6 +194,8 @@ public:
      *
      * @param body  Optional diagnostic message. Defaults to empty.
      * @return      Response with status 400.
+     * @note        Sets Content-Type: text/plain by default. Override with
+     *              `.content_type(...)` if the body is structured (e.g. JSON).
      */
     [[nodiscard]] static Response bad_request(std::string_view body = {});
 
@@ -198,6 +204,8 @@ public:
      *
      * @param body  Optional response body. Defaults to empty.
      * @return      Response with status 401.
+     * @note        Sets Content-Type: text/plain by default. Override with
+     *              `.content_type(...)` if the body is structured (e.g. JSON).
      */
     [[nodiscard]] static Response unauthorized(std::string_view body = {});
 
@@ -206,6 +214,8 @@ public:
      *
      * @param body  Optional response body. Defaults to empty.
      * @return      Response with status 403.
+     * @note        Sets Content-Type: text/plain by default. Override with
+     *              `.content_type(...)` if the body is structured (e.g. JSON).
      */
     [[nodiscard]] static Response forbidden(std::string_view body = {});
 

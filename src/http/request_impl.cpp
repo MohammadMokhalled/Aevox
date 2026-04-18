@@ -121,15 +121,6 @@ std::span<const std::byte> Request::body() const noexcept
 }
 
 // =============================================================================
-// set_params() — called by Router (AEV-004) before handler dispatch
-// =============================================================================
-
-void Request::set_params(std::unordered_map<std::string, std::string> params) noexcept
-{
-    impl_->params = std::move(params);
-}
-
-// =============================================================================
 // to_string(HttpMethod)
 // =============================================================================
 

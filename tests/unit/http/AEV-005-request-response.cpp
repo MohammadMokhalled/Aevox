@@ -33,17 +33,33 @@ static std::vector<std::byte> make_buffer(std::string_view s)
     return buf;
 }
 
+/// Reinterprets a byte buffer as a string_view without copying.
+/// std::byte* → const char* is well-defined per [basic.types]/2:
+/// any object may be accessed through a pointer to char or unsigned char,
+/// and std::byte has the same aliasing permissions.
+static std::string_view bytes_as_string_view(const std::vector<std::byte>& v) noexcept
+{
+    return {reinterpret_cast<const char*>(v.data()), v.size()}; // NOLINT: well-defined per [basic.types]/2
+}
+
 /// Constructs a test Request with the given buffer, parsed request, and params.
-/// Uses the internal detail::make_request_from_impl factory which is a friend
-/// of Request (declared in request.hpp, defined in request_impl.hpp).
+///
+/// Two-step approach (M2 fix — avoids naming aevox::Request::Impl in this TU):
+///   1. make_request_from_impl(buffer, parsed) constructs Impl internally via
+///      the friend function defined in request_impl.hpp.
+///   2. get_mutable_request_impl() returns a non-const Impl pointer (friend fn)
+///      so we can inject the path params after construction without naming Impl.
 static aevox::Request make_test_request(
     std::vector<std::byte>                       buffer,
     aevox::detail::ParsedRequest                 parsed,
     std::unordered_map<std::string, std::string> params = {})
 {
-    auto impl = std::make_unique<aevox::Request::Impl>(
-        std::move(buffer), std::move(parsed), std::move(params));
-    return aevox::make_request_from_impl(std::move(impl));
+    auto req = aevox::make_request_from_impl(std::move(buffer), std::move(parsed));
+    if (!params.empty()) {
+        auto* impl = aevox::get_mutable_request_impl(req);
+        impl->params = std::move(params);
+    }
+    return req;
 }
 
 /// Drives a lazy Task<T> to completion synchronously and returns its result.
@@ -178,8 +194,9 @@ TEST_CASE("AEV-005: Request - param<string_view> - zero-copy, no allocation",
 
     // Zero-copy verification: the string_view data pointer must equal the
     // address of the string stored inside the params map in Impl.
-    // Access Impl via the internal detail::get_request_impl helper.
-    const aevox::Request::Impl* impl = aevox::get_request_impl(req);
+    // Use auto to avoid naming aevox::Request::Impl (which is private after M2 fix).
+    // get_request_impl is a friend function returning const Request::Impl*.
+    const auto* impl = aevox::get_request_impl(req);
     REQUIRE(impl != nullptr);
     const std::string& stored = impl->params.at("token");
     CHECK(result->data() == stored.data());
@@ -289,8 +306,8 @@ TEST_CASE("AEV-005: Request - path() - splits target at question mark",
 
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
-    // target must be a view into buf.
-    pr.target = std::string_view{reinterpret_cast<const char*>(buf.data()), buf.size()};
+    // target must be a view into buf — use helper to avoid naked reinterpret_cast.
+    pr.target = bytes_as_string_view(buf);
 
     auto req = make_test_request(std::move(buf), std::move(pr));
     CHECK(req.path() == "/users/42");
@@ -304,7 +321,7 @@ TEST_CASE("AEV-005: Request - query() - returns portion after question mark",
 
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
-    pr.target = std::string_view{reinterpret_cast<const char*>(buf.data()), buf.size()};
+    pr.target = bytes_as_string_view(buf);
 
     auto req = make_test_request(std::move(buf), std::move(pr));
     CHECK(req.query() == "sort=asc&page=2");
@@ -318,7 +335,7 @@ TEST_CASE("AEV-005: Request - query() - empty when no query string present",
 
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
-    pr.target = std::string_view{reinterpret_cast<const char*>(buf.data()), buf.size()};
+    pr.target = bytes_as_string_view(buf);
 
     auto req = make_test_request(std::move(buf), std::move(pr));
     CHECK(req.query().empty());
@@ -452,7 +469,9 @@ TEST_CASE("AEV-005: Response - content_type() fluent lvalue overload modifies in
           "[http][response]")
 {
     auto res = aevox::Response::ok("body");
-    res.content_type("text/html");
+    // The lvalue overload mutates in place and returns *this for chaining.
+    // We intentionally discard the reference here — the mutation already happened.
+    (void)res.content_type("text/html");
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
@@ -476,7 +495,9 @@ TEST_CASE("AEV-005: Response - header() fluent lvalue overload sets header",
           "[http][response]")
 {
     auto res = aevox::Response::ok();
-    res.header("X-Request-Id", "abc-123");
+    // The lvalue overload mutates in place and returns *this for chaining.
+    // We intentionally discard the reference here — the mutation already happened.
+    (void)res.header("X-Request-Id", "abc-123");
 
     auto val = res.get_header("X-Request-Id");
     REQUIRE(val.has_value());

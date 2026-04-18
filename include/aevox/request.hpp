@@ -29,7 +29,7 @@
 #include <span>
 #include <string>
 #include <string_view>
-#include <unordered_map>
+#include <vector>
 
 namespace aevox {
 
@@ -99,6 +99,7 @@ enum class BodyParseError : std::uint8_t {
 
 namespace detail {
 class ConnectionHandler; // forward declaration — the only authorized constructor caller
+struct ParsedRequest;   // forward declaration — full definition in src/http/http_parser.hpp
 } // namespace detail
 
 /**
@@ -318,30 +319,46 @@ public:
     template <typename T>
     [[nodiscard]] std::optional<T> get(std::string_view key) const;
 
-    // Public forward declaration — definition lives in src/http/request_impl.hpp
-    // (an internal header never shipped with the library). Application code sees
-    // only an incomplete type and cannot instantiate it; framework/test code that
-    // includes request_impl.hpp gets the full struct layout.
-    struct Impl;
-
 private:
+    // Impl is private — the full layout is defined in src/http/request_impl.hpp.
+    // Application code sees only the incomplete type here and cannot name it.
+    // Framework-internal code (and tests) that include request_impl.hpp obtain
+    // the complete struct and may construct Request::Impl directly.
+    struct Impl;
     std::unique_ptr<Impl> impl_;
 
     // Only ConnectionHandler in src/http/ may construct a Request.
     explicit Request(std::unique_ptr<Impl> impl) noexcept;
     friend class detail::ConnectionHandler;
 
-    // AEV-004 Router calls this to inject path parameters after dispatch.
-    void set_params(std::unordered_map<std::string, std::string> params) noexcept;
+    // AEV-004 Router injects captured path parameters directly via friend-class
+    // access: req.impl_->params = std::move(params). No set_params() method is
+    // needed — friend class access covers all private members including impl_.
     friend class Router; // AEV-004 — forward declared; defined in AEV-004 ADD
 
     // Internal factory helpers (defined in src/http/request_impl.hpp).
     // Declared without namespace qualifier because a qualified friend requires
     // prior declaration in that namespace, which is impossible here (Impl is still
-    // incomplete at namespace scope). Resolved to aevox::make_request_from_impl
-    // and aevox::get_request_impl by ADL once the definitions are visible.
+    // incomplete at namespace scope). Resolved to aevox::make_request_from_impl /
+    // aevox::get_request_impl / aevox::get_mutable_request_impl by ADL once the
+    // definitions are visible.
+
+    /// Takes ownership of a pre-built Impl. Used by ConnectionHandler.
     friend Request make_request_from_impl(std::unique_ptr<Impl>) noexcept;
+
+    /// Constructs Impl from raw parts (buffer + parsed request). Used by tests.
+    /// params are NOT injected here — call get_mutable_request_impl() to set them.
+    /// Not noexcept — std::make_unique<Impl> may throw std::bad_alloc.
+    friend Request make_request_from_impl(
+        std::vector<std::byte>,
+        detail::ParsedRequest);
+
+    /// Read-only Impl access for internal inspection (tests, AEV-004).
     friend const Impl* get_request_impl(const Request&) noexcept;
+
+    /// Mutable Impl access for internal param injection (tests, AEV-004 Router).
+    /// AEV-004 uses req.impl_->params = ... directly via friend class Router.
+    friend Impl* get_mutable_request_impl(Request&) noexcept;
 };
 
 } // namespace aevox
