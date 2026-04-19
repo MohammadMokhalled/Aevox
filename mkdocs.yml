@@ -33,6 +33,9 @@ nav:
       - Async Helpers: api/async.md
       - Request and Response: api/request-response.md
       - Router and App: api/router.md
+  - Examples:
+      - Overview: examples/index.md
+      - Hello World: examples/hello-world.md
   - Architecture:
       - Overview: architecture/index.md
   - Changelog: changelog.md

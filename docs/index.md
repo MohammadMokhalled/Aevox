@@ -2,40 +2,23 @@
 
 **A modern C++23 web framework** built for developers who need to handle millions of concurrent connections without sacrificing code clarity.
 
-## Current State (v0.1-pre)
+## v0.1 Alpha
 
-The low-level networking stack is complete. You can write raw TCP servers today using coroutines:
+The complete v0.1 stack is available. Write a working HTTP server in five lines:
 
 ```cpp
-#include <aevox/executor.hpp>
-#include <aevox/tcp_stream.hpp>
-#include <print>
+#include <aevox/app.hpp>
 
 int main() {
-    auto ex = aevox::make_executor();
-
-    ex->listen(8080, [](std::uint64_t conn_id, aevox::TcpStream stream) -> aevox::Task<void> {
-        for (;;) {
-            auto data = co_await stream.read();
-            if (!data) co_return;           // EOF or error
-            co_await stream.write(*data);   // echo back
-        }
+    aevox::App app;
+    app.get("/hello", [](aevox::Request&) {
+        return aevox::Response::ok("Hello, World!");
     });
-
-    ex->run();
+    app.listen(8080);
 }
 ```
 
-The HTTP/1.1 layer, router, and high-level `App` API are in active development. The final API will look like:
-
-```cpp
-// Coming in v0.1 — not yet available
-aevox::App app;
-app.get("/hello", [](aevox::Request& req) {
-    return aevox::Response::ok("Hello, World!");
-});
-app.listen(8080);
-```
+See the [Hello World example](examples/hello-world.md) for a full walkthrough.
 
 ---
 
@@ -77,9 +60,9 @@ graph TD
 | CPU offload + timers + fan-out | **Done** | `<aevox/async.hpp>` |
 | Async TCP stream | **Done** | `<aevox/tcp_stream.hpp>` |
 | HTTP/1.1 parser | **Done** | internal (`src/http/`) |
-| Router + path matching | In progress | `<aevox/router.hpp>` |
-| Request / Response model | In progress | `<aevox/request.hpp>` |
-| App high-level API | Planned | `<aevox/app.hpp>` |
+| Router + path matching | **Done** | `<aevox/router.hpp>` |
+| Request / Response model | **Done** | `<aevox/request.hpp>` |
+| App high-level API | **Done** | `<aevox/app.hpp>` |
 
 ---
 
