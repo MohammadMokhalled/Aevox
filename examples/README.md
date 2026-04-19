@@ -3,12 +3,12 @@
 Runnable applications demonstrating the Aevox public API. Each example is a
 self-contained project under its own subdirectory.
 
-Examples are **not built by default** — use `--target <name>` explicitly:
+Examples are built as part of the default build:
 
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
 cmake --preset default
-cmake --build --preset default --target <example-name>
+cmake --build --preset default
 ```
 
 ---

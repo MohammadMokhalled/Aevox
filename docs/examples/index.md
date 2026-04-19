@@ -11,17 +11,17 @@ self-contained binary under `examples/` in the repository.
 
 ## Building examples
 
-Examples are not built by default. Use `--target <name>` explicitly:
+Examples are built as part of the default build:
 
 === "Linux"
     ```bash
     export VCPKG_ROOT=$HOME/vcpkg
     cmake --preset default
-    cmake --build --preset default --target hello-world
+    cmake --build --preset default
     ```
 
 === "Windows"
     ```bash
     cmake --preset windows-msvc
-    cmake --build --preset windows-msvc-debug --target hello-world
+    cmake --build --preset windows-msvc-debug
     ```

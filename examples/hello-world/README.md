@@ -8,7 +8,7 @@ single file: static routes, named path parameters, and clean SIGINT shutdown.
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
 cmake --preset default
-cmake --build --preset default --target hello-world
+cmake --build --preset default
 ```
 
 The binary is written to `build/debug/examples/hello-world/hello-world`.
