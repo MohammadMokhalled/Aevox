@@ -9,6 +9,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `examples/hello-world` — end-to-end Hello World demonstrating the v0.1 public API: static routes, named path parameters, and clean SIGINT shutdown (AEV-020)
 - `aevox::Router` — radix-trie HTTP router with static, named-parameter, and
   wildcard segment matching; O(depth) dispatch; thread-safe after registration (AEV-004)
 - `aevox::App` and `aevox::AppConfig` — top-level server entry point; owns Router

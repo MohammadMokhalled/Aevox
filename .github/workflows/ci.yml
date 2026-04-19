@@ -55,6 +55,9 @@ jobs:
       - name: Build (default preset)
         run: cmake --build --preset default
 
+      - name: Build examples (default preset)
+        run: cmake --build --preset default --target hello-world
+
       - name: Test (default preset)
         run: ctest --preset default
 
@@ -90,6 +93,9 @@ jobs:
       - name: Build (asan preset)
         run: cmake --build --preset asan
 
+      - name: Build examples (asan preset)
+        run: cmake --build --preset asan --target hello-world
+
       - name: Test (asan preset — ASan + UBSan)
         run: ctest --preset asan
 
@@ -118,6 +124,9 @@ jobs:
       - name: Build Debug (windows-msvc-debug preset)
         run: cmake --build --preset windows-msvc-debug
 
+      - name: Build examples (windows-msvc-debug preset)
+        run: cmake --build --preset windows-msvc-debug --target hello-world
+
       - name: Test Debug (windows-msvc-debug preset)
         run: ctest --preset windows-msvc-debug
 
@@ -140,7 +149,7 @@ jobs:
 
       - name: Run clang-format on all source files
         run: |
-          find include src tests -name '*.hpp' -o -name '*.cpp' | \
+          find include src tests examples -name '*.hpp' -o -name '*.cpp' | \
             xargs clang-format -i
 
       - name: Fail if any format violations exist
