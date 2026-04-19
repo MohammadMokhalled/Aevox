@@ -16,7 +16,6 @@
 // Design: AEV-004-arch.md §6, §7
 
 #include "router/router_impl.hpp"
-#include "http/request_impl.hpp"
 
 #include <algorithm>
 #include <array>
@@ -24,6 +23,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "http/request_impl.hpp"
 
 namespace aevox {
 
@@ -34,8 +35,9 @@ namespace aevox {
 namespace {
 
 /// Method names for Allow header construction. Index = static_cast<uint8_t>(HttpMethod).
-constexpr std::array<std::string_view, kMethodCount> kMethodNames{
-    "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"};
+constexpr std::array<std::string_view, kMethodCount> kMethodNames{"GET",    "POST",   "PUT",
+                                                                  "PATCH",  "DELETE", "HEAD",
+                                                                  "OPTIONS"};
 
 /// Builds the comma-separated Allow header value from a method_mask bitmask.
 std::string build_allow_header(std::uint8_t method_mask)
@@ -67,7 +69,7 @@ std::vector<Segment> parse_pattern(std::string_view pattern)
     }
 
     std::vector<Segment> segs;
-    std::size_t          pos         = 1; // skip leading '/'
+    std::size_t          pos          = 1; // skip leading '/'
     bool                 had_wildcard = false;
 
     while (pos <= pattern.size()) {
@@ -91,8 +93,8 @@ std::vector<Segment> parse_pattern(std::string_view pattern)
 
                 if (inner.ends_with("...")) {
                     // Wildcard: {name...}
-                    seg.kind  = Segment::Kind::Wildcard;
-                    seg.name  = std::string{inner.substr(0, inner.size() - 3)};
+                    seg.kind = Segment::Kind::Wildcard;
+                    seg.name = std::string{inner.substr(0, inner.size() - 3)};
                     if (seg.name.empty())
                         std::terminate(); // nameless wildcard
                     had_wildcard = true;
@@ -106,7 +108,7 @@ std::vector<Segment> parse_pattern(std::string_view pattern)
                         seg.param_type = ParamType::None;
                     }
                     else {
-                        seg.name              = std::string{inner.substr(0, colon_pos)};
+                        seg.name                       = std::string{inner.substr(0, colon_pos)};
                         const std::string_view type_sv = inner.substr(colon_pos + 1);
                         if (type_sv == "int")
                             seg.param_type = ParamType::Int;
@@ -128,7 +130,8 @@ std::vector<Segment> parse_pattern(std::string_view pattern)
             else {
                 // Static segment — sanity check for stray braces
                 if (tok.find('{') != std::string_view::npos ||
-                    tok.find('}') != std::string_view::npos) {
+                    tok.find('}') != std::string_view::npos)
+                {
                     std::terminate(); // unclosed or misplaced brace
                 }
                 seg.kind    = Segment::Kind::Static;
@@ -181,17 +184,17 @@ TrieNode* Router::Impl::ensure_child(TrieNode* node, const detail::Segment& seg)
             if (child->segment == seg.literal)
                 return child.get();
         }
-        auto  child = std::make_unique<TrieNode>();
+        auto child     = std::make_unique<TrieNode>();
         child->kind    = TrieNode::NodeKind::Static;
         child->segment = seg.literal;
-        auto* ptr = child.get();
+        auto* ptr      = child.get();
         node->static_children.push_back(std::move(child));
         return ptr;
     }
 
     if (seg.kind == Kind::Param) {
         if (!node->param_child) {
-            node->param_child          = std::make_unique<TrieNode>();
+            node->param_child             = std::make_unique<TrieNode>();
             node->param_child->kind       = TrieNode::NodeKind::Param;
             node->param_child->segment    = seg.name;
             node->param_child->param_type = seg.param_type;
@@ -201,22 +204,20 @@ TrieNode* Router::Impl::ensure_child(TrieNode* node, const detail::Segment& seg)
 
     // Wildcard
     if (!node->wildcard_child) {
-        node->wildcard_child         = std::make_unique<TrieNode>();
-        node->wildcard_child->kind      = TrieNode::NodeKind::Wildcard;
-        node->wildcard_child->segment   = seg.name;
+        node->wildcard_child          = std::make_unique<TrieNode>();
+        node->wildcard_child->kind    = TrieNode::NodeKind::Wildcard;
+        node->wildcard_child->segment = seg.name;
     }
     return node->wildcard_child.get();
 }
 
-void Router::Impl::insert(TrieNode*                        node,
-                           std::span<const detail::Segment> segs,
-                           HttpMethod                        method,
-                           detail::ErasedHandler             handler)
+void Router::Impl::insert(TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
+                          detail::ErasedHandler handler)
 {
     if (segs.empty()) {
-        const auto idx = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
-        node->handlers[idx]  = std::move(handler);
-        node->method_mask   |= static_cast<std::uint8_t>(1u << idx);
+        const auto idx      = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
+        node->handlers[idx] = std::move(handler);
+        node->method_mask |= static_cast<std::uint8_t>(1u << idx);
         return;
     }
     TrieNode* child = ensure_child(node, segs[0]);
@@ -229,11 +230,11 @@ void Router::Impl::insert(TrieNode*                        node,
 
 Router::Router()
 {
-    auto impl         = std::make_unique<Impl>();
-    impl->root_       = std::make_unique<TrieNode>();
+    auto impl          = std::make_unique<Impl>();
+    impl->root_        = std::make_unique<TrieNode>();
     impl->insert_root_ = impl->root_.get();
-    impl->owns_root_  = true;
-    impl_             = std::move(impl);
+    impl->owns_root_   = true;
+    impl_              = std::move(impl);
 }
 
 Router::~Router() = default;
@@ -242,8 +243,7 @@ Router::Router(Router&& other) noexcept = default;
 
 Router& Router::operator=(Router&& other) noexcept = default;
 
-Router::Router(GroupTag, std::unique_ptr<Impl> group_impl) noexcept
-    : impl_{std::move(group_impl)}
+Router::Router(GroupTag, std::unique_ptr<Impl> group_impl) noexcept : impl_{std::move(group_impl)}
 {}
 
 // =============================================================================
@@ -259,9 +259,8 @@ bool Router::valid() const noexcept
 // Router::register_route — private, called by template methods in router_impl.hpp
 // =============================================================================
 
-void Router::register_route(HttpMethod method,
-                             std::span<const detail::Segment> segs,
-                             ErasedHandler handler)
+void Router::register_route(HttpMethod method, std::span<const detail::Segment> segs,
+                            ErasedHandler handler)
 {
     impl_->insert(impl_->insert_root_, segs, method, std::move(handler));
 }
@@ -298,7 +297,7 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
         }
     }
 
-    TrieNode*                                    node = impl_->root_.get();
+    TrieNode*                                        node = impl_->root_.get();
     std::vector<std::pair<std::string, std::string>> captured;
     captured.reserve(4);
 
@@ -329,11 +328,9 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
         // 3. Wildcard match — greedy: captures remainder of path via offset arithmetic
         if (node->wildcard_child) {
-            const std::size_t offset =
-                static_cast<std::size_t>(seg.data() - path.data());
-            captured.emplace_back(node->wildcard_child->segment,
-                                  std::string{path.substr(offset)});
-            node            = node->wildcard_child.get();
+            const std::size_t offset = static_cast<std::size_t>(seg.data() - path.data());
+            captured.emplace_back(node->wildcard_child->segment, std::string{path.substr(offset)});
+            node             = node->wildcard_child.get();
             wildcard_matched = true;
             break;
         }
@@ -362,8 +359,8 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
     if (node->method_mask != 0) {
         // Path matched but the requested method has no handler → 405.
-        co_return aevox::Response::method_not_allowed()
-            .header("Allow", build_allow_header(node->method_mask));
+        co_return aevox::Response::method_not_allowed().header("Allow", build_allow_header(
+                                                                            node->method_mask));
     }
 
     co_return aevox::Response::not_found("404 Not Found");
@@ -375,15 +372,15 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
 Router Router::group(std::string_view prefix)
 {
-    auto segs  = detail::parse_pattern(prefix);
+    auto  segs = detail::parse_pattern(prefix);
     auto* node = impl_->insert_root_;
     for (const auto& seg : segs)
         node = impl_->ensure_child(node, seg);
 
-    auto group_impl           = std::make_unique<Impl>();
-    group_impl->root_          = nullptr; // group sub-Router does not own the root
-    group_impl->insert_root_   = node;
-    group_impl->owns_root_     = false;
+    auto group_impl          = std::make_unique<Impl>();
+    group_impl->root_        = nullptr; // group sub-Router does not own the root
+    group_impl->insert_root_ = node;
+    group_impl->owns_root_   = false;
 
     return Router{GroupTag{}, std::move(group_impl)};
 }

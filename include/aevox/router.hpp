@@ -32,7 +32,9 @@
 #include <span>
 #include <string_view>
 
-namespace aevox::detail { struct Segment; } // forward declaration — defined in handler_wrap.hpp
+namespace aevox::detail {
+struct Segment;
+} // namespace aevox::detail
 
 namespace aevox {
 
@@ -50,9 +52,9 @@ namespace aevox {
  */
 enum class RouteError : std::uint8_t
 {
-    NotFound,          ///< No route matched the request path for any method (→ 404).
-    MethodNotAllowed,  ///< A route matched the path but not the HTTP method (→ 405).
-    BadParam,          ///< A typed parameter failed its type conversion (→ 400).
+    NotFound,         ///< No route matched the request path for any method (→ 404).
+    MethodNotAllowed, ///< A route matched the path but not the HTTP method (→ 405).
+    BadParam,         ///< A typed parameter failed its type conversion (→ 400).
 };
 
 // =============================================================================
@@ -162,8 +164,7 @@ public:
      * @note   Duplicate registration (same method + pattern) silently overwrites.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void get(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void get(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a POST handler for the given path pattern.
@@ -174,8 +175,7 @@ public:
      * @note   Not thread-safe. Must be called before `dispatch()`.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void post(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void post(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a PUT handler for the given path pattern.
@@ -186,8 +186,7 @@ public:
      * @note   Not thread-safe. Must be called before `dispatch()`.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void put(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void put(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a PATCH handler for the given path pattern.
@@ -198,8 +197,7 @@ public:
      * @note   Not thread-safe. Must be called before `dispatch()`.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void patch(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void patch(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a DELETE handler for the given path pattern.
@@ -212,8 +210,7 @@ public:
      * @note   Not thread-safe. Must be called before `dispatch()`.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void del(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void del(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers an OPTIONS handler for the given path pattern.
@@ -224,8 +221,7 @@ public:
      * @note   Not thread-safe. Must be called before `dispatch()`.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void options(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void options(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Creates a child Router with a shared path prefix.
@@ -279,7 +275,8 @@ private:
 
     // Constructor used by group() to create a child Router sharing the parent
     // trie but rooted at a different insert node.
-    struct GroupTag {};
+    struct GroupTag
+    {};
     explicit Router(GroupTag, std::unique_ptr<Impl> group_impl) noexcept;
 
     // Type-erased handler type. Matches aevox::detail::ErasedHandler in
@@ -290,8 +287,7 @@ private:
     // Private non-template registration entry point. Defined in router_impl.cpp.
     // Called by the template methods below (via router_impl.hpp) with pre-parsed segments —
     // avoids re-parsing the pattern string a second time.
-    void register_route(HttpMethod method,
-                        std::span<const detail::Segment> segs,
+    void register_route(HttpMethod method, std::span<const detail::Segment> segs,
                         ErasedHandler handler);
 };
 

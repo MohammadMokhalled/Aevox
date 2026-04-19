@@ -20,86 +20,74 @@
 //
 // Design: AEV-004-arch.md §4.3 (Final resolved design for template bodies)
 
-#include "router/handler_wrap.hpp" // resolved via ${CMAKE_SOURCE_DIR}/src
-
 #include <span>
 #include <string>
 #include <utility>
+
+#include "router/handler_wrap.hpp" // resolved via ${CMAKE_SOURCE_DIR}/src
 
 // =============================================================================
 // Router template method bodies (out-of-class definitions)
 // =============================================================================
 
-template <typename Handler>
-void aevox::Router::get(std::string_view pattern, Handler&& handler)
+template <typename Handler> void aevox::Router::get(std::string_view pattern, Handler&& handler)
 {
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
-    register_route(
-        aevox::HttpMethod::GET, std::span{segs},
-        aevox::detail::normalise_handler(std::forward<Handler>(handler),
-                                         std::span{names}, std::span{types}));
+    register_route(aevox::HttpMethod::GET, std::span{segs},
+                   aevox::detail::normalise_handler(std::forward<Handler>(handler),
+                                                    std::span{names}, std::span{types}));
 }
 
-template <typename Handler>
-void aevox::Router::post(std::string_view pattern, Handler&& handler)
+template <typename Handler> void aevox::Router::post(std::string_view pattern, Handler&& handler)
 {
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
-    register_route(
-        aevox::HttpMethod::POST, std::span{segs},
-        aevox::detail::normalise_handler(std::forward<Handler>(handler),
-                                         std::span{names}, std::span{types}));
+    register_route(aevox::HttpMethod::POST, std::span{segs},
+                   aevox::detail::normalise_handler(std::forward<Handler>(handler),
+                                                    std::span{names}, std::span{types}));
 }
 
-template <typename Handler>
-void aevox::Router::put(std::string_view pattern, Handler&& handler)
+template <typename Handler> void aevox::Router::put(std::string_view pattern, Handler&& handler)
 {
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
-    register_route(
-        aevox::HttpMethod::PUT, std::span{segs},
-        aevox::detail::normalise_handler(std::forward<Handler>(handler),
-                                         std::span{names}, std::span{types}));
+    register_route(aevox::HttpMethod::PUT, std::span{segs},
+                   aevox::detail::normalise_handler(std::forward<Handler>(handler),
+                                                    std::span{names}, std::span{types}));
 }
 
-template <typename Handler>
-void aevox::Router::patch(std::string_view pattern, Handler&& handler)
+template <typename Handler> void aevox::Router::patch(std::string_view pattern, Handler&& handler)
 {
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
-    register_route(
-        aevox::HttpMethod::PATCH, std::span{segs},
-        aevox::detail::normalise_handler(std::forward<Handler>(handler),
-                                         std::span{names}, std::span{types}));
+    register_route(aevox::HttpMethod::PATCH, std::span{segs},
+                   aevox::detail::normalise_handler(std::forward<Handler>(handler),
+                                                    std::span{names}, std::span{types}));
 }
 
-template <typename Handler>
-void aevox::Router::del(std::string_view pattern, Handler&& handler)
+template <typename Handler> void aevox::Router::del(std::string_view pattern, Handler&& handler)
 {
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
-    register_route(
-        aevox::HttpMethod::DELETE, std::span{segs},
-        aevox::detail::normalise_handler(std::forward<Handler>(handler),
-                                         std::span{names}, std::span{types}));
+    register_route(aevox::HttpMethod::DELETE, std::span{segs},
+                   aevox::detail::normalise_handler(std::forward<Handler>(handler),
+                                                    std::span{names}, std::span{types}));
 }
 
-template <typename Handler>
-void aevox::Router::options(std::string_view pattern, Handler&& handler)
+template <typename Handler> void aevox::Router::options(std::string_view pattern, Handler&& handler)
 {
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
-    register_route(
-        aevox::HttpMethod::OPTIONS, std::span{segs},
-        aevox::detail::normalise_handler(std::forward<Handler>(handler),
-                                         std::span{names}, std::span{types}));
+    register_route(aevox::HttpMethod::OPTIONS, std::span{segs},
+                   aevox::detail::normalise_handler(std::forward<Handler>(handler),
+                                                    std::span{names}, std::span{types}));
 }
 
 // App template method bodies are defined inline in include/aevox/app.hpp

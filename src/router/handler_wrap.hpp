@@ -72,7 +72,7 @@ struct Segment
         Wildcard, ///< Greedy tail capture ({path...}). Must be last segment.
     };
 
-    Kind       kind{Kind::Static};
+    Kind        kind{Kind::Static};
     std::string name;    ///< Param or wildcard name (empty for Static).
     std::string literal; ///< Literal text (empty for Param/Wildcard).
     ParamType   param_type{ParamType::None};
@@ -92,16 +92,15 @@ std::vector<Segment> parse_pattern(std::string_view pattern);
 std::vector<std::string> extract_param_names(const std::vector<Segment>& segs);
 
 /// Extracts param types from a segment vector, in left-to-right order.
-std::vector<ParamType>   extract_param_types(const std::vector<Segment>& segs);
+std::vector<ParamType> extract_param_types(const std::vector<Segment>& segs);
 
 // =============================================================================
 // Internal concepts (used only by normalise_handler)
 // =============================================================================
 
 template <typename H>
-concept SyncHandlerBase =
-    std::invocable<H, aevox::Request&> &&
-    std::same_as<std::invoke_result_t<H, aevox::Request&>, aevox::Response>;
+concept SyncHandlerBase = std::invocable<H, aevox::Request&> &&
+                          std::same_as<std::invoke_result_t<H, aevox::Request&>, aevox::Response>;
 
 template <typename H>
 concept AsyncHandlerBase =
@@ -129,9 +128,8 @@ concept AsyncHandlerBase =
 /// @note std::function requires CopyConstructible captures. Handlers that capture
 ///       move-only types must wrap them in std::shared_ptr (OI-2, AEV-015).
 template <typename Handler>
-ErasedHandler normalise_handler(Handler&&                        h,
-                                std::span<const std::string>     param_names,
-                                std::span<const ParamType>       /*param_types*/)
+ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_names,
+                                std::span<const ParamType> /*param_types*/)
 {
     // Helper: wrap a sync call into a coroutine.
     // Used below for sync handler variants.
@@ -147,8 +145,9 @@ ErasedHandler normalise_handler(Handler&&                        h,
     // Arity 0: (Request&) -> Response
     // -------------------------------------------------------------------------
     else if constexpr (SyncHandlerBase<Handler>) {
-        return [h = std::forward<Handler>(h)](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> { co_return h(r); };
+        return [h = std::forward<Handler>(h)](aevox::Request& r) -> aevox::Task<aevox::Response> {
+            co_return h(r);
+        };
     }
 
     // -------------------------------------------------------------------------
@@ -158,15 +157,16 @@ ErasedHandler normalise_handler(Handler&&                        h,
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, int>) {
         std::string name0{param_names.empty() ? "" : param_names[0]};
-        return [h = std::forward<Handler>(h), name0](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h),
+                name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<int>(name0);
             if (!v) {
                 co_return aevox::Response::bad_request(
                     std::format("bad param '{}': expected int", name0));
             }
             if constexpr (std::is_same_v<std::invoke_result_t<Handler, aevox::Request&, int>,
-                                         aevox::Task<aevox::Response>>) {
+                                         aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v);
             }
             else {
@@ -180,8 +180,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, unsigned int>) {
         std::string name0{param_names.empty() ? "" : param_names[0]};
-        return [h = std::forward<Handler>(h), name0](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h),
+                name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<unsigned int>(name0);
             if (!v) {
                 co_return aevox::Response::bad_request(
@@ -189,7 +189,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
             }
             if constexpr (std::is_same_v<
                               std::invoke_result_t<Handler, aevox::Request&, unsigned int>,
-                              aevox::Task<aevox::Response>>) {
+                              aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v);
             }
             else {
@@ -203,15 +204,16 @@ ErasedHandler normalise_handler(Handler&&                        h,
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, float>) {
         std::string name0{param_names.empty() ? "" : param_names[0]};
-        return [h = std::forward<Handler>(h), name0](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h),
+                name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<float>(name0);
             if (!v) {
                 co_return aevox::Response::bad_request(
                     std::format("bad param '{}': expected float", name0));
             }
             if constexpr (std::is_same_v<std::invoke_result_t<Handler, aevox::Request&, float>,
-                                         aevox::Task<aevox::Response>>) {
+                                         aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v);
             }
             else {
@@ -225,15 +227,16 @@ ErasedHandler normalise_handler(Handler&&                        h,
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, double>) {
         std::string name0{param_names.empty() ? "" : param_names[0]};
-        return [h = std::forward<Handler>(h), name0](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h),
+                name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<double>(name0);
             if (!v) {
                 co_return aevox::Response::bad_request(
                     std::format("bad param '{}': expected double", name0));
             }
             if constexpr (std::is_same_v<std::invoke_result_t<Handler, aevox::Request&, double>,
-                                         aevox::Task<aevox::Response>>) {
+                                         aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v);
             }
             else {
@@ -247,8 +250,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, std::string>) {
         std::string name0{param_names.empty() ? "" : param_names[0]};
-        return [h = std::forward<Handler>(h), name0](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h),
+                name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<std::string>(name0);
             if (!v) {
                 co_return aevox::Response::bad_request(
@@ -256,7 +259,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
             }
             if constexpr (std::is_same_v<
                               std::invoke_result_t<Handler, aevox::Request&, std::string>,
-                              aevox::Task<aevox::Response>>) {
+                              aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v);
             }
             else {
@@ -271,13 +275,12 @@ ErasedHandler normalise_handler(Handler&&                        h,
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, std::string, int>) {
         std::string name0{param_names.size() > 0 ? param_names[0] : ""};
         std::string name1{param_names.size() > 1 ? param_names[1] : ""};
-        return [h = std::forward<Handler>(h), name0, name1](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h), name0,
+                name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<std::string>(name0);
             auto v1 = r.param<int>(name1);
             if (!v0) {
-                co_return aevox::Response::bad_request(
-                    std::format("bad param '{}'", name0));
+                co_return aevox::Response::bad_request(std::format("bad param '{}'", name0));
             }
             if (!v1) {
                 co_return aevox::Response::bad_request(
@@ -285,7 +288,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
             }
             if constexpr (std::is_same_v<
                               std::invoke_result_t<Handler, aevox::Request&, std::string, int>,
-                              aevox::Task<aevox::Response>>) {
+                              aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v0, *v1);
             }
             else {
@@ -300,8 +304,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, int, std::string>) {
         std::string name0{param_names.size() > 0 ? param_names[0] : ""};
         std::string name1{param_names.size() > 1 ? param_names[1] : ""};
-        return [h = std::forward<Handler>(h), name0, name1](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h), name0,
+                name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<int>(name0);
             auto v1 = r.param<std::string>(name1);
             if (!v0) {
@@ -309,12 +313,12 @@ ErasedHandler normalise_handler(Handler&&                        h,
                     std::format("bad param '{}': expected int", name0));
             }
             if (!v1) {
-                co_return aevox::Response::bad_request(
-                    std::format("bad param '{}'", name1));
+                co_return aevox::Response::bad_request(std::format("bad param '{}'", name1));
             }
             if constexpr (std::is_same_v<
                               std::invoke_result_t<Handler, aevox::Request&, int, std::string>,
-                              aevox::Task<aevox::Response>>) {
+                              aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v0, *v1);
             }
             else {
@@ -329,8 +333,8 @@ ErasedHandler normalise_handler(Handler&&                        h,
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, int, int>) {
         std::string name0{param_names.size() > 0 ? param_names[0] : ""};
         std::string name1{param_names.size() > 1 ? param_names[1] : ""};
-        return [h = std::forward<Handler>(h), name0, name1](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h), name0,
+                name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<int>(name0);
             auto v1 = r.param<int>(name1);
             if (!v0) {
@@ -341,9 +345,9 @@ ErasedHandler normalise_handler(Handler&&                        h,
                 co_return aevox::Response::bad_request(
                     std::format("bad param '{}': expected int", name1));
             }
-            if constexpr (std::is_same_v<
-                              std::invoke_result_t<Handler, aevox::Request&, int, int>,
-                              aevox::Task<aevox::Response>>) {
+            if constexpr (std::is_same_v<std::invoke_result_t<Handler, aevox::Request&, int, int>,
+                                         aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v0, *v1);
             }
             else {
@@ -358,22 +362,20 @@ ErasedHandler normalise_handler(Handler&&                        h,
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, std::string, std::string>) {
         std::string name0{param_names.size() > 0 ? param_names[0] : ""};
         std::string name1{param_names.size() > 1 ? param_names[1] : ""};
-        return [h = std::forward<Handler>(h), name0, name1](aevox::Request& r)
-                   -> aevox::Task<aevox::Response> {
+        return [h = std::forward<Handler>(h), name0,
+                name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<std::string>(name0);
             auto v1 = r.param<std::string>(name1);
             if (!v0) {
-                co_return aevox::Response::bad_request(
-                    std::format("bad param '{}'", name0));
+                co_return aevox::Response::bad_request(std::format("bad param '{}'", name0));
             }
             if (!v1) {
-                co_return aevox::Response::bad_request(
-                    std::format("bad param '{}'", name1));
+                co_return aevox::Response::bad_request(std::format("bad param '{}'", name1));
             }
-            if constexpr (std::is_same_v<
-                              std::invoke_result_t<Handler, aevox::Request&, std::string,
-                                                   std::string>,
-                              aevox::Task<aevox::Response>>) {
+            if constexpr (std::is_same_v<std::invoke_result_t<Handler, aevox::Request&, std::string,
+                                                              std::string>,
+                                         aevox::Task<aevox::Response>>)
+            {
                 co_return co_await h(r, *v0, *v1);
             }
             else {

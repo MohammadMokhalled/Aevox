@@ -16,8 +16,6 @@
 //
 // Design: AEV-004-arch.md §5
 
-#include "router/handler_wrap.hpp"
-
 #include <aevox/app.hpp>
 #include <aevox/executor.hpp>
 #include <aevox/router.hpp>
@@ -28,6 +26,8 @@
 #include <span>
 #include <string>
 #include <vector>
+
+#include "router/handler_wrap.hpp"
 
 namespace aevox {
 
@@ -102,10 +102,8 @@ struct Router::Impl
 
     /// Recursively inserts a route at segs.front(), advancing recursively.
     /// Terminal call (segs empty) registers handler at node.
-    void insert(TrieNode*                        node,
-                std::span<const detail::Segment> segs,
-                HttpMethod                        method,
-                detail::ErasedHandler             handler);
+    void insert(TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
+                detail::ErasedHandler handler);
 
     /// Finds or creates a child of node matching seg's kind and name/literal.
     /// Returns the child node pointer (never null — creates if absent).
@@ -118,9 +116,9 @@ struct Router::Impl
 
 struct App::Impl
 {
-    AppConfig                  config_;
-    Router                     router_;
-    std::unique_ptr<Executor>  executor_;
+    AppConfig                 config_;
+    Router                    router_;
+    std::unique_ptr<Executor> executor_;
 };
 
 } // namespace aevox

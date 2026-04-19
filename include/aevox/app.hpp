@@ -168,8 +168,7 @@ public:
      * @note   Not thread-safe. Must be called before `listen()`.
      * @note   `std::function` requires CopyConstructible captures (AEV-015).
      */
-    template <typename Handler>
-    void get(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void get(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a POST handler on the internal Router.
@@ -179,8 +178,7 @@ public:
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `listen()`.
      */
-    template <typename Handler>
-    void post(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void post(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a PUT handler on the internal Router.
@@ -190,8 +188,7 @@ public:
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `listen()`.
      */
-    template <typename Handler>
-    void put(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void put(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a PATCH handler on the internal Router.
@@ -201,8 +198,7 @@ public:
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `listen()`.
      */
-    template <typename Handler>
-    void patch(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void patch(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers a DELETE handler on the internal Router.
@@ -212,8 +208,7 @@ public:
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `listen()`.
      */
-    template <typename Handler>
-    void del(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void del(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Registers an OPTIONS handler on the internal Router.
@@ -223,8 +218,7 @@ public:
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `listen()`.
      */
-    template <typename Handler>
-    void options(std::string_view pattern, Handler&& handler);
+    template <typename Handler> void options(std::string_view pattern, Handler&& handler);
 
     /**
      * @brief Installs a middleware function that wraps every handler.
@@ -323,8 +317,7 @@ private:
 // would fail because router.hpp includes router_impl.hpp before app.hpp declares App.
 // =============================================================================
 
-template <typename Handler>
-inline void aevox::App::get(std::string_view pattern, Handler&& handler)
+template <typename Handler> inline void aevox::App::get(std::string_view pattern, Handler&& handler)
 {
     router().get(pattern, std::forward<Handler>(handler));
 }
@@ -335,8 +328,7 @@ inline void aevox::App::post(std::string_view pattern, Handler&& handler)
     router().post(pattern, std::forward<Handler>(handler));
 }
 
-template <typename Handler>
-inline void aevox::App::put(std::string_view pattern, Handler&& handler)
+template <typename Handler> inline void aevox::App::put(std::string_view pattern, Handler&& handler)
 {
     router().put(pattern, std::forward<Handler>(handler));
 }
@@ -347,8 +339,7 @@ inline void aevox::App::patch(std::string_view pattern, Handler&& handler)
     router().patch(pattern, std::forward<Handler>(handler));
 }
 
-template <typename Handler>
-inline void aevox::App::del(std::string_view pattern, Handler&& handler)
+template <typename Handler> inline void aevox::App::del(std::string_view pattern, Handler&& handler)
 {
     router().del(pattern, std::forward<Handler>(handler));
 }

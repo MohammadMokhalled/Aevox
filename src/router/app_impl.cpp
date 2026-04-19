@@ -9,23 +9,23 @@
 //
 // Design: AEV-004-arch.md §8
 
-#include "router/router_impl.hpp"
-#include "http/http_parser.hpp"
-#include "http/request_impl.hpp"
-#include "http/response_impl.hpp"
-
 #include <aevox/response.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
 
 #include <atomic>
+#include <csignal>
 #include <cstddef>
 #include <cstring>
-#include <csignal>
 #include <format>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "http/http_parser.hpp"
+#include "http/request_impl.hpp"
+#include "http/response_impl.hpp"
+#include "router/router_impl.hpp"
 
 namespace aevox {
 
@@ -52,17 +52,28 @@ void handle_signal(int) noexcept
 constexpr std::string_view status_text(int code) noexcept
 {
     switch (code) {
-    case 200: return "OK";
-    case 201: return "Created";
-    case 204: return "No Content";
-    case 400: return "Bad Request";
-    case 401: return "Unauthorized";
-    case 403: return "Forbidden";
-    case 404: return "Not Found";
-    case 405: return "Method Not Allowed";
-    case 413: return "Payload Too Large";
-    case 500: return "Internal Server Error";
-    default:  return "Unknown";
+        case 200:
+            return "OK";
+        case 201:
+            return "Created";
+        case 204:
+            return "No Content";
+        case 400:
+            return "Bad Request";
+        case 401:
+            return "Unauthorized";
+        case 403:
+            return "Forbidden";
+        case 404:
+            return "Not Found";
+        case 405:
+            return "Method Not Allowed";
+        case 413:
+            return "Payload Too Large";
+        case 500:
+            return "Internal Server Error";
+        default:
+            return "Unknown";
     }
 }
 
@@ -74,9 +85,7 @@ std::vector<std::byte> serialize_response(const Response& resp)
     // Build the response header section into a std::string buffer.
     std::string head;
     head.reserve(256);
-    head += std::format("HTTP/1.1 {} {}\r\n",
-                        resp.status_code(),
-                        status_text(resp.status_code()));
+    head += std::format("HTTP/1.1 {} {}\r\n", resp.status_code(), status_text(resp.status_code()));
     head += std::format("Content-Length: {}\r\n", body.size());
 
     if (impl) {
@@ -104,8 +113,7 @@ std::vector<std::byte> serialize_response(const Response& resp)
 // App — constructor / destructor / move
 // =============================================================================
 
-App::App(AppConfig config)
-    : impl_{std::make_unique<Impl>()}
+App::App(AppConfig config) : impl_{std::make_unique<Impl>()}
 {
     impl_->config_   = std::move(config);
     impl_->executor_ = make_executor(impl_->config_.executor);
@@ -146,14 +154,14 @@ void App::listen(std::uint16_t port)
 {
     // Install signal handlers so Ctrl-C stops the executor cleanly.
     g_signal_executor.store(impl_->executor_.get(), std::memory_order_relaxed);
-    std::signal(SIGINT,  handle_signal);  // NOLINT: signal() is appropriate here
-    std::signal(SIGTERM, handle_signal);  // NOLINT
+    std::signal(SIGINT, handle_signal);  // NOLINT: signal() is appropriate here
+    std::signal(SIGTERM, handle_signal); // NOLINT
 
     const std::size_t max_body = impl_->config_.max_body_size;
     Router&           router   = impl_->router_;
 
-    auto connection_handler =
-        [max_body, &router](std::uint64_t /*conn_id*/, TcpStream stream) -> Task<void> {
+    auto connection_handler = [max_body, &router](std::uint64_t /*conn_id*/,
+                                                  TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_body_bytes = max_body}};
 
         for (;;) {
