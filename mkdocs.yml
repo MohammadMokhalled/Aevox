@@ -32,6 +32,7 @@ nav:
       - Task: api/task.md
       - Async Helpers: api/async.md
       - Request and Response: api/request-response.md
+      - Router and App: api/router.md
   - Architecture:
       - Overview: architecture/index.md
   - Changelog: changelog.md

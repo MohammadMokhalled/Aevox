@@ -4,5 +4,6 @@
 # Framework: Catch2 3 + real asio::io_context (no Asio mocking permitted).
 # Location convention: tests/integration/{module}/{TASK-ID}-{slug}.cpp
 
-add_subdirectory(net)   # AEV-001: TCP accept loop integration tests
-add_subdirectory(http)  # AEV-003: HttpParser + TcpStream roundtrip integration tests
+add_subdirectory(net)    # AEV-001: TCP accept loop integration tests
+add_subdirectory(http)   # AEV-003: HttpParser + TcpStream roundtrip integration tests
+add_subdirectory(router) # AEV-004: App + Router end-to-end over loopback TCP

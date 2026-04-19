@@ -47,4 +47,17 @@ template <typename T>
     return Response{200, R"({"error":"not_implemented"})", "application/json"};
 }
 
+// =============================================================================
+// Internal serialization accessor (friend of Response — see response.hpp)
+// =============================================================================
+
+/// Returns a read-only pointer to Response's Impl for serialization.
+/// Used by src/router/app_impl.cpp to iterate all headers when writing
+/// HTTP responses to the wire. Returns nullptr for a moved-from Response.
+/// Friend of Response — declared in response.hpp (in aevox namespace, not detail).
+inline const Response::Impl* get_response_impl(const Response& res) noexcept
+{
+    return res.impl_.get();
+}
+
 } // namespace aevox
