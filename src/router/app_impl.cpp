@@ -179,9 +179,9 @@ void App::listen(std::uint16_t port)
                 if (parsed.error() == detail::ParseError::Incomplete)
                     continue; // need more data
 
-                // Protocol error — send 400 and close
+                // Protocol error — send 400 and close; ignore write error (closing anyway)
                 auto err_bytes = serialize_response(Response::bad_request("Bad Request"));
-                co_await stream.write(std::span{err_bytes});
+                (void)(co_await stream.write(std::span{err_bytes}));
                 co_return;
             }
 
