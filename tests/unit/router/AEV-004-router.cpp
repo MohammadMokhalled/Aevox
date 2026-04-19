@@ -69,7 +69,7 @@ template <typename T> static T drive_task(aevox::Task<T> task)
 // Static path matching
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — static path matching", "[router]")
+TEST_CASE("AEV-004: Router - static path matching", "[router]")
 {
     SECTION("exact match returns 200")
     {
@@ -108,7 +108,7 @@ TEST_CASE("AEV-004: Router — static path matching", "[router]")
 // Named parameter extraction
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — named parameter extraction", "[router]")
+TEST_CASE("AEV-004: Router - named parameter extraction", "[router]")
 {
     SECTION("string param is extracted")
     {
@@ -163,7 +163,7 @@ TEST_CASE("AEV-004: Router — named parameter extraction", "[router]")
 // Wildcard capture
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — wildcard capture", "[router]")
+TEST_CASE("AEV-004: Router - wildcard capture", "[router]")
 {
     SECTION("wildcard captures tail")
     {
@@ -205,7 +205,7 @@ TEST_CASE("AEV-004: Router — wildcard capture", "[router]")
 // Handler invocation — all supported arities and return types
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — handler invocation", "[router]")
+TEST_CASE("AEV-004: Router - handler invocation", "[router]")
 {
     SECTION("sync arity-0 handler")
     {
@@ -271,7 +271,7 @@ TEST_CASE("AEV-004: Router — handler invocation", "[router]")
 // 405 Method Not Allowed
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — method not allowed", "[router]")
+TEST_CASE("AEV-004: Router - method not allowed", "[router]")
 {
     SECTION("GET-only route returns 405 for POST with Allow header")
     {
@@ -291,7 +291,7 @@ TEST_CASE("AEV-004: Router — method not allowed", "[router]")
 // Concurrent dispatch thread safety
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — concurrent dispatch thread safety", "[router]")
+TEST_CASE("AEV-004: Router - concurrent dispatch thread safety", "[router]")
 {
     SECTION("1000 concurrent dispatches on read-only trie")
     {
@@ -329,7 +329,7 @@ TEST_CASE("AEV-004: Router — concurrent dispatch thread safety", "[router]")
 // Group prefix
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — group prefix", "[router]")
+TEST_CASE("AEV-004: Router - group prefix", "[router]")
 {
     SECTION("group routes are accessible via prefixed path")
     {
@@ -359,7 +359,7 @@ TEST_CASE("AEV-004: Router — group prefix", "[router]")
 // Match priority: static > param > wildcard
 // =============================================================================
 
-TEST_CASE("AEV-004: Router — match priority", "[router]")
+TEST_CASE("AEV-004: Router - match priority", "[router]")
 {
     SECTION("static segment takes priority over param at same level")
     {
