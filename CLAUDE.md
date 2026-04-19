@@ -128,6 +128,7 @@ These patterns are required everywhere in the codebase — internals, public API
 | `using namespace std;` | Explicit `std::` prefix always |
 | Mutable globals | Dependency injection |
 | `reinterpret_cast` | Redesign (rare justified exceptions with comment) |
+| Em dash `—` (U+2014) in string literals / `TEST_CASE` names | ASCII hyphen-minus ` - ` — MSVC's Windows-1252 encoding garbles non-ASCII in string literals, breaking Catch2 test name matching |
 
 ---
 

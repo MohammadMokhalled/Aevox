@@ -2,8 +2,8 @@
 
 This guide walks you from zero to a working TCP echo server using Aevox's coroutine-based I/O stack.
 
-!!! note "v0.1-pre"
-    The high-level `App`, `Request`, and `Response` APIs are not yet available. This guide covers the current networking layer — `Executor`, `TcpStream`, and async helpers — which is fully implemented and tested.
+!!! tip "Start with the Hello World example"
+    If you want to write an HTTP server right away, skip to the [Hello World example](examples/hello-world.md). It covers `App`, `Router`, `Request`, and `Response` in one file. This guide goes deeper into the networking layer underneath.
 
 ---
 
@@ -220,6 +220,8 @@ The drain timeout (default 30 s) gives in-flight connections time to finish clea
 
 | Topic | Where |
 |---|---|
+| HTTP server with routing | [Hello World example](examples/hello-world.md) |
+| `App` / `Router` / `Request` / `Response` | [API Reference — Router and App](api/router.md) |
 | Full `Executor` API | [API Reference — Executor](api/executor.md) |
 | `TcpStream` read/write details | [API Reference — TcpStream](api/tcp_stream.md) |
 | CPU offload, timers, fan-out | [API Reference — Async Helpers](api/async.md) |

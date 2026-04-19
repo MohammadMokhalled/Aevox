@@ -66,4 +66,4 @@ enable_testing()
 # ── Subdirectories ────────────────────────────────────────────────────────────
 add_subdirectory(src)
 add_subdirectory(tests)
-add_subdirectory(examples EXCLUDE_FROM_ALL)  # not built by default
+add_subdirectory(examples)  # always built — examples are the canonical public-API smoke test
