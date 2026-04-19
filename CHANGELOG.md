@@ -9,6 +9,16 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `aevox::Router` — radix-trie HTTP router with static, named-parameter, and
+  wildcard segment matching; O(depth) dispatch; thread-safe after registration (AEV-004)
+- `aevox::App` and `aevox::AppConfig` — top-level server entry point; owns Router
+  and Executor; registers routes via `get/post/put/patch/del/options`; starts
+  listening with `listen(port)` which blocks until `stop()` or SIGINT/SIGTERM (AEV-004)
+- `aevox::RouteError` enum (`NotFound`, `MethodNotAllowed`, `BadParam`) for dispatch
+  error introspection in tests (AEV-004)
+- `aevox::Response::method_not_allowed()` factory — returns 405 response; caller
+  adds the `Allow` header via `.header("Allow", value)` (AEV-004)
+- `Router::group(prefix)` — returns a child Router scoped to a shared path prefix (AEV-004)
 - `aevox::Request` and `aevox::Response` public API types with typed path-parameter
   extraction (`param<T>`), case-insensitive header lookup, raw body access (`body()`),
   middleware context store (`set<T>`/`get<T>`), fluent response builder

@@ -201,6 +201,20 @@ public:
     [[nodiscard]] static Response bad_request(std::string_view body = {});
 
     /**
+     * @brief Creates a 405 Method Not Allowed response.
+     *
+     * Sets Content-Type: text/plain. The caller is responsible for adding the
+     * `Allow` header listing the permitted methods via `.header("Allow", value)`:
+     * @code
+     * co_return Response::method_not_allowed().header("Allow", "GET, POST");
+     * @endcode
+     *
+     * @param body  Optional diagnostic message. Defaults to empty.
+     * @return      Response with status 405.
+     */
+    [[nodiscard]] static Response method_not_allowed(std::string_view body = {});
+
+    /**
      * @brief Creates a 401 Unauthorized response.
      *
      * @param body  Optional response body. Defaults to empty.
@@ -273,6 +287,10 @@ private:
 
     // Private constructor — used only by factory methods.
     explicit Response(int status_code, std::string body, std::string content_type_value);
+
+    // Internal read-only Impl access for serialization (app_impl.cpp, AEV-004).
+    // Declared here, defined inline in src/http/response_impl.hpp.
+    friend const Impl* get_response_impl(const Response&) noexcept;
 };
 
 } // namespace aevox

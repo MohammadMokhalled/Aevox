@@ -138,6 +138,11 @@ Response Response::json(std::string body)
     return Response{200, std::move(body), "application/json"};
 }
 
+Response Response::method_not_allowed(std::string_view body)
+{
+    return Response{405, std::string{body}, "text/plain"};
+}
+
 Response Response::stream(std::string_view content_type)
 {
     // v0.1: returns a normal Response with empty body and the given Content-Type.
