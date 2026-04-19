@@ -19,7 +19,7 @@ The binary is written to `build/debug/examples/hello-world/hello-world`.
 ./build/debug/examples/hello-world/hello-world
 ```
 
-The server listens on port 8080. Stop it with `Ctrl-Z`.
+The server listens on port 8080. Stop it with `Ctrl-C`.
 
 ## Routes
 
