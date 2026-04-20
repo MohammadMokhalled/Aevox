@@ -75,15 +75,7 @@ Glob: pattern="tests/**/*executor*"
 
 ## CLAUDE.md Constraint Check
 
-Before recommending any approach, verify it against the invariants in CLAUDE.md §3:
-
-- **No Asio types in `include/aevox/`** — any approach requiring Asio in public headers is non-viable.
-- **No third-party types in public headers** — any approach requiring llhttp, glaze, spdlog, etc. there is non-viable.
-- **No raw `new` / `delete`** — non-viable.
-- **`std::expected<T,E>` for errors** — any approach using exceptions for control flow is non-viable.
-- **Layer diagram must be respected** — nothing flows upward.
-
-Flag any non-viable option explicitly, even if it would be simpler.
+Before recommending any approach, verify it against CLAUDE.md §3 invariants. Any option that violates them is non-viable — flag it explicitly, even if it would be simpler.
 
 ---
 

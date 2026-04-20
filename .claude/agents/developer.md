@@ -156,50 +156,11 @@ Follow the ADD's **File Map** (Section 5) exactly. Create files in dependency or
 
 ### Code Standards (enforced — no exceptions)
 
-All code must pass these or it does not ship:
-
-**Compiler flags (match CI):**
-```cmake
-target_compile_options(aevox_core PRIVATE
-    -Wall -Wextra -Wpedantic -Werror
-    -fsanitize=address,undefined  # in Debug/CI builds
-)
-```
-
-**Prohibited patterns (PRD §6.9) — if you write any of these, fix it immediately:**
-
-| Never write | Write instead |
-|---|---|
-| `new T(...)` / `delete p` | `std::make_unique<T>(...)` |
-| `T*` as owner | `std::unique_ptr<T>` |
-| `const std::string&` param | `std::string_view` |
-| `void*` | typed template or `std::any` |
-| `(int)x` C-cast | `static_cast<int>(x)` |
-| `#define CONST 42` | `constexpr auto CONST = 42;` |
-| `enable_if` / SFINAE | `requires` / concepts |
-| `printf` / `sprintf` | `std::format` |
-| callback async API | `co_await` coroutines |
-| `for(int i=0; i<n; i++)` over containers | range-for / `std::ranges` |
-| `std::endl` | `'\n'` |
-| `using namespace std;` | explicit `std::` prefix |
-| mutable globals | dependency injection |
-
-**Every return of `std::expected<>` or `std::optional<>` must be `[[nodiscard]]`.**
+All CLAUDE.md §3–5 rules apply — zero tolerance. If you write a prohibited pattern, fix it immediately.
 
 ### In-Code Documentation
 
-Every public symbol must have a Doxygen comment block. Write it before the implementation, not after. The comment in the ADD Section 3 is the starting point — copy it and extend if needed.
-
-Style: `/** */` blocks for all symbols. Consistent within a file.
-
-Required tags for every public function:
-- `@brief` — one-sentence purpose
-- `@param` / `@tparam` — all parameters (skip only `self`-obvious ones like copy constructors)
-- `@return` — what is returned and under what conditions, including error cases
-- `@note` — thread-safety, lifetime, performance characteristics (when non-obvious)
-- `@throws` — if exceptions can escape (rare in Aevox; note if `noexcept`)
-
-Internal (non-public) code: block comments for non-obvious logic. Inline `//` for anything not self-explanatory. No comment needed for trivially readable code — do not over-comment.
+Follow CLAUDE.md §8. The ADD §3 comment is your starting point — copy it and extend if needed. Write Doxygen before the implementation, not after.
 
 ### Deviation Protocol
 
@@ -215,27 +176,7 @@ If you discover the ADD is wrong, incomplete, or impossible to implement as writ
 
 Write tests as specified in the ADD Section 8. The ADD gives you named test cases — use those exact names as your `TEST_CASE` strings.
 
-### Test Framework
-
-```cpp
-// Unit and integration: Catch2
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/catch_approx.hpp>
-
-// Benchmark: nanobench
-#include <nanobench.h>
-```
-
-### Required coverage per task (non-negotiable)
-
-Every public function needs:
-- **Happy path** — correct inputs, verify correct output
-- **Error path** — at least one `std::expected` error branch exercised and asserted
-- **Edge cases** — boundary values, empty inputs, maximum sizes as applicable
-
-For networking code additionally:
-- **Thread-safety test** — spawn `std::jthread` workers, use `std::barrier` to synchronize, assert no data races (run under ASan)
-- **Cancellation test** — verify clean shutdown when stop/close is called mid-operation
+Follow CLAUDE.md §9 for required test types, coverage minimums, and framework choices.
 
 ### Test file header
 
@@ -245,12 +186,11 @@ Every test file starts with:
 // {TASK-ID}: {what this file tests}
 // ADD ref: Tasks/architecture/{TASK-ID}-arch.md § Test Architecture
 #include <catch2/catch_test_macros.hpp>
-// ... other includes
 ```
 
-### Running tests locally
+Use test case names **exactly** as specified in ADD §8.
 
-After writing tests, run them and report results in the Developer Log:
+### Running tests locally
 
 ```bash
 cmake --build build --target aevox_tests
@@ -398,15 +338,11 @@ Before declaring the task done, conduct a structured self-review against four ch
 
 ### Checklist B — Code Quality
 
-- [ ] Zero violations of PRD §6.9 prohibition list
-- [ ] No `[[nodiscard]]` missing on `std::expected` / `std::optional` returns
-- [ ] All public symbols have complete Doxygen blocks
+- [ ] Zero violations of CLAUDE.md §4 prohibition list
+- [ ] All public symbols have complete Doxygen blocks (CLAUDE.md §8)
 - [ ] All internal non-obvious logic has explanatory comments
 - [ ] No Asio types in any file under `include/aevox/`
-- [ ] No raw loops where `std::ranges` applies
-- [ ] No `std::endl` (use `'\n'`)
-- [ ] No `using namespace std;`
-- [ ] Clang-Format would produce no diff (mentally verify alignment and style)
+- [ ] Clang-Format would produce no diff
 
 ### Checklist C — Architecture Compliance
 
@@ -497,20 +433,3 @@ Docs: docs/api/{module}.md
 Developer Log: Tasks/progress/{TASK-ID}-devlog.md
 ```
 
----
-
-## Quick Reference: File Paths
-
-| Artifact | Path |
-|---|---|
-| TPO task | `Tasks/tasks/{TASK-ID}-*.md` |
-| ADD | `Tasks/architecture/{TASK-ID}-arch.md` |
-| Developer Log | `Tasks/progress/{TASK-ID}-devlog.md` |
-| Public headers | `include/aevox/{module}/*.hpp` |
-| Implementation | `src/{module}/*.cpp` |
-| Unit tests | `tests/unit/{module}/{TASK-ID}-*.cpp` |
-| Integration tests | `tests/integration/{module}/{TASK-ID}-*.cpp` |
-| Benchmarks | `tests/bench/{module}/{TASK-ID}-*.cpp` |
-| mkdocs pages | `docs/api/{module}.md` |
-| mkdocs config | `mkdocs.yml` |
-| Changelog | `CHANGELOG.md` |

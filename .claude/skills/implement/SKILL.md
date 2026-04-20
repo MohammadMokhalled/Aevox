@@ -30,26 +30,7 @@ You are executing the **implementation phase** of a task for the Aevox C++23 web
 
 ## Code Standards (Zero Tolerance)
 
-All code must comply with CLAUDE.md §3 and §4. The hard prohibitions:
-
-| Never write | Write instead |
-|---|---|
-| `new T(...)` / `delete p` | `std::make_unique<T>(...)` |
-| `T*` as owner | `std::unique_ptr<T>` |
-| `const std::string&` param | `std::string_view` |
-| `(int)x` C-cast | `static_cast<int>(x)` |
-| `#define CONST 42` | `constexpr auto CONST = 42;` |
-| `enable_if` / SFINAE | `requires` / concepts |
-| `printf` / `sprintf` | `std::format` |
-| callback async API | `co_await` coroutines |
-| `for(int i=0; i<n; i++)` over containers | range-for / `std::ranges` |
-| `std::endl` | `'\n'` |
-| `using namespace std;` | explicit `std::` prefix |
-| mutable globals | dependency injection |
-
-**Every `std::expected<>` or `std::optional<>` return must be `[[nodiscard]]`.**
-
-No Asio types under `include/aevox/`. No third-party types in public headers.
+All CLAUDE.md §3–4 rules apply. If you write a prohibited pattern, fix it immediately.
 
 ---
 
@@ -64,22 +45,7 @@ Follow the ADD File Map (§5) exactly. Create in dependency order:
 5. Integration tests (`tests/integration/`) — only if ADD §8 requires them
 6. Benchmarks (`tests/bench/`) — only if the task is tagged `#networking` or `#performance`
 
-### Doxygen requirement
-
-Every public symbol must have a complete block before you move to the next file:
-
-```cpp
-/**
- * @brief One-sentence purpose.
- *
- * @tparam T   Template parameter description.
- * @param  x   Parameter description.
- * @return     What is returned, including error conditions.
- * @note       Thread-safety. Move semantics. Performance characteristics.
- */
-[[nodiscard]] std::expected<Result, Error>
-my_function(std::string_view x) noexcept;
-```
+Every public symbol needs a complete Doxygen block (CLAUDE.md §8) before moving to the next file. Use the ADD §3 comment as your starting point.
 
 ---
 

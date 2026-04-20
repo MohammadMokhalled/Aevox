@@ -79,18 +79,7 @@ Before writing a single finding:
 - [ ] No test is skipped, commented out, or marked `PENDING`
 
 ### C++23 Compliance (CLAUDE.md §4)
-- [ ] No `new` / `delete`
-- [ ] No raw owning `T*`
-- [ ] No `const std::string&` params
-- [ ] No C-style casts
-- [ ] No `#define` constants
-- [ ] No SFINAE / `enable_if`
-- [ ] No `printf` / `sprintf`
-- [ ] No callback async API
-- [ ] No raw index loops over containers
-- [ ] No `std::endl`
-- [ ] No `using namespace std;`
-- [ ] No mutable globals
+- [ ] No violations of CLAUDE.md §4 prohibition list (all items apply)
 
 ### Public API (`include/aevox/`)
 - [ ] No Asio headers or types

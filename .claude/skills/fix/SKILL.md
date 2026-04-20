@@ -41,13 +41,7 @@ Change only what is necessary to resolve the issue. Do not refactor surrounding 
 
 ### Code standards still apply
 
-Even in a fix, all CLAUDE.md §3–4 rules are non-negotiable:
-
-- No `new` / `delete`
-- No Asio types in `include/aevox/`
-- No third-party types in public headers
-- All `std::expected` / `std::optional` returns `[[nodiscard]]`
-- No prohibited patterns from CLAUDE.md §4
+All CLAUDE.md §3–4 rules are non-negotiable in a fix — minimal scope, not relaxed rules.
 
 ### If the fix requires a public API change
 
