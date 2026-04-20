@@ -12,6 +12,7 @@ This guide walks you through every feature of Aevox step by step, assuming you k
 | [Request and Response](request-response.md) | Reading method, path, headers, body, and path parameters; building responses with factory methods |
 | [Async Patterns](async-patterns.md) | Writing coroutine handlers, offloading CPU work, non-blocking timers, concurrent fan-out, and graceful shutdown |
 | [Error Handling](error-handling.md) | The `std::expected` error model, Aevox error types, propagating errors in coroutines, and diagnostics |
+| [Configuration](configuration.md) | Runtime configuration via `AppConfig` and an optional TOML file — ports, limits, thread counts, and error handling |
 
 ## How to Use This Guide
 

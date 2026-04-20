@@ -14,6 +14,7 @@
 
 find_package(asio CONFIG REQUIRED)
 find_package(llhttp CONFIG REQUIRED)
+find_package(tomlplusplus CONFIG REQUIRED)
 
 add_subdirectory(http)    # aevox_http OBJECT library (HttpParser + llhttp)
 add_subdirectory(router)  # aevox_router OBJECT library (Router + App)
@@ -22,6 +23,8 @@ add_library(aevox_core STATIC
     net/asio_executor.cpp      # Asio-backed executor + accept loop
     net/executor_context.cpp   # thread_local executor bridge definitions
     net/asio_tcp_stream.cpp    # TcpStream pimpl implementation
+    config/toml_loader.cpp     # TOML config file loading (toml++ confined here)
+    config/config_impl.cpp     # to_string(ConfigError) implementation
     $<TARGET_OBJECTS:aevox_http>
     $<TARGET_OBJECTS:aevox_router>
 )
@@ -32,6 +35,10 @@ target_include_directories(aevox_core
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
         # Install tree: resolved by install(EXPORT ...) — configured by a future task
         $<INSTALL_INTERFACE:include>
+    PRIVATE
+        # Internal headers (src/config/, src/http/, src/net/, src/router/) are
+        # included with paths relative to src/ (e.g. "config/toml_loader.hpp").
+        ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_compile_features(aevox_core
@@ -52,9 +59,11 @@ target_compile_definitions(aevox_core
 
 # Asio link — PRIVATE: keeps asio:: include paths out of aevox_core consumers.
 # llhttp link — PRIVATE: llhttp types must not appear in public headers (ADR compliance).
+# tomlplusplus link — PRIVATE: TOML types are confined to src/config/toml_loader.cpp only.
 # Note: OBJECT library (aevox_http) does not propagate its PRIVATE deps; link here directly.
 target_link_libraries(aevox_core
     PRIVATE
         asio::asio
         llhttp::llhttp_static
+        tomlplusplus::tomlplusplus
 )

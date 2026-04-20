@@ -7,3 +7,4 @@
 add_subdirectory(net)    # Executor interface + Task<T> unit tests
 add_subdirectory(http)   # HttpParser unit tests
 add_subdirectory(router) # Router path matching + dispatch unit tests
+add_subdirectory(config) # Runtime configuration system unit tests
