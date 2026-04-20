@@ -23,6 +23,7 @@ Work in this project flows through three distinct roles. Each has a dedicated sk
 | **TPO** — Technical Product Owner | `/tpo` | Roadmap, task creation, epic breakdown, sprint planning, backlog |
 | **Architect** | `/architect` | Module design, ADD creation, architectural review, layer decisions |
 | **Developer** | `/developer` | Implementation, tests, documentation, bug fixes, self-review |
+| **Documentarian** — Technical Writer | `/document` | User Guide creation, Architecture and Concepts pages, consistency refactor pass — called after /developer marks a task Done |
 
 ### Skill invocation order
 
@@ -32,6 +33,7 @@ A task must exist before it is architected. An ADD must exist before it is imple
 /tpo → creates Tasks/tasks/AEV-NNN-*.md
 /architect → creates Tasks/architecture/AEV-NNN-arch.md
 /developer → implements following the ADD
+/document → produces or updates docs/ pages for the completed task
 ```
 
 If asked to implement a task that has no ADD: **stop**. Report the missing ADD and prompt the user to run `/architect` first.
@@ -382,3 +384,56 @@ When a user request conflicts with the PRD, implement the request and explicitly
 ### Run clang-format after every code change
 
 Run `bash scripts/format.sh` after editing any `.cpp`/`.hpp` file and before any build.
+
+---
+
+## 17. Document Skill Rules
+
+The `/document` skill is invoked after `/developer` marks a task Done. It produces or updates `docs/` pages so the public documentation remains synchronized with each completed implementation.
+
+### Trigger
+
+A task transitions to Done and its public-facing output — new API, changed behavior, new concept — is not yet reflected in `docs/`. The `/document` skill runs once per task, or on-demand when a documentation gap is discovered.
+
+### Output Categories
+
+Every `/document` invocation covers one or more of the following categories. The task description specifies which apply.
+
+**User Guide (`docs/guide/`)**
+- Target audience: C++ developers new to Aevox.
+- Every concept introduced with a one-paragraph explanation followed immediately by a minimal, complete, compilable code snippet.
+- Error handling (`std::expected` error branch) shown alongside every happy-path example — never omitted.
+- No references to internal artifacts: no task IDs, no ADD file names, no `Tasks/` paths, no ADR numbers.
+- Every page ends with a "See Also" section containing at least two relative cross-links to related docs pages.
+
+**Architecture and Concepts (`docs/architecture/`)**
+- Target audience: contributors and advanced users who want to understand design rationale.
+- Each page opens with the design problem being solved, before describing the solution.
+- Every page contains at least one Mermaid diagram showing component relationships, data flow, or a state machine.
+- Major design choices include a "Consequences" sub-section listing trade-offs.
+- ADR references use the format: "ADR-N: one-line description." No `Tasks/` paths.
+- Every page ends with a "See Also" section.
+
+**Refactor Pass (existing `docs/` pages)**
+- Do not change factual content unless it is incorrect.
+- Normalize: H1 = page title (one per page), H2 = major section, H3 = sub-section.
+- Add language tags to all bare fenced code blocks.
+- Remove references to internal paths (`Tasks/`, `AEV-NNN` IDs) from user-facing prose.
+- Add "See Also" sections to pages that lack them.
+- Verify all relative cross-links resolve to existing files.
+
+### Page Structure Requirements
+
+| Element | User Guide | Architecture | Refactor |
+|---|---|---|---|
+| H1 page title | Required | Required | Normalize existing |
+| Code examples | Required (min 1, with error branch) | Recommended | Tag bare blocks |
+| Mermaid diagram | Optional | Required (min 1) | Not added |
+| "Consequences" section | Not used | Required per design choice | Not added |
+| "See Also" section | Required | Required | Add if missing |
+| ADR references | Forbidden | Allowed (by number) | Remove if present |
+| Tasks/ path references | Forbidden | Forbidden | Remove if present |
+
+### Exit Criterion
+
+`mkdocs build --strict` exits 0 with no warnings. All Mermaid diagrams render without errors in `mkdocs serve`. All relative cross-links resolve. All C++ code blocks are syntactically valid complete snippets (no pseudocode, no truncated examples).

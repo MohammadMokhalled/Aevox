@@ -12,17 +12,8 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [Task](task.md) | `<aevox/task.hpp>` | Coroutine return type for all async operations |
 | [Async Helpers](async.md) | `<aevox/async.hpp>` | `pool()`, `sleep()`, `when_all()` — CPU offload, timers, concurrent fan-out |
 | [TcpStream](tcp_stream.md) | `<aevox/tcp_stream.hpp>` | Move-only async TCP connection — `read()` and `write()` as coroutines |
-
----
-
-## Coming in v0.1
-
-| Module | Header | Description |
-|---|---|---|
-| App | `<aevox/app.hpp>` | Top-level application object — HTTP server in 3 lines |
-| Request | `<aevox/request.hpp>` | Incoming HTTP request — method, path, headers, body, JSON |
-| Response | `<aevox/response.hpp>` | Outgoing HTTP response — factory methods, streaming |
-| Router | `<aevox/router.hpp>` | URL routing — static, parameter, wildcard segments |
+| [Request and Response](request-response.md) | `<aevox/request.hpp>` / `<aevox/response.hpp>` | Incoming HTTP request and outgoing HTTP response — typed parameter extraction, factory methods, fluent header builder |
+| [Router and App](router.md) | `<aevox/router.hpp>` / `<aevox/app.hpp>` | URL routing and top-level server entry point — static, parameter, wildcard segments |
 
 ---
 
@@ -41,8 +32,8 @@ graph LR
     ASYNC["async.hpp<br/>pool · sleep · when_all"] --> TASK
     EXEC["executor.hpp<br/>Executor · ExecutorConfig"] --> TASK["task.hpp<br/>Task&lt;T&gt;"]
     EXEC --> TCP["tcp_stream.hpp<br/>TcpStream · IoError"]
-    APP["app.hpp (planned)"] --> ROUTER["router.hpp (planned)"]
-    ROUTER --> RR["request.hpp / response.hpp (planned)"]
+    APP["app.hpp"] --> ROUTER["router.hpp"]
+    ROUTER --> RR["request.hpp / response.hpp"]
     RR --> EXEC
 ```
 
@@ -85,3 +76,10 @@ if (!data) co_return;   // handle IoError
 ```
 
 No Aevox function throws for a recoverable error. Exceptions only propagate from coroutine internals (e.g. `std::bad_alloc`) or from user-supplied lambdas passed to `aevox::pool()`.
+
+---
+
+## See Also
+
+- [User Guide](../guide/index.md) — practical, example-driven guide for every framework feature
+- [Architecture Overview](../architecture/index.md) — design rationale and diagrams for each component

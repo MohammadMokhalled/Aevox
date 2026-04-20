@@ -45,3 +45,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 - Initial project skeleton
 - MkDocs documentation scaffold
+
+---
+
+## See Also
+
+- [API Reference](api/index.md) — complete reference for all public symbols
+- [Architecture Overview](architecture/index.md) — design rationale and layer diagram

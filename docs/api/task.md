@@ -4,7 +4,6 @@
 
 **Header:** `#include <aevox/task.hpp>`
 **Included by:** `<aevox/executor.hpp>` and `<aevox/async.hpp>` transitively
-**ADD:** `Tasks/architecture/AEV-001-arch.md`
 
 ---
 
@@ -207,5 +206,4 @@ co_await t;  // WRONG — t.valid() == false, undefined behaviour
 - [Executor](executor.md) — `make_executor()`, `Executor` interface, `ExecutorConfig`
 - [Async Helpers](async.md) — `pool()`, `sleep()`, `when_all()`
 - [API Overview](index.md)
-- PRD §5.6 — Executor Abstraction
-- ADD: `Tasks/architecture/AEV-001-arch.md` (internal reference)
+- [Architecture — Coroutines](../architecture/coroutines.md) — design rationale for `Task<T>` and `co_await` mechanics

@@ -233,15 +233,28 @@ aevox/
 
 ---
 
-## Architecture Design Documents
+## Detailed Topics
 
-ADDs live in `Tasks/architecture/`. Each ADD covers one task's design in full — open issues, file maps, API sketches, and deviation records.
+In-depth pages covering the design rationale, diagrams, and trade-offs for each major component:
 
-| ADD | Task | Status |
-|---|---|---|
-| `Tasks/architecture/AEV-001-arch.md` | Asio-backed executor, `Task<T>`, TCP accept loop | Done |
-| `Tasks/architecture/AEV-003-arch.md` | `TcpStream`, HTTP/1.1 parser (llhttp), `ConnectionHandler` breaking change | Done |
-| `Tasks/architecture/AEV-006-arch.md` | CPU thread pool, `pool()`, `sleep()`, `when_all()` | Done |
+| Page | What it covers |
+|---|---|
+| [Executor](executor.md) | Why the `Executor` abstraction exists, the thread model, and the C++29 `std::net` migration path |
+| [Router](router.md) | Trie-based path matching, match priority, parameter extraction, and handler type erasure |
+| [Coroutines and Task\<T\>](coroutines.md) | What a C++20 coroutine is, how `Task<T>` works, and why callbacks are banned |
+| [Error Model](error-model.md) | Why `std::expected` instead of exceptions, error type hierarchy, propagation patterns |
+| [Layer Diagram](layer-diagram.md) | The full stack with boundary annotations and enforcement rules |
+
+---
+
+## Implementation Status
+
+| Component | Status |
+|---|---|
+| Asio-backed executor, `Task<T>`, TCP accept loop | Done |
+| `TcpStream`, HTTP/1.1 parser (llhttp), `ConnectionHandler` | Done |
+| CPU thread pool, `pool()`, `sleep()`, `when_all()` | Done |
+| Router, App, Request, Response | Done |
 
 ---
 
@@ -255,3 +268,10 @@ ADDs live in `Tasks/architecture/`. Each ADD covers one task's design in full �
 | ADR-4 | Regex routing is opt-in, not available in v0.1. |
 | ADR-5 | C++20 modules are opt-in in v0.4. |
 | ADR-6 | HTTP/2 is permanently out of scope — delegated to Nginx/Caddy. |
+
+---
+
+## See Also
+
+- [User Guide](../guide/index.md) — practical, example-driven guide for framework users
+- [API Reference](../api/index.md) — complete symbol reference for all public headers

@@ -90,3 +90,10 @@ int main()
 | `aevox::App` / `AppConfig` | `<aevox/app.hpp>` | [Router and App](../api/router.md) |
 | `aevox::Request` | `<aevox/request.hpp>` | [Request and Response](../api/request-response.md) |
 | `aevox::Response` | `<aevox/response.hpp>` | [Request and Response](../api/request-response.md) |
+
+---
+
+## See Also
+
+- [User Guide — First HTTP Server](../guide/first-http-server.md) — deeper walkthrough of the same example with full error handling
+- [User Guide — Routing](../guide/routing.md) — all route pattern types, groups, and match priority

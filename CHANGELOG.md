@@ -8,7 +8,17 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `/document` skill definition in `CLAUDE.md` §17 covering User Guide creation, Architecture and Concepts pages, and consistency refactor pass; added to the skill table and invocation chain in §2
+- `docs/guide/` section with 7 pages: installation, first HTTP server, routing, request and response, async patterns, error handling, and guide index
+- `docs/architecture/` expanded with 5 new pages: executor concepts, router path-matching design, coroutines and `Task<T>`, error model, and layer diagram
+- All new architecture pages include at least one Mermaid diagram
+
 ### Changed
+- `docs/architecture/index.md` updated with links to new architecture sub-pages
+- `docs/api/index.md` corrected: App, Router, Request, Response now listed as available (v0.1 is complete)
+- `docs/api/executor.md` and other pages cleaned of internal `Tasks/` path references
+- Consistency refactor across all `docs/` pages: normalized heading hierarchy, language-tagged code blocks, "See Also" sections added where missing
 - Removed AEV-xxx task ID references from all file names, CMake targets, in-code comments, and documentation outside the `Tasks/` folder; lint script added at `scripts/check_task_ids.sh`
 - `CLAUDE.md` Section 7 File Naming Conventions updated: test, integration test, and benchmark files now use slug-only naming (no task ID prefix); AEV-NNN prefixes apply exclusively to files inside `Tasks/`
 
