@@ -1,8 +1,7 @@
-// AEV-004: App + Router integration tests — full stack over real loopback TCP.
+// App + Router integration tests — full stack over real loopback TCP.
 // ADD ref: Tasks/architecture/AEV-004-arch.md §8.2
 //
-// Uses real aevox::App on an ephemeral port. The client side uses raw POSIX-style
-// Asio sockets (same pattern as AEV-003). No mocks.
+// Uses real aevox::App on an ephemeral port. Client side uses raw Asio sockets. No mocks.
 
 #include <aevox/app.hpp>
 #include <aevox/request.hpp>
@@ -71,7 +70,7 @@ static std::string http_post(std::uint16_t port, std::string_view path, std::str
 //
 // configure_fn is called against app BEFORE listen() starts, satisfying the
 // Router thread-safety contract: all registration must complete before any
-// dispatch() call can occur. (MAJOR-2 fix from architect review-AEV-004.md)
+// dispatch() call can occur. (MAJOR-2 fix from architect review)
 // =============================================================================
 
 struct TestServer
@@ -102,7 +101,7 @@ struct TestServer
 // Integration tests
 // =============================================================================
 
-TEST_CASE("AEV-004 integration: static route returns 200", "[integration][router]")
+TEST_CASE("static route returns 200", "[integration][router]")
 {
     const auto port = free_port();
     TestServer server{port, [](aevox::App& app) {
@@ -116,7 +115,7 @@ TEST_CASE("AEV-004 integration: static route returns 200", "[integration][router
     REQUIRE(resp.find("Hello, World!") != std::string::npos);
 }
 
-TEST_CASE("AEV-004 integration: unregistered path returns 404", "[integration][router]")
+TEST_CASE("unregistered path returns 404", "[integration][router]")
 {
     const auto port = free_port();
     TestServer server{port, [](aevox::App& app) {
@@ -128,7 +127,7 @@ TEST_CASE("AEV-004 integration: unregistered path returns 404", "[integration][r
     REQUIRE(resp.find("HTTP/1.1 404") != std::string::npos);
 }
 
-TEST_CASE("AEV-004 integration: wrong method returns 405 with Allow header",
+TEST_CASE("wrong method returns 405 with Allow header",
           "[integration][router]")
 {
     const auto port = free_port();
@@ -142,7 +141,7 @@ TEST_CASE("AEV-004 integration: wrong method returns 405 with Allow header",
     REQUIRE(resp.find("Allow:") != std::string::npos);
 }
 
-TEST_CASE("AEV-004 integration: path parameter extracted end-to-end", "[integration][router]")
+TEST_CASE("path parameter extracted end-to-end", "[integration][router]")
 {
     const auto port = free_port();
     TestServer server{port, [](aevox::App& app) {
@@ -156,7 +155,7 @@ TEST_CASE("AEV-004 integration: path parameter extracted end-to-end", "[integrat
     REQUIRE(resp.find("99") != std::string::npos);
 }
 
-TEST_CASE("AEV-004 integration: bad typed param returns 400", "[integration][router]")
+TEST_CASE("bad typed param returns 400", "[integration][router]")
 {
     const auto port = free_port();
     TestServer server{port, [](aevox::App& app) {
@@ -169,7 +168,7 @@ TEST_CASE("AEV-004 integration: bad typed param returns 400", "[integration][rou
     REQUIRE(resp.find("HTTP/1.1 400") != std::string::npos);
 }
 
-TEST_CASE("AEV-004 integration: wildcard captures tail path", "[integration][router]")
+TEST_CASE("wildcard captures tail path", "[integration][router]")
 {
     const auto port = free_port();
     TestServer server{port, [](aevox::App& app) {

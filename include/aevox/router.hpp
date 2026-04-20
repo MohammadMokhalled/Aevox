@@ -20,7 +20,7 @@
 //   Router owns all registered handlers by value (stored in the trie nodes).
 //   Lambdas captured by reference must outlive the Router.
 //
-// Design: AEV-004-arch.md §3.1
+// Design: Tasks/architecture/AEV-004-arch.md §3.1
 
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
@@ -87,7 +87,7 @@ enum class RouteError : std::uint8_t
  *       Router's lifetime.
  * @note `std::function` requires CopyConstructible captures. Handlers capturing
  *       move-only types (e.g. `std::unique_ptr`) must wrap them in
- *       `std::shared_ptr`. This limitation is tracked in AEV-015.
+ *       `std::shared_ptr`. This limitation is tracked (future task).
  */
 class Router
 {
@@ -162,7 +162,7 @@ public:
      * @param  handler  Callable to invoke on match. Stored by value.
      * @note   Not thread-safe. Must be called before `dispatch()` or `listen()`.
      * @note   Duplicate registration (same method + pattern) silently overwrites.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void get(std::string_view pattern, Handler&& handler);
 
@@ -173,7 +173,7 @@ public:
      * @param  pattern  Route pattern string.
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `dispatch()`.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void post(std::string_view pattern, Handler&& handler);
 
@@ -184,7 +184,7 @@ public:
      * @param  pattern  Route pattern string.
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `dispatch()`.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void put(std::string_view pattern, Handler&& handler);
 
@@ -195,7 +195,7 @@ public:
      * @param  pattern  Route pattern string.
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `dispatch()`.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void patch(std::string_view pattern, Handler&& handler);
 
@@ -208,7 +208,7 @@ public:
      * @param  pattern  Route pattern string.
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `dispatch()`.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void del(std::string_view pattern, Handler&& handler);
 
@@ -219,7 +219,7 @@ public:
      * @param  pattern  Route pattern string.
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `dispatch()`.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void options(std::string_view pattern, Handler&& handler);
 
@@ -230,7 +230,7 @@ public:
      * with `prefix`. The returned Router shares its trie root with the parent
      * through a prefix node — there is no separate memory allocation.
      *
-     * In v0.1, middleware composition for groups is deferred to AEV-008.
+     * In v0.1, middleware composition for groups is deferred.
      * `group()` provides prefix scoping only.
      *
      * @param  prefix  Path prefix for all routes in this group. Must start
@@ -294,5 +294,5 @@ private:
 } // namespace aevox
 
 // Template method bodies. This companion file includes src/router/handler_wrap.hpp
-// (which must be on the include path). See AEV-004-arch.md §4.3.
+// (which must be on the include path). See Tasks/architecture/AEV-004-arch.md §4.3.
 #include <aevox/router_impl.hpp>

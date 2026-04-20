@@ -2,37 +2,37 @@
 # Throughput baseline for the TCP accept loop.
 # Target: >= 500,000 accepted connections/sec on loopback (PRD §9).
 
-add_executable(AEV-001-accept-throughput
-    AEV-001-accept-throughput.cpp
+add_executable(accept-throughput
+    accept-throughput.cpp
 )
 
-target_link_libraries(AEV-001-accept-throughput
+target_link_libraries(accept-throughput
     PRIVATE
         aevox_core
         nanobench::nanobench
 )
 
-target_compile_options(AEV-001-accept-throughput
+target_compile_options(accept-throughput
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-add_test(NAME AEV-001-accept-throughput COMMAND AEV-001-accept-throughput)
-add_dependencies(aevox_tests_bench AEV-001-accept-throughput)
+add_test(NAME accept-throughput COMMAND accept-throughput)
+add_dependencies(aevox_tests_bench accept-throughput)
 
-# AEV-006: Task dispatch and pool() latency benchmarks
-add_executable(AEV-006-executor-throughput
-    AEV-006-executor-throughput.cpp
+# Task dispatch and pool() latency benchmarks
+add_executable(executor-throughput
+    executor-throughput.cpp
 )
 
-target_link_libraries(AEV-006-executor-throughput
+target_link_libraries(executor-throughput
     PRIVATE
         aevox_core
         nanobench::nanobench
 )
 
-target_compile_options(AEV-006-executor-throughput
+target_compile_options(executor-throughput
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-add_test(NAME AEV-006-executor-throughput COMMAND AEV-006-executor-throughput)
-add_dependencies(aevox_tests_bench AEV-006-executor-throughput)
+add_test(NAME executor-throughput COMMAND executor-throughput)
+add_dependencies(aevox_tests_bench executor-throughput)

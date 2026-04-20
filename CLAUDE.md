@@ -198,11 +198,13 @@ aevox/
 | Developer logs | `AEV-NNN-devlog.md` | `AEV-001-devlog.md` |
 | Public headers | `{class-or-module}.hpp` | `executor.hpp`, `request.hpp` |
 | Source files | `{class-or-module}.cpp` | `asio_executor.cpp` |
-| Unit tests | `AEV-NNN-{slug}.cpp` | `AEV-001-executor-contract.cpp` |
-| Integration tests | `AEV-NNN-{slug}.cpp` | `AEV-001-tcp-accept.cpp` |
-| Benchmarks | `AEV-NNN-{slug}.cpp` | `AEV-001-accept-throughput.cpp` |
+| Unit tests | `{module}-{what}.cpp` (no task ID prefix) | `executor-contract.cpp`, `http-parser.cpp` |
+| Integration tests | `{module}-{what}.cpp` (no task ID prefix) | `tcp-accept.cpp`, `http-parse-roundtrip.cpp` |
+| Benchmarks | `{subject}-{metric}.cpp` (no task ID prefix) | `accept-throughput.cpp`, `executor-throughput.cpp` |
 
 Task IDs are sequential and zero-padded: `AEV-001`, `AEV-002`, etc. Always scan existing tasks to find the next available ID before creating one.
+
+> **AEV-NNN prefixes apply exclusively to files inside `Tasks/`** (task files, ADD files, developer logs, epics). Source files, headers, test files, benchmarks, examples, and documentation pages must never include a task ID in their name. Use the lint script `scripts/check_task_ids.sh` to verify compliance.
 
 ---
 

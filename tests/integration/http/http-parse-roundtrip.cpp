@@ -1,4 +1,4 @@
-// AEV-003: HTTP/1.1 parser integration tests — full stack over real loopback TCP.
+// HTTP/1.1 parser integration tests — full stack over real loopback TCP.
 // ADD ref: Tasks/architecture/AEV-003-arch.md §8.2
 //
 // Uses real aevox::Executor + aevox::TcpStream + aevox::detail::HttpParser.
@@ -60,7 +60,7 @@ static void tcp_connect_close(std::uint16_t port)
 
 // ==============================================================================
 
-TEST_CASE("AEV-003 integration: GET request roundtrip via loopback", "[integration][http]")
+TEST_CASE("GET request roundtrip via loopback", "[integration][http]")
 {
     std::string got_method;
     std::string got_target;
@@ -104,7 +104,7 @@ TEST_CASE("AEV-003 integration: GET request roundtrip via loopback", "[integrati
 
 // =============================================================================
 
-TEST_CASE("AEV-003 integration: POST with body roundtrip via loopback", "[integration][http]")
+TEST_CASE("POST with body roundtrip via loopback", "[integration][http]")
 {
     std::string got_body;
     std::latch  done{1};
@@ -152,7 +152,7 @@ TEST_CASE("AEV-003 integration: POST with body roundtrip via loopback", "[integr
 
 // =============================================================================
 
-TEST_CASE("AEV-003 integration: pipelined keep-alive requests", "[integration][http]")
+TEST_CASE("pipelined keep-alive requests", "[integration][http]")
 {
     // Two back-to-back requests on one TCP connection (keep-alive).
     // Requests are sent sequentially so each arrives in its own read() call,
@@ -221,7 +221,7 @@ TEST_CASE("AEV-003 integration: pipelined keep-alive requests", "[integration][h
 
 // =============================================================================
 
-TEST_CASE("AEV-003 integration: malformed request - 400 path", "[integration][http]")
+TEST_CASE("malformed request - 400 path", "[integration][http]")
 {
     std::atomic<bool> got_bad_request{false};
     std::latch        done{1};
@@ -265,7 +265,7 @@ TEST_CASE("AEV-003 integration: malformed request - 400 path", "[integration][ht
 
 // =============================================================================
 
-TEST_CASE("AEV-003 integration: connection EOF mid-request", "[integration][http]")
+TEST_CASE("connection EOF mid-request", "[integration][http]")
 {
     std::atomic<bool> got_eof{false};
     std::latch        done{1};

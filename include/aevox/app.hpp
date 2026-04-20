@@ -17,7 +17,7 @@
 // Move semantics:
 //   Move-only. A moved-from App must not be used.
 //
-// Design: AEV-004-arch.md §3.2
+// Design: Tasks/architecture/AEV-004-arch.md §3.2
 
 #include <aevox/executor.hpp>
 #include <aevox/request.hpp>
@@ -166,7 +166,7 @@ public:
      * @param  pattern  Route pattern string.
      * @param  handler  Handler callable, stored by value.
      * @note   Not thread-safe. Must be called before `listen()`.
-     * @note   `std::function` requires CopyConstructible captures (AEV-015).
+     * @note   `std::function` requires CopyConstructible captures (see handler_wrap.hpp).
      */
     template <typename Handler> void get(std::string_view pattern, Handler&& handler);
 
@@ -224,20 +224,20 @@ public:
      * @brief Installs a middleware function that wraps every handler.
      *
      * In v0.1 this is a no-op stub. Middleware integration is implemented in
-     * AEV-008.
+     * a future middleware task.
      *
-     * @tparam Handler  Middleware callable. Signature defined in AEV-008.
+     * @tparam Handler  Middleware callable. Signature defined in the middleware task.
      * @param  handler  Middleware callable (ignored in v0.1).
      */
     template <typename Handler>
-    [[deprecated("use() is a v0.1 stub — implemented in AEV-008")]]
+    [[deprecated("use() is a v0.1 stub — middleware not yet implemented")]]
     void use(Handler&& handler);
 
     /**
      * @brief Returns a child Router with a shared path prefix.
      *
      * Forwards to the internal `Router::group()`. See `Router::group()` for
-     * the full specification. In v0.1, group middleware is deferred to AEV-008.
+     * the full specification. In v0.1, group middleware is deferred.
      *
      * @param  prefix  Path prefix for the group. Must start with `/`.
      * @return         Child Router scoped to the prefix.
@@ -351,8 +351,8 @@ inline void aevox::App::options(std::string_view pattern, Handler&& handler)
 }
 
 template <typename Handler>
-[[deprecated("use() is a v0.1 stub — implemented in AEV-008")]]
+[[deprecated("use() is a v0.1 stub — middleware not yet implemented")]]
 inline void aevox::App::use(Handler&& /*handler*/)
 {
-    // v0.1 stub — AEV-008 implements middleware composition.
+    // v0.1 stub — middleware composition not yet implemented.
 }

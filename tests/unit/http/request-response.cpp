@@ -1,4 +1,4 @@
-// AEV-005: Request and Response unit tests — no I/O.
+// Request and Response unit tests — no I/O.
 // ADD ref: Tasks/architecture/AEV-005-arch.md §8
 //
 // Tests construct Request objects directly via the internal PIMPL, bypassing
@@ -91,7 +91,7 @@ template <typename T> static T drive_task(aevox::Task<T> task)
 // Request tests — header access
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - header access - happy path, existing header returns value",
+TEST_CASE("Request - header access - happy path, existing header returns value",
           "[http][request]")
 {
     auto buf = make_buffer("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
@@ -113,7 +113,7 @@ TEST_CASE("AEV-005: Request - header access - happy path, existing header return
     CHECK(*result == "example.com");
 }
 
-TEST_CASE("AEV-005: Request - header access - missing header returns nullopt", "[http][request]")
+TEST_CASE("Request - header access - missing header returns nullopt", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -126,7 +126,7 @@ TEST_CASE("AEV-005: Request - header access - missing header returns nullopt", "
     CHECK(!result.has_value());
 }
 
-TEST_CASE("AEV-005: Request - header access - lookup is case-insensitive", "[http][request]")
+TEST_CASE("Request - header access - lookup is case-insensitive", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -154,7 +154,7 @@ TEST_CASE("AEV-005: Request - header access - lookup is case-insensitive", "[htt
 // Request tests — param<T>()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - param<int> - happy path converts correctly", "[http][request]")
+TEST_CASE("Request - param<int> - happy path converts correctly", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -170,7 +170,7 @@ TEST_CASE("AEV-005: Request - param<int> - happy path converts correctly", "[htt
     CHECK(*result == 42);
 }
 
-TEST_CASE("AEV-005: Request - param<string_view> - zero-copy, no allocation", "[http][request]")
+TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -197,7 +197,7 @@ TEST_CASE("AEV-005: Request - param<string_view> - zero-copy, no allocation", "[
     CHECK(result->data() == stored.data());
 }
 
-TEST_CASE("AEV-005: Request - param<int> - non-numeric string returns BadConversion",
+TEST_CASE("Request - param<int> - non-numeric string returns BadConversion",
           "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
@@ -214,7 +214,7 @@ TEST_CASE("AEV-005: Request - param<int> - non-numeric string returns BadConvers
     CHECK(result.error() == aevox::ParamError::BadConversion);
 }
 
-TEST_CASE("AEV-005: Request - param<T> - missing param returns NotFound", "[http][request]")
+TEST_CASE("Request - param<T> - missing param returns NotFound", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -232,7 +232,7 @@ TEST_CASE("AEV-005: Request - param<T> - missing param returns NotFound", "[http
 // Request tests — body()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - body() - returns correct span into owned buffer", "[http][request]")
+TEST_CASE("Request - body() - returns correct span into owned buffer", "[http][request]")
 {
     // body() returns the span stored in ParsedRequest::body, which is a span
     // into the parser's chunk_buf (not into our owned buffer). For the test we
@@ -256,7 +256,7 @@ TEST_CASE("AEV-005: Request - body() - returns correct span into owned buffer", 
 // Request tests — json<T>()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - json<T>() - returns NotImplemented in v0.1", "[http][request]")
+TEST_CASE("Request - json<T>() - returns NotImplemented in v0.1", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "POST";
@@ -276,7 +276,7 @@ TEST_CASE("AEV-005: Request - json<T>() - returns NotImplemented in v0.1", "[htt
 // Request tests — method(), path(), query()
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - method() - GET parsed correctly", "[http][request]")
+TEST_CASE("Request - method() - GET parsed correctly", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -286,7 +286,7 @@ TEST_CASE("AEV-005: Request - method() - GET parsed correctly", "[http][request]
     CHECK(req.method() == aevox::HttpMethod::GET);
 }
 
-TEST_CASE("AEV-005: Request - path() - splits target at question mark", "[http][request]")
+TEST_CASE("Request - path() - splits target at question mark", "[http][request]")
 {
     // We need the target string_view to be backed by a stable buffer.
     // Use the owned buffer for this.
@@ -302,7 +302,7 @@ TEST_CASE("AEV-005: Request - path() - splits target at question mark", "[http][
     CHECK(req.path() == "/users/42");
 }
 
-TEST_CASE("AEV-005: Request - query() - returns portion after question mark", "[http][request]")
+TEST_CASE("Request - query() - returns portion after question mark", "[http][request]")
 {
     const std::string_view raw = "/users?sort=asc&page=2";
     auto                   buf = make_buffer(raw);
@@ -315,7 +315,7 @@ TEST_CASE("AEV-005: Request - query() - returns portion after question mark", "[
     CHECK(req.query() == "sort=asc&page=2");
 }
 
-TEST_CASE("AEV-005: Request - query() - empty when no query string present", "[http][request]")
+TEST_CASE("Request - query() - empty when no query string present", "[http][request]")
 {
     const std::string_view raw = "/users/42";
     auto                   buf = make_buffer(raw);
@@ -332,7 +332,7 @@ TEST_CASE("AEV-005: Request - query() - empty when no query string present", "[h
 // Request tests — context store (set / get)
 // =============================================================================
 
-TEST_CASE("AEV-005: Request - context store - set and get roundtrip typed value", "[http][request]")
+TEST_CASE("Request - context store - set and get roundtrip typed value", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -347,7 +347,7 @@ TEST_CASE("AEV-005: Request - context store - set and get roundtrip typed value"
     CHECK(*val == "alice");
 }
 
-TEST_CASE("AEV-005: Request - context store - get returns nullopt for absent key",
+TEST_CASE("Request - context store - get returns nullopt for absent key",
           "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
@@ -360,7 +360,7 @@ TEST_CASE("AEV-005: Request - context store - get returns nullopt for absent key
     CHECK(!val.has_value());
 }
 
-TEST_CASE("AEV-005: Request - context store - get returns nullopt for type mismatch",
+TEST_CASE("Request - context store - get returns nullopt for type mismatch",
           "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
@@ -380,45 +380,45 @@ TEST_CASE("AEV-005: Request - context store - get returns nullopt for type misma
 // Response tests — factory methods
 // =============================================================================
 
-TEST_CASE("AEV-005: Response - ok() sets status 200", "[http][response]")
+TEST_CASE("Response - ok() sets status 200", "[http][response]")
 {
     auto res = aevox::Response::ok("Hello");
     CHECK(res.status_code() == 200);
     CHECK(res.body_view() == "Hello");
 }
 
-TEST_CASE("AEV-005: Response - not_found() sets status 404", "[http][response]")
+TEST_CASE("Response - not_found() sets status 404", "[http][response]")
 {
     auto res = aevox::Response::not_found();
     CHECK(res.status_code() == 404);
 }
 
-TEST_CASE("AEV-005: Response - bad_request() sets status 400 with body", "[http][response]")
+TEST_CASE("Response - bad_request() sets status 400 with body", "[http][response]")
 {
     auto res = aevox::Response::bad_request("invalid input");
     CHECK(res.status_code() == 400);
     CHECK(res.body_view() == "invalid input");
 }
 
-TEST_CASE("AEV-005: Response - created() sets status 201", "[http][response]")
+TEST_CASE("Response - created() sets status 201", "[http][response]")
 {
     auto res = aevox::Response::created("resource created");
     CHECK(res.status_code() == 201);
 }
 
-TEST_CASE("AEV-005: Response - unauthorized() sets status 401", "[http][response]")
+TEST_CASE("Response - unauthorized() sets status 401", "[http][response]")
 {
     auto res = aevox::Response::unauthorized();
     CHECK(res.status_code() == 401);
 }
 
-TEST_CASE("AEV-005: Response - forbidden() sets status 403", "[http][response]")
+TEST_CASE("Response - forbidden() sets status 403", "[http][response]")
 {
     auto res = aevox::Response::forbidden();
     CHECK(res.status_code() == 403);
 }
 
-TEST_CASE("AEV-005: Response - json(string) sets Content-Type application/json", "[http][response]")
+TEST_CASE("Response - json(string) sets Content-Type application/json", "[http][response]")
 {
     auto res = aevox::Response::json(std::string{R"({"key":"value"})"});
     CHECK(res.status_code() == 200);
@@ -430,7 +430,7 @@ TEST_CASE("AEV-005: Response - json(string) sets Content-Type application/json",
     CHECK(*ct == "application/json");
 }
 
-TEST_CASE("AEV-005: Response - json<T>() produces sentinel body in v0.1", "[http][response]")
+TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][response]")
 {
     struct MyType
     {
@@ -451,7 +451,7 @@ TEST_CASE("AEV-005: Response - json<T>() produces sentinel body in v0.1", "[http
 // Response tests — fluent builder
 // =============================================================================
 
-TEST_CASE("AEV-005: Response - content_type() fluent lvalue overload modifies in place",
+TEST_CASE("Response - content_type() fluent lvalue overload modifies in place",
           "[http][response]")
 {
     auto res = aevox::Response::ok("body");
@@ -464,7 +464,7 @@ TEST_CASE("AEV-005: Response - content_type() fluent lvalue overload modifies in
     CHECK(*ct == "text/html");
 }
 
-TEST_CASE("AEV-005: Response - content_type() fluent rvalue overload chains on temporary",
+TEST_CASE("Response - content_type() fluent rvalue overload chains on temporary",
           "[http][response]")
 {
     auto res = aevox::Response::ok("body").content_type("text/html");
@@ -477,7 +477,7 @@ TEST_CASE("AEV-005: Response - content_type() fluent rvalue overload chains on t
     CHECK(*ct == "text/html");
 }
 
-TEST_CASE("AEV-005: Response - header() fluent lvalue overload sets header", "[http][response]")
+TEST_CASE("Response - header() fluent lvalue overload sets header", "[http][response]")
 {
     auto res = aevox::Response::ok();
     // The lvalue overload mutates in place and returns *this for chaining.
@@ -493,7 +493,7 @@ TEST_CASE("AEV-005: Response - header() fluent lvalue overload sets header", "[h
 // Response tests — move semantics
 // =============================================================================
 
-TEST_CASE("AEV-005: Response - move semantics - moved-from Response is valid but empty",
+TEST_CASE("Response - move semantics - moved-from Response is valid but empty",
           "[http][response]")
 {
     auto original = aevox::Response::ok("hello world");
@@ -516,7 +516,7 @@ TEST_CASE("AEV-005: Response - move semantics - moved-from Response is valid but
 // Response tests — stream()
 // =============================================================================
 
-TEST_CASE("AEV-005: Response - stream() returns status 200 with given content type",
+TEST_CASE("Response - stream() returns status 200 with given content type",
           "[http][response]")
 {
     auto res = aevox::Response::stream("text/event-stream");

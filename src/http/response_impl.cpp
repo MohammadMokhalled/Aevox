@@ -8,7 +8,7 @@
 // All static factory methods delegate to the private constructor
 // Response(int status_code, std::string body, std::string content_type_value).
 //
-// Design: AEV-005-arch.md §4.2
+// Design: Tasks/architecture/AEV-005-arch.md §4.2
 
 #include "http/response_impl.hpp"
 
@@ -146,8 +146,8 @@ Response Response::method_not_allowed(std::string_view body)
 Response Response::stream(std::string_view content_type)
 {
     // v0.1: returns a normal Response with empty body and the given Content-Type.
-    // The streaming write API is designed in AEV-006. This factory exists now so
-    // code that calls stream() compiles. AEV-006 must not change this signature.
+    // The streaming write API is designed separately. This factory exists now so
+    // code that calls stream() compiles.
     return Response{200, {}, std::string{content_type}};
 }
 

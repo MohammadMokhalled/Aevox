@@ -8,7 +8,7 @@
 // No Asio types appear in this file. The concrete implementation (AsioExecutor)
 // lives entirely in src/net/ and is never visible to application code.
 //
-// Design: ADD §3, §7 (AEV-001-arch.md Rev.2)
+// Design: Tasks/architecture/AEV-001-arch.md Rev.2 §3, §7
 // PRD §5.5, §5.6 — Executor abstraction, future-proof networking
 
 #include <aevox/task.hpp>

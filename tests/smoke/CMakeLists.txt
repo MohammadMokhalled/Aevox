@@ -4,19 +4,19 @@
 # correct include paths, linker graph, and C++23 feature availability.
 # They contain no business logic — compilation + exit-0 is the test.
 
-add_executable(AEV-002-smoke
-    AEV-002-compile-smoke.cpp
+add_executable(build-smoke
+    build-smoke.cpp
 )
 
-target_link_libraries(AEV-002-smoke
+target_link_libraries(build-smoke
     PRIVATE aevox_core
 )
 
-target_compile_options(AEV-002-smoke
+target_compile_options(build-smoke
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-add_test(NAME AEV-002-smoke COMMAND AEV-002-smoke)
+add_test(NAME build-smoke COMMAND build-smoke)
 
 # Register under the unit alias so `--target aevox_tests_unit` includes it.
-add_dependencies(aevox_tests_unit AEV-002-smoke)
+add_dependencies(aevox_tests_unit build-smoke)

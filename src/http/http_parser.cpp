@@ -20,7 +20,7 @@
 //   C++23 [basic.types.general]: std::byte aliases any object type.
 //   Each cast carries this comment.
 //
-// Design: AEV-003-arch.md §4.2
+// Design: Tasks/architecture/AEV-003-arch.md §4.2
 
 #include "http_parser.hpp"
 
@@ -197,7 +197,7 @@ struct HttpParser::Impl
     // HPE_OK + llhttp_pause(): calling llhttp_pause() inside a callback does not
     // halt llhttp_execute() on the *current* call — the pause only takes effect
     // on the next call to llhttp_execute(), which means execute() returns HPE_OK
-    // here, and feed()'s `rc == HPE_PAUSED` branch is never reached (see AEV-003
+    // here, and feed()'s `rc == HPE_PAUSED` branch is never reached (Paused state
     // devlog deviation #1).
     static int on_message_complete(llhttp_t* p)
     {

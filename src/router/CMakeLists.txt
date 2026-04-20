@@ -5,7 +5,7 @@
 #
 # Constraint: no Asio types may appear in handler_wrap.hpp (which is transitively
 # included by the public include/aevox/router.hpp). This is verified in CI by the
-# no-asio-in-public-headers check. See AEV-004-arch.md OI-1.
+# no-asio-in-public-headers check. See Tasks/architecture/AEV-004-arch.md OI-1.
 #
 # IMPORTANT — OBJECT library transitive deps:
 #   CMake does not propagate PRIVATE link libraries from an OBJECT library.
@@ -13,8 +13,8 @@
 #   Do not add link_libraries here without updating src/CMakeLists.txt.
 
 add_library(aevox_router OBJECT
-    router_impl.cpp   # AEV-004: parse_pattern, trie insert/dispatch/group
-    app_impl.cpp      # AEV-004: App lifecycle + connection handler
+    router_impl.cpp   # parse_pattern, trie insert/dispatch/group
+    app_impl.cpp      # App lifecycle + connection handler
 )
 
 target_include_directories(aevox_router

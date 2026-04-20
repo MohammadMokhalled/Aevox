@@ -14,7 +14,7 @@
 // header include/aevox/router.hpp (via router_impl.hpp). Any type appearing here
 // becomes transitively visible to application code.
 //
-// Design: AEV-004-arch.md §4.3
+// Design: Tasks/architecture/AEV-004-arch.md §4.3
 
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
@@ -39,7 +39,7 @@ namespace aevox::detail {
 /// All handler variants are normalised to this signature at registration time.
 /// std::function requires CopyConstructible captures: lambdas that capture
 /// move-only types (e.g. std::unique_ptr) must wrap them in std::shared_ptr.
-/// Upgrade to std::move_only_function is tracked in AEV-015.
+/// Upgrade to std::move_only_function is tracked (future task).
 using ErasedHandler = std::function<aevox::Task<aevox::Response>(aevox::Request&)>;
 
 // =============================================================================
@@ -126,7 +126,7 @@ concept AsyncHandlerBase =
 /// param_types: type annotations (informational; extraction uses T0/T1 from handler).
 ///
 /// @note std::function requires CopyConstructible captures. Handlers that capture
-///       move-only types must wrap them in std::shared_ptr (OI-2, AEV-015).
+///       move-only types must wrap them in std::shared_ptr.
 template <typename Handler>
 ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_names,
                                 std::span<const ParamType> /*param_types*/)

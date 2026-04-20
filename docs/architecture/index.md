@@ -224,11 +224,11 @@ aevox/
 │
 └── tests/
     ├── unit/
-    │   ├── net/    # AEV-001, AEV-006 unit tests
-    │   └── http/   # AEV-003 HTTP parser unit tests
+    │   ├── net/    # executor + async helpers unit tests
+    │   └── http/   # HTTP parser unit tests
     └── integration/
-        ├── net/    # AEV-001, AEV-006 integration tests (real loopback)
-        └── http/   # AEV-003 integration tests (real loopback + parser)
+        ├── net/    # executor + async helpers integration tests (real loopback)
+        └── http/   # HTTP parser integration tests (real loopback + parser)
 ```
 
 ---

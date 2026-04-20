@@ -8,7 +8,7 @@
 // Asio types are confined to this translation unit and asio_tcp_stream.hpp.
 // Nothing in include/aevox/ ever includes this file or sees these types.
 //
-// Design: AEV-003-arch.md §4.1
+// Design: Tasks/architecture/AEV-003-arch.md §4.1
 
 #include "asio_tcp_stream.hpp"
 

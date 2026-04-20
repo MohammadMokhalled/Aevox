@@ -1,4 +1,4 @@
-// AEV-006: Executor async-helper dispatch latency benchmarks.
+// Executor async-helper dispatch latency benchmarks.
 // ADD ref: Tasks/architecture/AEV-006-arch.md § Test Architecture §8.3
 //
 // Measures:
@@ -69,7 +69,7 @@ int main()
         ankerl::nanobench::Bench()
             .minEpochIterations(iters_per_epoch)
             .warmup(50)
-            .title("AEV-006: Task dispatch latency (accept → handler returns)")
+            .title("Task dispatch latency (accept - handler returns)")
             .run("round-trip", [&] {
                 int before = handled.load(std::memory_order_relaxed);
                 tcp_connect(port);
@@ -82,7 +82,7 @@ int main()
         ex->stop();
         runner.join();
 
-        std::cout << "[AEV-006] Task dispatch: " << handled.load() << " handlers processed\n";
+        std::cout << "Task dispatch: " << handled.load() << " handlers processed\n";
     }
 
     // -------------------------------------------------------------------------
@@ -112,7 +112,7 @@ int main()
         ankerl::nanobench::Bench()
             .minEpochIterations(iters_per_epoch)
             .warmup(50)
-            .title("AEV-006: pool() dispatch round-trip (accept → pool(noop) → handler returns)")
+            .title("pool() dispatch round-trip (accept - pool(noop) - handler returns)")
             .run("pool-round-trip", [&] {
                 int before = handled.load(std::memory_order_relaxed);
                 tcp_connect(port);
@@ -124,7 +124,7 @@ int main()
         ex->stop();
         runner.join();
 
-        std::cout << "[AEV-006] pool() dispatch: " << handled.load() << " handlers processed\n";
+        std::cout << "pool() dispatch: " << handled.load() << " handlers processed\n";
     }
 
     return 0;

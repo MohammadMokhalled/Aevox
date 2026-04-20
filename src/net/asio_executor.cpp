@@ -3,7 +3,7 @@
 // AsioExecutor — Asio-backed implementation of aevox::Executor.
 // Acceptor loop, thread pool management, connection dispatch, and drain logic.
 //
-// AEV-006 changes from AEV-001:
+// Refactor: replaced asio::thread_pool with asio::io_context + strand dispatch.
 //   - Replaced asio::thread_pool with asio::io_context + std::jthread vector.
 //     Reason: asio::thread_pool provides no thread-start hook. Manual jthread
 //     management allows each I/O thread to set the thread_local executor bridges
@@ -11,7 +11,7 @@
 //   - Added optional<asio::thread_pool> cpu_pool_ for aevox::pool() offloads.
 //   - Added optional<work_guard> to control io_ctx_ lifetime.
 //
-// Design: ADD §4.2 (AEV-006-arch.md)
+// Design: Tasks/architecture/AEV-006-arch.md §4.2
 // Asio types are PRIVATE to this translation unit and asio_executor.hpp.
 
 #include "asio_executor.hpp"
@@ -144,7 +144,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
                 co_return; // stop() closed the acceptor — clean exit
 
             // Transient error (e.g. EMFILE) — log and continue.
-            // TODO(AEV-011): replace with spdlog when logging is wired.
+            // TODO: replace with spdlog when logging is wired.
             continue;
         }
 

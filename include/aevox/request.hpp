@@ -15,7 +15,7 @@
 //
 // Construction: Only aevox::detail::ConnectionHandler may construct a Request.
 //
-// Design: AEV-005-arch.md §3.2
+// Design: Tasks/architecture/AEV-005-arch.md §3.2
 
 #include <aevox/concepts.hpp>
 #include <aevox/task.hpp>
@@ -87,13 +87,13 @@ enum class ParamError : std::uint8_t
 /**
  * @brief Error codes for `Request::json<T>()`.
  *
- * `NotImplemented` is the only value returned in v0.1. AEV-009 extends this.
+ * `NotImplemented` is the only value returned in v0.1. The JSON backend extends this.
  */
 enum class BodyParseError : std::uint8_t
 {
-    NotImplemented, ///< JSON parsing is not wired in v0.1; replaced by AEV-009.
-    BadJson,        ///< The body is not valid JSON (reserved for AEV-009).
-    TypeMismatch,   ///< JSON does not match the target type schema (reserved for AEV-009).
+    NotImplemented, ///< JSON parsing is not wired in v0.1; replaced by the JSON backend task.
+    BadJson,        ///< The body is not valid JSON (reserved for the JSON backend task).
+    TypeMismatch,   ///< JSON does not match the target type schema (reserved for the JSON backend task).
 };
 
 // =============================================================================
@@ -246,7 +246,7 @@ public:
      * - `std::string_view`: returned zero-copy; lifetime tied to the `Request` lifetime.
      * - `std::string`: returned as an owning copy.
      *
-     * Path parameters are populated by the Router (AEV-004) via `Request::set_params()`
+     * Path parameters are populated by the Router via `Request::set_params()`
      * before the handler is invoked. Calling `param<T>()` before the router has
      * dispatched is defined behaviour: it returns `ParamError::NotFound`.
      *
@@ -269,18 +269,18 @@ public:
     /**
      * @brief Asynchronously parses the request body as JSON into type `T`.
      *
-     * In v0.1 this always returns `BodyParseError::NotImplemented`. AEV-009
+     * In v0.1 this always returns `BodyParseError::NotImplemented`. The JSON backend
      * replaces the implementation stub with a real glaze-backed deserializer.
      *
      * The coroutine suspends immediately and resumes with the error in v0.1.
-     * AEV-004 handlers must `co_await` this — it is not synchronous.
+     * Handlers must `co_await` this — it is not synchronous.
      *
      * @tparam T  Target deserialization type. Must satisfy `aevox::Deserializable`.
      *            The constraint is a stub in v0.1 (always satisfied).
      * @return    `Task<std::expected<T, BodyParseError>>` — always resolves to
      *            `BodyParseError::NotImplemented` in v0.1.
-     * @note      The implementation hook for AEV-009 is `Request::Impl::do_json_parse()`.
-     *            See AEV-005-arch.md §4.3.
+     * @note      The implementation hook is `Request::Impl::do_json_parse()`.
+     *            See Tasks/architecture/AEV-005-arch.md §4.3.
      */
     template <typename T>
         requires aevox::Deserializable<T>
@@ -330,10 +330,10 @@ private:
     explicit Request(std::unique_ptr<Impl> impl) noexcept;
     friend class detail::ConnectionHandler;
 
-    // AEV-004 Router injects captured path parameters directly via friend-class
+    // The Router injects captured path parameters directly via friend-class
     // access: req.impl_->params = std::move(params). No set_params() method is
     // needed — friend class access covers all private members including impl_.
-    friend class Router; // AEV-004 — forward declared; defined in AEV-004 ADD
+    friend class Router; // forward declared; defined in router.hpp
 
     // Internal factory helpers (defined in src/http/request_impl.hpp).
     // Declared without namespace qualifier because a qualified friend requires
@@ -350,11 +350,11 @@ private:
     /// Not noexcept — std::make_unique<Impl> may throw std::bad_alloc.
     friend Request make_request_from_impl(std::vector<std::byte>, detail::ParsedRequest);
 
-    /// Read-only Impl access for internal inspection (tests, AEV-004).
+    /// Read-only Impl access for internal inspection (tests, Router).
     friend const Impl* get_request_impl(const Request&) noexcept;
 
-    /// Mutable Impl access for internal param injection (tests, AEV-004 Router).
-    /// AEV-004 uses req.impl_->params = ... directly via friend class Router.
+    /// Mutable Impl access for internal param injection (tests, Router).
+    /// The Router uses req.impl_->params = ... directly via friend class Router.
     friend Impl* get_mutable_request_impl(Request&) noexcept;
 };
 

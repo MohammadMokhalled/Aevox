@@ -173,7 +173,7 @@ template <typename T>
 json() const;
 ```
 
-Asynchronously parses the request body as JSON into type `T`. Must be `co_await`-ed. In v0.1, always returns `BodyParseError::NotImplemented`. AEV-009 wires in real glaze deserialization.
+Asynchronously parses the request body as JSON into type `T`. Must be `co_await`-ed. In v0.1, always returns `BodyParseError::NotImplemented`. A future JSON backend task wires in real glaze deserialization.
 
 ---
 
@@ -294,16 +294,16 @@ Returns a read-only view of the response body. Valid for the lifetime of this Re
 
 | Error | Meaning | How to handle |
 |---|---|---|
-| `BodyParseError::NotImplemented` | JSON parsing not wired in v0.1 | Expected until AEV-009 is implemented |
-| `BodyParseError::BadJson` | Body is not valid JSON (reserved for AEV-009) | Return `bad_request()` |
-| `BodyParseError::TypeMismatch` | JSON does not match target type (reserved for AEV-009) | Return `bad_request()` |
+| `BodyParseError::NotImplemented` | JSON parsing not wired in v0.1 | Expected until JSON backend is implemented |
+| `BodyParseError::BadJson` | Body is not valid JSON (reserved for the JSON backend task) | Return `bad_request()` |
+| `BodyParseError::TypeMismatch` | JSON does not match target type (reserved for the JSON backend task) | Return `bad_request()` |
 
 ### `aevox::SerializeError`
 
 | Error | Meaning | How to handle |
 |---|---|---|
-| `SerializeError::NotImplemented` | JSON serialization not wired in v0.1 | Expected until AEV-009 |
-| `SerializeError::TypeNotSupported` | Type cannot be serialized (reserved for AEV-009) | Use `Response::json(std::string)` overload |
+| `SerializeError::NotImplemented` | JSON serialization not wired in v0.1 | Expected until JSON backend |
+| `SerializeError::TypeNotSupported` | Type cannot be serialized (reserved for the JSON backend task) | Use `Response::json(std::string)` overload |
 
 ## Thread Safety
 
@@ -325,9 +325,9 @@ auto r2 = std::move(r1);
 
 ## v0.1 Limitations
 
-- **JSON parsing (`req.json<T>()`):** Always returns `BodyParseError::NotImplemented`. Real implementation wired in AEV-009.
-- **JSON serialization (`Response::json<T>()`):** Always produces sentinel body `{"error":"not_implemented"}`. Real implementation wired in AEV-009. Use `Response::json(std::string)` to pass a pre-serialized string.
-- **Streaming (`Response::stream()`):** Returns a normal Response with empty body. The streaming write API is designed in AEV-006.
+- **JSON parsing (`req.json<T>()`):** Always returns `BodyParseError::NotImplemented`. Real implementation wired in a future JSON backend task.
+- **JSON serialization (`Response::json<T>()`):** Always produces sentinel body `{"error":"not_implemented"}`. Real implementation wired in a future JSON backend task. Use `Response::json(std::string)` to pass a pre-serialized string.
+- **Streaming (`Response::stream()`):** Returns a normal Response with empty body. The streaming write API is not yet designed.
 - **Duplicate headers:** `Request::header()` returns the first occurrence of a repeated header name. Multi-value header support is deferred.
 - **Query parameter parsing:** `Request::query()` returns the raw query string. Typed extraction (e.g. `req.query_param<int>("page")`) is deferred.
 

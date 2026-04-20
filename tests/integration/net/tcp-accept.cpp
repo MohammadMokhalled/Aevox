@@ -1,4 +1,4 @@
-// AEV-001: Integration tests for the TCP accept loop.
+// Integration tests for the TCP accept loop.
 // ADD ref: Tasks/architecture/AEV-001-arch.md § Test Architecture (Rev.2)
 //
 // Setup: make_executor({.thread_count=2, .drain_timeout=2s}), listen on port 0
@@ -56,7 +56,7 @@ static void tcp_connect(std::uint16_t port)
 
 // ---------------------------------------------------------------------------
 
-TEST_CASE("AEV-001: integration - single client connect triggers handler coroutine",
+TEST_CASE("integration - single client connect triggers handler coroutine",
           "[net][integration]")
 {
     auto port = find_free_port();
@@ -97,7 +97,7 @@ TEST_CASE("AEV-001: integration - single client connect triggers handler corouti
     ex->stop();
 }
 
-TEST_CASE("AEV-001: integration - handler receives monotonically increasing conn_id",
+TEST_CASE("integration - handler receives monotonically increasing conn_id",
           "[net][integration]")
 {
     auto port = find_free_port();
@@ -149,7 +149,7 @@ TEST_CASE("AEV-001: integration - handler receives monotonically increasing conn
     }
 }
 
-TEST_CASE("AEV-001: integration - 1000 sequential connections all dispatched without drops",
+TEST_CASE("integration - 1000 sequential connections all dispatched without drops",
           "[net][integration]")
 {
     auto port = find_free_port();
@@ -190,7 +190,7 @@ TEST_CASE("AEV-001: integration - 1000 sequential connections all dispatched wit
     ex->stop();
 }
 
-TEST_CASE("AEV-001: integration - stop() drains in-flight handlers before run() returns",
+TEST_CASE("integration - stop() drains in-flight handlers before run() returns",
           "[net][integration]")
 {
     auto port = find_free_port();

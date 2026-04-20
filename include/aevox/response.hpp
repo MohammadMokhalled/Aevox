@@ -16,10 +16,10 @@
 //
 // Streaming: Response::stream() returns a Response with status 200 and the
 // given Content-Type but an empty body. The actual streaming write API
-// is designed in AEV-006. In v0.1, stream() creates a non-streaming Response.
-// See AEV-005-arch.md §10.2.
+// The streaming write API is not yet designed. In v0.1, stream() creates a non-streaming Response.
+// See Tasks/architecture/AEV-005-arch.md §10.2.
 //
-// Design: AEV-005-arch.md §3.3
+// Design: Tasks/architecture/AEV-005-arch.md §3.3
 
 #include <aevox/concepts.hpp>
 
@@ -33,12 +33,12 @@ namespace aevox {
 /**
  * @brief Error codes for `Response::json<T>()` serialization.
  *
- * `NotImplemented` is the only value produced in v0.1. AEV-009 extends this.
+ * `NotImplemented` is the only value produced in v0.1. The JSON backend extends this.
  */
 enum class SerializeError : std::uint8_t
 {
-    NotImplemented,   ///< JSON serialization is not wired in v0.1; replaced by AEV-009.
-    TypeNotSupported, ///< The type T cannot be serialized (reserved for AEV-009).
+    NotImplemented,   ///< JSON serialization is not wired in v0.1; replaced by the JSON backend task.
+    TypeNotSupported, ///< The type T cannot be serialized (reserved for the JSON backend task).
 };
 
 /**
@@ -252,7 +252,7 @@ public:
      * @brief Creates a 200 OK JSON response by serializing `value` to JSON.
      *
      * In v0.1 this always returns a `Response` whose body is the error sentinel
-     * string `{\"error\":\"not_implemented\"}`. AEV-009 replaces the stub
+     * string `{\"error\":\"not_implemented\"}`. The JSON backend task replaces the stub
      * with real glaze serialization.
      *
      * @tparam T  Type to serialize. Must satisfy `aevox::Serializable`.
@@ -260,8 +260,8 @@ public:
      * @param  value  The value to serialize. Moved from the caller.
      * @return        Response with status 200 and `Content-Type: application/json`.
      *                Body content is a stub in v0.1.
-     * @note          AEV-009's hook is `Response::Impl::do_json_serialize()`. See
-     *                AEV-005-arch.md §4.3.
+     * @note          The serialization hook is `Response::Impl::do_json_serialize()`. See
+     *                Tasks/architecture/AEV-005-arch.md §4.3.
      */
     template <typename T>
         requires aevox::Serializable<T>
@@ -272,7 +272,7 @@ public:
      *
      * In v0.1 this returns a normal (non-streaming) `Response` with status 200,
      * the provided `Content-Type`, and an empty body. The streaming write API
-     * (`stream.write(...)`) is designed in AEV-006. This factory method exists
+     * (`stream.write(...)`) is not yet designed. This factory method exists
      * now so that v0.1 code compiles; streaming behaviour is deferred.
      *
      * @param content_type  Content-Type for the stream (e.g. `"text/event-stream"`).
@@ -288,7 +288,7 @@ private:
     // Private constructor — used only by factory methods.
     explicit Response(int status_code, std::string body, std::string content_type_value);
 
-    // Internal read-only Impl access for serialization (app_impl.cpp, AEV-004).
+    // Internal read-only Impl access for serialization (app_impl.cpp).
     // Declared here, defined inline in src/http/response_impl.hpp.
     friend const Impl* get_response_impl(const Response&) noexcept;
 };

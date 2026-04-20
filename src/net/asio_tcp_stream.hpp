@@ -8,7 +8,7 @@
 // include/aevox/tcp_stream.hpp names this class so it can call the private
 // TcpStream(unique_ptr<Impl>) constructor.
 //
-// Design: AEV-003-arch.md §4.1
+// Design: Tasks/architecture/AEV-003-arch.md §4.1
 
 #include <aevox/tcp_stream.hpp>
 

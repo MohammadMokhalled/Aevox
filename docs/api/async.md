@@ -204,4 +204,4 @@ In debug builds, an `assert` fires on misuse if `NDEBUG` is not defined.
 - [Architecture Overview](../architecture/index.md) — Thread pool + coroutine execution model design
 - PRD §9.3 — Execution model
 - PRD §9.4 — Async helpers design
-- ADD: `Tasks/architecture/AEV-006-arch.md`
+- ADD: `Tasks/architecture/AEV-006-arch.md` (internal reference)
