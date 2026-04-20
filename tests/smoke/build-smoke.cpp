@@ -1,4 +1,4 @@
-// AEV-002: build-system smoke test
+// Build-system smoke test.
 // ADD ref: Tasks/architecture/AEV-002-arch.md § Test Architecture
 //
 // Verifies:
@@ -31,7 +31,7 @@ int main()
     (void)s;
 
     // std::format — C++23 string formatting (PRD §6.8)
-    [[maybe_unused]] auto msg = std::format("AEV-002 smoke: ok\n");
+    [[maybe_unused]] auto msg = std::format("build smoke: ok\n");
 
     return 0;
 }

@@ -6,14 +6,14 @@
 // Declares AsioExecutor, the Asio-backed implementation of aevox::Executor.
 // All Asio types are confined to this file and asio_executor.cpp.
 //
-// AEV-006 refactor: replaced asio::thread_pool with asio::io_context +
+// Refactor: replaced asio::thread_pool with asio::io_context +
 // std::vector<std::jthread> to enable per-thread initialization of the
 // thread_local executor bridges required by pool(), sleep(), when_all().
 //
 // The public boundary is enforced by CMake: asio::asio is linked PRIVATELY to
 // aevox_core, so no Asio include paths propagate to consumers.
 //
-// Design: ADD §3, §4 (AEV-001-arch.md Rev.2, AEV-006-arch.md §4.2)
+// Design: Tasks/architecture/AEV-001-arch.md Rev.2, Tasks/architecture/AEV-006-arch.md §4.2
 
 #include <aevox/executor.hpp> // public interface we implement
 
@@ -108,7 +108,7 @@ private:
 
     aevox::ExecutorConfig config_;
 
-    // I/O execution context — replaced asio::thread_pool from AEV-001.
+    // I/O execution context.
     // io_ctx_.run() is called from each I/O thread in io_threads_.
     asio::io_context io_ctx_;
 

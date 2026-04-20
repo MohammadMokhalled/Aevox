@@ -13,7 +13,7 @@
 // Dependency note: includes request_impl.hpp to gain friend-class access to
 // Request::Impl::params for path-parameter injection in dispatch().
 //
-// Design: AEV-004-arch.md §6, §7
+// Design: Tasks/architecture/AEV-004-arch.md §6, §7
 
 #include "router/router_impl.hpp"
 

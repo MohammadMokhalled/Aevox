@@ -6,7 +6,7 @@
 // the C++ standard library. The Asio integration happens inside src/net/ via a
 // thin wrapper lambda that co_awaits Task<void> inside an asio::awaitable<void>.
 //
-// Design: ADD §3, §7 (AEV-001-arch.md Rev.2)
+// Design: Tasks/architecture/AEV-001-arch.md Rev.2 §3, §7
 
 #include <coroutine>
 #include <exception>

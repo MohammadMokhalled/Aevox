@@ -1,7 +1,7 @@
 # src/CMakeLists.txt
 #
 # Declares the `aevox_core` compiled static library target.
-# Populated incrementally by subsequent tasks (AEV-001 adds net/, AEV-003 adds http/, etc.)
+# Populated incrementally by subsequent tasks.
 #
 # Requires: vcpkg toolchain (VCPKG_ROOT set, all packages in vcpkg.json resolved).
 # Provides: `aevox_core` target for linking by tests, examples, and user applications.
@@ -15,13 +15,13 @@
 find_package(asio CONFIG REQUIRED)
 find_package(llhttp CONFIG REQUIRED)
 
-add_subdirectory(http)    # AEV-003: aevox_http OBJECT library (HttpParser + llhttp)
-add_subdirectory(router)  # AEV-004: aevox_router OBJECT library (Router + App)
+add_subdirectory(http)    # aevox_http OBJECT library (HttpParser + llhttp)
+add_subdirectory(router)  # aevox_router OBJECT library (Router + App)
 
 add_library(aevox_core STATIC
-    net/asio_executor.cpp      # AEV-001: Asio-backed executor + accept loop
-    net/executor_context.cpp   # AEV-006: thread_local executor bridge definitions
-    net/asio_tcp_stream.cpp    # AEV-003: TcpStream pimpl implementation
+    net/asio_executor.cpp      # Asio-backed executor + accept loop
+    net/executor_context.cpp   # thread_local executor bridge definitions
+    net/asio_tcp_stream.cpp    # TcpStream pimpl implementation
     $<TARGET_OBJECTS:aevox_http>
     $<TARGET_OBJECTS:aevox_router>
 )

@@ -12,7 +12,7 @@
 //   vector alive for as long as any std::string_view or std::span derived from
 //   its contents remains in scope (e.g. the lifetime of a ParsedRequest).
 //
-// Design: AEV-003-arch.md §3.1
+// Design: Tasks/architecture/AEV-003-arch.md §3.1
 
 #include <aevox/task.hpp>
 
@@ -68,7 +68,7 @@ enum class IoError : std::uint8_t
  * @brief Owns one accepted TCP connection and exposes coroutine I/O operations.
  *
  * `TcpStream` is the public bridge between the `Executor` accept loop and the
- * HTTP parser layer (AEV-003). Application handlers and the HTTP parser interact
+ * HTTP parser layer. Application handlers and the HTTP parser interact
  * only with this type — they never see `asio::ip::tcp::socket` or any OS socket
  * primitive.
  *
@@ -78,7 +78,7 @@ enum class IoError : std::uint8_t
  * **Read ownership contract:**
  * `read()` returns an owned `std::vector<std::byte>`. Any `std::string_view` or
  * `std::span` derived from the returned buffer is valid only while that
- * `std::vector<std::byte>` is alive. The `ParsedRequest` struct (AEV-003) stores
+ * `std::vector<std::byte>` is alive. The `ParsedRequest` struct stores
  * views into the caller-owned buffer — the caller is responsible for keeping the
  * buffer alive for the duration of any `ParsedRequest` derived from it.
  *

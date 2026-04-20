@@ -3,7 +3,7 @@
 > An owned, move-only async TCP connection. Passed to every connection handler by the `Executor`. Read and write are `co_await`-able coroutines.
 
 **Header:** `#include <aevox/tcp_stream.hpp>`  
-**Task:** AEV-003 | **ADD:** `Tasks/architecture/AEV-003-arch.md`
+**ADD:** `Tasks/architecture/AEV-003-arch.md`
 
 ---
 

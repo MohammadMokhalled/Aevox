@@ -1,9 +1,9 @@
-// AEV-001: Unit tests for aevox::Executor interface and aevox::Task<T>.
+// Unit tests for aevox::Executor interface and aevox::Task<T>.
 // ADD ref: Tasks/architecture/AEV-001-arch.md § Test Architecture (Rev.2)
 //
 // All Executor tests use make_executor({.thread_count=2, .drain_timeout=2s}).
 // Task coroutine tests use a minimal asio::io_context as a scheduler driver.
-// (Deviation documented in AEV-001-devlog.md: ADD §8 explicitly permits this.)
+// (Deviation documented in Tasks/progress/AEV-001-devlog.md: ADD §8 explicitly permits this.)
 //
 // No test ever names AsioExecutor directly — all access is via aevox::Executor.
 
@@ -116,13 +116,13 @@ template <> void run_task<void>(aevox::Task<void> task)
 // Executor interface tests
 // ==========================================================================
 
-TEST_CASE("AEV-001: make_executor() returns non-null with default config", "[net]")
+TEST_CASE("make_executor() returns non-null with default config", "[net]")
 {
     auto ex = aevox::make_executor();
     REQUIRE(ex != nullptr);
 }
 
-TEST_CASE("AEV-001: Executor - listen() on port 0 succeeds", "[net]")
+TEST_CASE("Executor - listen() on port 0 succeeds", "[net]")
 {
     auto ex = aevox::make_executor(test_config());
 
@@ -132,7 +132,7 @@ TEST_CASE("AEV-001: Executor - listen() on port 0 succeeds", "[net]")
     REQUIRE(result.has_value());
 }
 
-TEST_CASE("AEV-001: Executor - listen() twice on same port returns bind_failed", "[net]")
+TEST_CASE("Executor - listen() twice on same port returns bind_failed", "[net]")
 {
     // Use a fixed port for this test. If the port happens to be in use on the
     // test machine, the first listen() will also fail — both cases are acceptable.
@@ -167,7 +167,7 @@ TEST_CASE("AEV-001: Executor - listen() twice on same port returns bind_failed",
     REQUIRE(r2.has_value());
 }
 
-TEST_CASE("AEV-001: Executor - run() + stop() from another thread terminates cleanly", "[net]")
+TEST_CASE("Executor - run() + stop() from another thread terminates cleanly", "[net]")
 {
     auto port = find_free_port();
     auto ex   = aevox::make_executor(test_config());
@@ -188,7 +188,7 @@ TEST_CASE("AEV-001: Executor - run() + stop() from another thread terminates cle
     stopper.join();
 }
 
-TEST_CASE("AEV-001: Executor - stop() before run() is a no-op, not a crash", "[net]")
+TEST_CASE("Executor - stop() before run() is a no-op, not a crash", "[net]")
 {
     auto ex = aevox::make_executor(test_config());
     // Calling stop() without ever calling run() must not crash or hang.
@@ -196,7 +196,7 @@ TEST_CASE("AEV-001: Executor - stop() before run() is a no-op, not a crash", "[n
     // No assertion needed — if we reach here, the test passes.
 }
 
-TEST_CASE("AEV-001: Executor - thread_count() matches construction argument", "[net]")
+TEST_CASE("Executor - thread_count() matches construction argument", "[net]")
 {
     aevox::ExecutorConfig cfg{.thread_count = 3, .drain_timeout = 1s};
     auto                  ex = aevox::make_executor(cfg);
@@ -208,7 +208,7 @@ TEST_CASE("AEV-001: Executor - thread_count() matches construction argument", "[
 // (Use minimal asio::io_context driver — see file header for justification)
 // ==========================================================================
 
-TEST_CASE("AEV-001: Task<int> - co_return value is received by co_await caller", "[net]")
+TEST_CASE("Task<int> - co_return value is received by co_await caller", "[net]")
 {
     auto producer = []() -> aevox::Task<int> { co_return 42; };
 
@@ -216,7 +216,7 @@ TEST_CASE("AEV-001: Task<int> - co_return value is received by co_await caller",
     REQUIRE(result == 42);
 }
 
-TEST_CASE("AEV-001: Task<void> - completes without value", "[net]")
+TEST_CASE("Task<void> - completes without value", "[net]")
 {
     bool ran      = false;
     auto producer = [&ran]()
@@ -229,7 +229,7 @@ TEST_CASE("AEV-001: Task<void> - completes without value", "[net]")
     REQUIRE(ran);
 }
 
-TEST_CASE("AEV-001: Task - moved-from Task::valid() returns false", "[net]")
+TEST_CASE("Task - moved-from Task::valid() returns false", "[net]")
 {
     auto t1 = []() -> aevox::Task<int> { co_return 0; }();
     REQUIRE(t1.valid());

@@ -14,7 +14,7 @@
 // transitively pull in include/aevox/router_impl.hpp → src/router/handler_wrap.hpp,
 // so all detail:: types (ErasedHandler, ParamType, Segment) are available here.
 //
-// Design: AEV-004-arch.md §5
+// Design: Tasks/architecture/AEV-004-arch.md §5
 
 #include <aevox/app.hpp>
 #include <aevox/executor.hpp>

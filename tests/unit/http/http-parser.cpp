@@ -1,4 +1,4 @@
-// AEV-003: HttpParser unit tests — no I/O.
+// HttpParser unit tests — no I/O.
 // ADD ref: Tasks/architecture/AEV-003-arch.md §8.1
 
 #include <catch2/catch_test_macros.hpp>
@@ -22,7 +22,7 @@ static std::vector<std::byte> to_bytes(std::string_view s)
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - happy path GET no body", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - happy path GET no body", "[http][parser]")
 {
     HttpParser parser;
     auto       buf    = to_bytes("GET /index.html HTTP/1.1\r\nHost: example.com\r\n\r\n");
@@ -43,7 +43,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - happy path GET no body", "[http][parser]")
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - happy path POST with Content-Length body", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - happy path POST with Content-Length body", "[http][parser]")
 {
     HttpParser parser;
     auto       buf    = to_bytes("POST /submit HTTP/1.1\r\n"
@@ -73,7 +73,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - happy path POST with Content-Length body",
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - headers parsed as string_view pairs", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - headers parsed as string_view pairs", "[http][parser]")
 {
     HttpParser parser;
     auto       buf    = to_bytes("GET / HTTP/1.1\r\n"
@@ -107,7 +107,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - headers parsed as string_view pairs", "[ht
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - truncated request returns Incomplete", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - truncated request returns Incomplete", "[http][parser]")
 {
     HttpParser parser;
 
@@ -133,7 +133,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - truncated request returns Incomplete", "[h
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - invalid method returns BadRequest", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - invalid method returns BadRequest", "[http][parser]")
 {
     HttpParser parser;
     auto       buf    = to_bytes("NOTAVERB / HTTP/1.1\r\n\r\n");
@@ -145,7 +145,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - invalid method returns BadRequest", "[http
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - chunked transfer encoding assembled", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - chunked transfer encoding assembled", "[http][parser]")
 {
     HttpParser parser;
     auto       buf    = to_bytes("POST /data HTTP/1.1\r\n"
@@ -169,7 +169,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - chunked transfer encoding assembled", "[ht
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - HTTP Upgrade header detected", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - HTTP Upgrade header detected", "[http][parser]")
 {
     HttpParser parser;
     auto       buf    = to_bytes("GET /ws HTTP/1.1\r\n"
@@ -185,7 +185,7 @@ TEST_CASE("AEV-003: HTTP/1.1 parser - HTTP Upgrade header detected", "[http][par
 
 // =============================================================================
 
-TEST_CASE("AEV-003: HTTP/1.1 parser - limits and edge cases", "[http][parser]")
+TEST_CASE("HTTP/1.1 parser - limits and edge cases", "[http][parser]")
 {
     SECTION("max_header_count limit enforced")
     {

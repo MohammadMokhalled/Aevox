@@ -16,9 +16,9 @@
 //
 // Constraint: src/router/handler_wrap.hpp must contain ONLY standard-library
 // headers, aevox public headers, and no Asio/third-party types. See OI-1 in
-// AEV-004-arch.md §10.
+// Tasks/architecture/AEV-004-arch.md §10.
 //
-// Design: AEV-004-arch.md §4.3 (Final resolved design for template bodies)
+// Design: Tasks/architecture/AEV-004-arch.md §4.3
 
 #include <span>
 #include <string>

@@ -16,7 +16,7 @@
 // when each I/O worker thread starts). Implementations live inline here
 // because all public helpers are templates.
 //
-// Design: ADD §3, §4 (AEV-006-arch.md)
+// Design: Tasks/architecture/AEV-006-arch.md §3, §4
 // PRD §9.3, §9.4 — Execution model, async helpers
 
 #include <aevox/task.hpp>

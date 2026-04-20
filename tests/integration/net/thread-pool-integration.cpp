@@ -1,4 +1,4 @@
-// AEV-006: Integration tests for thread pool, CPU offload, and when_all concurrency.
+// Integration tests for thread pool, CPU offload, and when_all concurrency.
 // ADD ref: Tasks/architecture/AEV-006-arch.md § Test Architecture §8.2
 //
 // Uses real AsioExecutor with 4 I/O threads and 2 CPU threads.
@@ -47,8 +47,7 @@ static void tcp_connect(std::uint16_t port)
 
 // ---------------------------------------------------------------------------
 
-TEST_CASE("AEV-006 integration: 1000 concurrent coroutines - all complete",
-          "[integration][net][thread-safety]")
+TEST_CASE("1000 concurrent coroutines - all complete", "[integration][net][thread-safety]")
 {
     constexpr int N = 1000;
 
@@ -81,7 +80,7 @@ TEST_CASE("AEV-006 integration: 1000 concurrent coroutines - all complete",
     REQUIRE(handled.load() == N);
 }
 
-TEST_CASE("AEV-006 integration: pool() does not block I/O threads", "[integration][net]")
+TEST_CASE("pool() does not block I/O threads", "[integration][net]")
 {
     // Send two connections. The first handler runs a 100ms CPU task via pool().
     // The second handler must be accepted and run concurrently — not blocked.
@@ -133,8 +132,7 @@ TEST_CASE("AEV-006 integration: pool() does not block I/O threads", "[integratio
     REQUIRE(h2_order.load() < h1_order.load());
 }
 
-TEST_CASE("AEV-006 integration: thread-safety - 100 concurrent pool() calls",
-          "[integration][net][thread-safety]")
+TEST_CASE("thread-safety - 100 concurrent pool() calls", "[integration][net][thread-safety]")
 {
     constexpr int N = 100;
 
@@ -172,8 +170,7 @@ TEST_CASE("AEV-006 integration: thread-safety - 100 concurrent pool() calls",
     REQUIRE(sum.load() == expected_sum);
 }
 
-TEST_CASE("AEV-006 integration: when_all - concurrent sleep-based tasks",
-          "[integration][net][when_all]")
+TEST_CASE("when_all - concurrent sleep-based tasks", "[integration][net][when_all]")
 {
     std::string result_a;
     std::string result_b;

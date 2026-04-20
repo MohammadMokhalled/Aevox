@@ -18,7 +18,7 @@
 //   ConnectionHandler, not by Impl). It must not be used after the parser is
 //   reset or destroyed.
 //
-// Design: AEV-005-arch.md §4.1, §4.4
+// Design: Tasks/architecture/AEV-005-arch.md §4.1, §4.4
 
 #include <aevox/request.hpp>
 
@@ -54,7 +54,7 @@ struct Request::Impl
     std::string_view path_view;
     std::string_view query_view;
 
-    /// Path parameters injected by the Router (AEV-004) via Request::set_params().
+    /// Path parameters injected by the Router via Request::set_params().
     /// Keys are parameter names as declared in the route pattern; values are raw strings.
     std::unordered_map<std::string, std::string> params;
 
@@ -126,7 +126,7 @@ template <typename T>
     requires aevox::Deserializable<T>
 [[nodiscard]] aevox::Task<std::expected<T, BodyParseError>> Request::json() const
 {
-    // v0.1 stub — real implementation wired by AEV-009 via Impl::do_json_parse().
+    // v0.1 stub — real JSON implementation not yet wired.
     co_return std::unexpected(BodyParseError::NotImplemented);
 }
 
@@ -156,11 +156,11 @@ template <typename T> [[nodiscard]] std::optional<T> Request::get(std::string_vi
 }
 
 // =============================================================================
-// AEV-004 Router — path parameter injection
+// Router — path parameter injection
 // =============================================================================
 //
 // set_params() was removed from the public header (M1 fix: avoids pulling
-// <unordered_map> into a public header). AEV-004 (Router) injects captured
+// <unordered_map> into a public header). The Router injects captured
 // path parameters directly through its friend-class access to Request::Impl:
 //
 //   req.impl_->params = std::move(captured_params);
@@ -202,7 +202,7 @@ inline const Request::Impl* get_request_impl(const Request& req) noexcept
 }
 
 /// Returns a mutable pointer to Request's Impl for internal param injection.
-/// Used by tests (to set params after construction) and AEV-004 Router
+/// Used by tests (to set params after construction) and the Router
 /// (which uses friend class Router to directly write req.impl_->params).
 /// Returns nullptr for a moved-from Request.
 /// Friend of Request — declared in request.hpp (in aevox namespace, not detail).

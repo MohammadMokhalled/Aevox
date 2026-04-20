@@ -4,11 +4,11 @@
 // Framework-wide C++23 concept definitions.
 //
 // Serializable and Deserializable are placeholder stubs in v0.1.
-// AEV-009 (glaze JSON backend) replaces them with real constraints.
+// The JSON backend task replaces them with real constraints.
 // Do not add any includes beyond <concepts>, <string>, and <string_view> here —
 // this header is included by request.hpp and response.hpp.
 //
-// Design: AEV-005-arch.md §3.1
+// Design: Tasks/architecture/AEV-005-arch.md §3.1
 
 #include <concepts>
 #include <string>
@@ -33,7 +33,7 @@ concept ParamConvertible = std::integral<T> || std::floating_point<T> ||
 /**
  * @brief Placeholder concept: any type is serializable to JSON in v0.1.
  *
- * AEV-009 replaces this with a real glaze-backed constraint. Until then,
+ * The JSON backend task replaces this with a real glaze-backed constraint. Until then,
  * `Response::json<T>()` will fail at runtime with `SerializeError::NotImplemented`
  * for all T except `std::string` (which has a non-template overload).
  *
@@ -41,17 +41,17 @@ concept ParamConvertible = std::integral<T> || std::floating_point<T> ||
  *       The v0.1 stub exists only to allow `Response::json<T>()` to compile.
  */
 template <typename T>
-concept Serializable = true; // replaced in AEV-009
+concept Serializable = true; // replaced by the JSON backend task
 
 /**
  * @brief Placeholder concept: any type is deserializable from JSON in v0.1.
  *
- * AEV-009 replaces this with a real glaze-backed constraint. Until then,
+ * The JSON backend task replaces this with a real glaze-backed constraint. Until then,
  * `Request::json<T>()` always returns `BodyParseError::NotImplemented`.
  *
  * @note Do not write production code that depends on this being unconstrained.
  */
 template <typename T>
-concept Deserializable = true; // replaced in AEV-009
+concept Deserializable = true; // replaced by the JSON backend task
 
 } // namespace aevox

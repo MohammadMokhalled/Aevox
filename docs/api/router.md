@@ -108,7 +108,7 @@ All of the following are accepted by `get()`, `post()`, etc.:
 [](aevox::Request& req, T0 a, T1 b) -> aevox::Response { ... }
 ```
 
-> **Note:** `std::function` requires `CopyConstructible` captures. Handlers that capture `std::unique_ptr` or other move-only types must wrap them in `std::shared_ptr`. This limitation is tracked in AEV-015.
+> **Note:** `std::function` requires `CopyConstructible` captures. Handlers that capture `std::unique_ptr` or other move-only types must wrap them in `std::shared_ptr`. This limitation is tracked (future task).
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Header:** `#include <aevox/task.hpp>`
 **Included by:** `<aevox/executor.hpp>` and `<aevox/async.hpp>` transitively
-**Task:** AEV-001 | **ADD:** `Tasks/architecture/AEV-001-arch.md`
+**ADD:** `Tasks/architecture/AEV-001-arch.md`
 
 ---
 
@@ -208,4 +208,4 @@ co_await t;  // WRONG — t.valid() == false, undefined behaviour
 - [Async Helpers](async.md) — `pool()`, `sleep()`, `when_all()`
 - [API Overview](index.md)
 - PRD §5.6 — Executor Abstraction
-- ADD: `Tasks/architecture/AEV-001-arch.md`
+- ADD: `Tasks/architecture/AEV-001-arch.md` (internal reference)

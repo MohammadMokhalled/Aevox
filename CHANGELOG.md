@@ -8,6 +8,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Removed AEV-xxx task ID references from all file names, CMake targets, in-code comments, and documentation outside the `Tasks/` folder; lint script added at `scripts/check_task_ids.sh`
+- `CLAUDE.md` Section 7 File Naming Conventions updated: test, integration test, and benchmark files now use slug-only naming (no task ID prefix); AEV-NNN prefixes apply exclusively to files inside `Tasks/`
+
 ### Added
 - `examples/hello-world` — end-to-end Hello World demonstrating the v0.1 public API: static routes, named path parameters, and clean SIGINT shutdown (AEV-020)
 - `aevox::Router` — radix-trie HTTP router with static, named-parameter, and

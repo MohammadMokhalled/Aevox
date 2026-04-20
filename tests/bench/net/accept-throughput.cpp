@@ -1,4 +1,4 @@
-// AEV-001: accept_loop throughput baseline.
+// accept_loop throughput baseline.
 // ADD ref: Tasks/architecture/AEV-001-arch.md § Test Architecture (Rev.2)
 //
 // Measures: accepted connections per second on loopback.
@@ -6,7 +6,7 @@
 // Config: 2-thread pool (bench machine may be constrained in CI).
 //
 // Methodology: each iteration connects + triggers handler entry (co_return
-// immediately). Not a full round-trip — HTTP parsing is AEV-003.
+// immediately). Not a full round-trip — HTTP parsing is a separate concern.
 
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include <aevox/executor.hpp>
@@ -68,12 +68,12 @@ int main()
     }
 
     ankerl::nanobench::Bench bench;
-    bench.title("AEV-001: accept_loop loopback throughput")
+    bench.title("accept_loop loopback throughput")
         .unit("connection")
         .minEpochIterations(connections_per_epoch)
         .warmup(3);
 
-    bench.run("AEV-001: accept_loop loopback throughput", [&] {
+    bench.run("accept_loop loopback throughput", [&] {
         asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;

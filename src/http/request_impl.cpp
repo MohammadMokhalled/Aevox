@@ -7,10 +7,10 @@
 //
 // Also provides explicit instantiations for all five ParamConvertible types so
 // that code in src/ can call Request::param<T>() without including the template
-// definition header. AEV-004 (Router) must include request_impl.hpp directly
+// definition header. The Router must include request_impl.hpp directly
 // if it requires additional instantiations.
 //
-// Design: AEV-005-arch.md §4.1
+// Design: Tasks/architecture/AEV-005-arch.md §4.1
 
 #include "http/request_impl.hpp"
 
@@ -152,7 +152,7 @@ std::string_view to_string(HttpMethod m) noexcept
 //
 // These instantiations allow TUs that only link against aevox_core (without
 // including request_impl.hpp) to call param<T>() for these five types.
-// AEV-004 (Router) must add any additional T types it uses to this list.
+// The Router must add any additional T types it uses to this list.
 // A missing instantiation will manifest as a linker error — not silent UB.
 // =============================================================================
 

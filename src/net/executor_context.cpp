@@ -11,7 +11,7 @@
 // Having definitions in a single TU (this file) prevents ODR violations that
 // would arise from multiple TUs defining the same thread_local variable.
 //
-// Design: ADD §4.1 (AEV-006-arch.md)
+// Design: Tasks/architecture/AEV-006-arch.md §4.1
 
 #include <aevox/async.hpp>
 

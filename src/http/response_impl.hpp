@@ -7,7 +7,7 @@
 // Response::json<T>(T&&). The template definition must be visible to any
 // TU that instantiates Response::json<T>() — i.e. internal framework code.
 //
-// Design: AEV-005-arch.md §4.2, §4.3
+// Design: Tasks/architecture/AEV-005-arch.md §4.2, §4.3
 
 #include <aevox/response.hpp>
 
@@ -29,7 +29,7 @@ struct Response::Impl
     std::string body;
 
     /// Header map: name → value. Names stored as provided (no normalization).
-    /// The framework's write path (AEV-004/AEV-006) serializes these to the wire.
+    /// The framework's write path serializes these to the wire.
     std::unordered_map<std::string, std::string> headers;
 };
 
@@ -41,7 +41,7 @@ template <typename T>
     requires aevox::Serializable<T>
 [[nodiscard]] Response Response::json(T&& /*value*/)
 {
-    // v0.1 stub — AEV-009 wires in real glaze serialization via
+    // v0.1 stub — real glaze serialization not yet wired via
     // Response::Impl::do_json_serialize(). The sentinel body makes it obvious
     // at runtime that the stub is active. Do not use this output as real JSON.
     return Response{200, R"({"error":"not_implemented"})", "application/json"};

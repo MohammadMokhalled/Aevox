@@ -2,37 +2,37 @@
 # Unit tests for the aevox::Executor interface, aevox::Task<T>, and async helpers.
 # All tests go through the public aevox:: interface — never AsioExecutor directly.
 
-add_executable(AEV-001-executor-contract
-    AEV-001-executor-contract.cpp
+add_executable(executor-contract
+    executor-contract.cpp
 )
 
-target_link_libraries(AEV-001-executor-contract
+target_link_libraries(executor-contract
     PRIVATE
         aevox_core
         Catch2::Catch2WithMain
 )
 
-target_compile_options(AEV-001-executor-contract
+target_compile_options(executor-contract
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-catch_discover_tests(AEV-001-executor-contract)
-add_dependencies(aevox_tests_unit AEV-001-executor-contract)
+catch_discover_tests(executor-contract)
+add_dependencies(aevox_tests_unit executor-contract)
 
-# AEV-006: pool(), sleep(), when_all() unit tests
-add_executable(AEV-006-executor
-    AEV-006-executor.cpp
+# pool(), sleep(), when_all() unit tests
+add_executable(executor-async
+    executor-async.cpp
 )
 
-target_link_libraries(AEV-006-executor
+target_link_libraries(executor-async
     PRIVATE
         aevox_core
         Catch2::Catch2WithMain
 )
 
-target_compile_options(AEV-006-executor
+target_compile_options(executor-async
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-catch_discover_tests(AEV-006-executor)
-add_dependencies(aevox_tests_unit AEV-006-executor)
+catch_discover_tests(executor-async)
+add_dependencies(aevox_tests_unit executor-async)

@@ -93,42 +93,28 @@ Nothing flows upward through this diagram. A layer may only depend on layers bel
 
 ---
 
-## 4. C++23 Mandatory Patterns
+## 4. C++23 Mandatory Patterns (PRD §6.9)
 
-These patterns are required everywhere in the codebase — internals, public API, tests, and examples.
+Required everywhere — internals, public API, tests, examples. Zero tolerance.
 
-| Pattern | Required | Prohibited |
-|---|---|---|
-| Errors | `std::expected<T, E>` | Exceptions for control flow |
-| Nullable values | `std::optional<T>` | Nullable raw pointers `T*` |
-| Non-owning buffers | `std::span<T>` | `T* data, size_t len` pairs |
-| String parameters | `std::string_view` | `const std::string&` |
-| Heap allocation | `std::make_unique` / `std::make_shared` | `new` / `delete` |
-| Async operations | Coroutines (`co_await`) | Callbacks in public API |
-| Type constraints | Concepts (`requires`) | SFINAE (`enable_if`) |
-| String formatting | `std::format` | `printf` / `sprintf` / `+` concatenation |
-| Collection iteration | `std::ranges` / range-for | Raw index loops |
-| Nodiscard | `[[nodiscard]]` on all `expected`/`optional` returns | Unannotated fallible returns |
-
-### Complete Prohibition List (PRD §6.9)
-
-| Banned | Use instead |
+| Use | Never use |
 |---|---|
-| `new` / `delete` | `std::make_unique` / `std::make_shared` |
-| Raw owning `T*` | `std::unique_ptr<T>` |
-| `const std::string&` params | `std::string_view` |
-| `void*` | `std::any` or typed templates |
-| C-style casts `(int)x` | `static_cast<int>(x)` |
-| `#define` constants | `constexpr` |
-| SFINAE / `enable_if` | Concepts / `requires` |
-| `printf` / `sprintf` | `std::format` |
-| Callback-based async | Coroutines |
-| `for(int i=0; i<n; i++)` over containers | Range-for or `std::ranges` |
-| `std::endl` | `'\n'` |
-| `using namespace std;` | Explicit `std::` prefix always |
-| Mutable globals | Dependency injection |
-| `reinterpret_cast` | Redesign (rare justified exceptions with comment) |
-| Em dash `—` (U+2014) in string literals / `TEST_CASE` names | ASCII hyphen-minus ` - ` — MSVC's Windows-1252 encoding garbles non-ASCII in string literals, breaking Catch2 test name matching |
+| `std::expected<T, E>` for errors | Exceptions for control flow |
+| `std::optional<T>` for nullable values | Nullable raw pointers `T*` |
+| `std::span<T>` for non-owning buffers | `T* data, size_t len` pairs |
+| `std::string_view` for string params | `const std::string&` |
+| `std::make_unique` / `std::make_shared` | `new` / `delete`, raw owning `T*` |
+| Coroutines (`co_await`) for async | Callbacks in public API |
+| Concepts (`requires`) for constraints | SFINAE / `enable_if` |
+| `std::format` | `printf` / `sprintf` / `+` concatenation |
+| `std::ranges` / range-for | Raw index loops, `std::endl` |
+| `[[nodiscard]]` on all `expected`/`optional` returns | Unannotated fallible returns |
+| `static_cast<T>` | C-style casts `(T)x`, `reinterpret_cast` (rare: add comment) |
+| `constexpr` | `#define` constants |
+| `std::any` or typed templates | `void*` |
+| Explicit `std::` prefix always | `using namespace std;` |
+| Dependency injection | Mutable globals |
+| ASCII hyphen-minus ` - ` in `TEST_CASE` names | Em dash `—` (U+2014) — garbles in MSVC Windows-1252, breaks Catch2 name matching |
 
 ---
 
@@ -198,11 +184,13 @@ aevox/
 | Developer logs | `AEV-NNN-devlog.md` | `AEV-001-devlog.md` |
 | Public headers | `{class-or-module}.hpp` | `executor.hpp`, `request.hpp` |
 | Source files | `{class-or-module}.cpp` | `asio_executor.cpp` |
-| Unit tests | `AEV-NNN-{slug}.cpp` | `AEV-001-executor-contract.cpp` |
-| Integration tests | `AEV-NNN-{slug}.cpp` | `AEV-001-tcp-accept.cpp` |
-| Benchmarks | `AEV-NNN-{slug}.cpp` | `AEV-001-accept-throughput.cpp` |
+| Unit tests | `{module}-{what}.cpp` (no task ID prefix) | `executor-contract.cpp`, `http-parser.cpp` |
+| Integration tests | `{module}-{what}.cpp` (no task ID prefix) | `tcp-accept.cpp`, `http-parse-roundtrip.cpp` |
+| Benchmarks | `{subject}-{metric}.cpp` (no task ID prefix) | `accept-throughput.cpp`, `executor-throughput.cpp` |
 
 Task IDs are sequential and zero-padded: `AEV-001`, `AEV-002`, etc. Always scan existing tasks to find the next available ID before creating one.
+
+> **AEV-NNN prefixes apply exclusively to files inside `Tasks/`** (task files, ADD files, developer logs, epics). Source files, headers, test files, benchmarks, examples, and documentation pages must never include a task ID in their name. Use the lint script `scripts/check_task_ids.sh` to verify compliance.
 
 ---
 
@@ -364,6 +352,9 @@ Do not implement, design, or suggest adding:
 
 These apply to every response in this repository.
 
+### Search before reading
+Before opening files speculatively, use Grep to find relevant symbols/patterns and Glob to find relevant files. Read only files that directly answer the question. Never read an entire file when a targeted search would suffice.
+
 ### Read before modifying
 Never propose changes to code you have not read. Use the Read tool before editing. Understand existing patterns before suggesting modifications.
 
@@ -387,3 +378,7 @@ Ask before: deleting files, pushing commits, modifying `CMakeLists.txt` in ways 
 
 ### The PRD is the final arbiter
 When a user request conflicts with the PRD, implement the request and explicitly flag the conflict so the user can decide whether to update the PRD. Never silently abandon a PRD constraint.
+
+### Run clang-format after every code change
+
+Run `bash scripts/format.sh` after editing any `.cpp`/`.hpp` file and before any build.

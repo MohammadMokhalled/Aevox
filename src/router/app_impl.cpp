@@ -7,7 +7,7 @@
 // can call executor_->stop() safely. This is the v0.1 approach and is adequate for
 // single-App deployments (one Executor per process).
 //
-// Design: AEV-004-arch.md §8
+// Design: Tasks/architecture/AEV-004-arch.md §8
 
 #include <aevox/response.hpp>
 #include <aevox/task.hpp>

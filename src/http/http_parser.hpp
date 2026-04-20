@@ -20,7 +20,7 @@
 // Thread-safety:
 //   HttpParser is not thread-safe. Use one instance per connection coroutine.
 //
-// Design: AEV-003-arch.md §3.3, §4.2
+// Design: Tasks/architecture/AEV-003-arch.md §3.3, §4.2
 
 #include <cstddef>
 #include <cstdint>
@@ -67,7 +67,7 @@ enum class ParseError : std::uint8_t
  *       HttpParser::Impl (chunk_buf). ParsedRequest::body is a span into that
  *       internal buffer and is valid until the next call to feed() or reset().
  *       This gives body a uniform, connection-scoped lifetime regardless of
- *       transfer encoding (intentional simplification; see AEV-003 devlog A-2).
+ *       transfer encoding (intentional simplification; see Tasks/progress/AEV-003-devlog.md A-2).
  *
  * Thread-safety: not thread-safe — value type, do not share between threads.
  */
