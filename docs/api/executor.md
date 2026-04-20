@@ -2,8 +2,7 @@
 
 > The async I/O execution layer — manages the thread pool, TCP acceptors, and coroutine dispatch. Every Aevox server starts here.
 
-**Headers:** `#include <aevox/executor.hpp>` · `#include <aevox/task.hpp>` · `#include <aevox/tcp_stream.hpp>` (included transitively)  
-**ADDs:** `Tasks/architecture/AEV-001-arch.md`, `Tasks/architecture/AEV-003-arch.md`
+**Headers:** `#include <aevox/executor.hpp>` · `#include <aevox/task.hpp>` · `#include <aevox/tcp_stream.hpp>` (included transitively)
 
 ---
 
@@ -285,7 +284,5 @@ aevox::Task<void> outer(aevox::TcpStream stream) {
 - [Task](task.md) — `aevox::Task<T>` coroutine return type
 - [Async Helpers](async.md) — `pool()`, `sleep()`, `when_all()`
 - [Architecture Overview](../architecture/index.md)
-- PRD §5.5 — Layered Architecture
-- PRD §5.6 — Executor Abstraction (C++29 `std::net` migration path)
-- PRD §9 — Thread Pool + Coroutine Execution Model
-- ADD: `Tasks/architecture/AEV-001-arch.md`, `Tasks/architecture/AEV-003-arch.md` (internal reference)
+- [Architecture — Executor](../architecture/executor.md) — design rationale for the Executor abstraction
+- [Architecture — Coroutines](../architecture/coroutines.md) — how coroutines interact with the Executor

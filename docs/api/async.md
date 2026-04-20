@@ -201,7 +201,5 @@ In debug builds, an `assert` fires on misuse if `NDEBUG` is not defined.
 - [Executor](executor.md) — `make_executor()`, `ExecutorConfig`, `Executor` interface
 - [Task](task.md) — `aevox::Task<T>` coroutine return type
 - [API Overview](index.md)
-- [Architecture Overview](../architecture/index.md) — Thread pool + coroutine execution model design
-- PRD §9.3 — Execution model
-- PRD §9.4 — Async helpers design
-- ADD: `Tasks/architecture/AEV-006-arch.md` (internal reference)
+- [Architecture Overview](../architecture/index.md) — thread pool and coroutine execution model
+- [Architecture — Coroutines](../architecture/coroutines.md) — how `pool()`, `sleep()`, and `when_all()` interact with the coroutine machinery

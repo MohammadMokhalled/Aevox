@@ -1,9 +1,6 @@
 # Getting Started
 
-This guide walks you from zero to a working TCP echo server using Aevox's coroutine-based I/O stack.
-
-!!! tip "Start with the Hello World example"
-    If you want to write an HTTP server right away, skip to the [Hello World example](examples/hello-world.md). It covers `App`, `Router`, `Request`, and `Response` in one file. This guide goes deeper into the networking layer underneath.
+This page takes you from zero to a running HTTP server in minutes. You will need CMake, a C++23 compiler, and vcpkg.
 
 ---
 
@@ -23,196 +20,135 @@ macOS and Clang are not currently supported.
 
 ## Installation
 
-### 1. Clone with vcpkg manifest
-
-Aevox uses [vcpkg manifest mode](https://learn.microsoft.com/en-us/vcpkg/consume/manifest-mode). Dependencies are declared in `vcpkg.json` and installed automatically during the CMake configure step.
+Clone the repository and set your vcpkg root:
 
 ```bash
 git clone https://github.com/MohammadMokhalled/Aevox.git
 cd Aevox
-export VCPKG_ROOT=$HOME/vcpkg   # or wherever vcpkg is installed
+export VCPKG_ROOT=$HOME/vcpkg
 ```
 
-### 2. Configure
+Configure and build:
 
 === "Linux (GCC 13)"
     ```bash
     cmake --preset default
+    cmake --build build/debug
     ```
 
 === "Windows (MSVC)"
     ```bash
     cmake --preset windows-msvc-debug
+    cmake --build --preset windows-msvc-debug
     ```
 
-=== "Release"
-    ```bash
-    cmake --preset release
-    ```
-
-### 3. Build
-
-```bash
-cmake --build build/debug
-```
-
-### 4. Run the tests
+Verify everything works:
 
 ```bash
 ctest --test-dir build/debug --output-on-failure
 ```
 
-All 44 tests should pass (unit + integration + benchmarks).
-
 ---
 
-## Your First TCP Echo Server
+## Your First HTTP Server
 
-Create a file `echo.cpp`:
+Create `main.cpp`:
 
 ```cpp
-#include <aevox/executor.hpp>
-#include <aevox/tcp_stream.hpp>
-#include <print>
+#include <aevox/app.hpp>
 
-int main() {
-    auto ex = aevox::make_executor({
-        .thread_count    = 4,    // 4 I/O threads
-        .cpu_pool_threads = 0,   // no CPU pool needed for I/O-only work
+int main()
+{
+    aevox::App app;
+
+    app.get("/", [](aevox::Request&) {
+        return aevox::Response::ok("Hello, World!");
     });
 
-    auto result = ex->listen(8080,
-        [](std::uint64_t conn_id, aevox::TcpStream stream) -> aevox::Task<void> {
-            std::println("conn {} connected", conn_id);
+    app.get("/hello/{name}", [](aevox::Request& req) {
+        auto name = req.param<std::string_view>("name").value_or("stranger");
+        return aevox::Response::ok(std::format("Hello, {}!", name));
+    });
 
-            for (;;) {
-                auto data = co_await stream.read();
+    app.get("/health", [](aevox::Request&) {
+        return aevox::Response::ok("ok");
+    });
 
-                if (!data) {
-                    // EOF or network error — close the connection
-                    std::println("conn {} closed: {}", conn_id,
-                                 aevox::to_string(data.error()));
-                    co_return;
-                }
-
-                // Echo the bytes back
-                auto write_result = co_await stream.write(*data);
-                if (!write_result) co_return;
-            }
-        });
-
-    if (!result) {
-        std::println(stderr, "listen failed: {}", aevox::to_string(result.error()));
-        return 1;
-    }
-
-    std::println("Listening on :8080 — Ctrl-C to stop");
-    ex->run();
+    app.listen(8080);
 }
 ```
 
 Add it to your `CMakeLists.txt`:
 
 ```cmake
-find_package(aevox REQUIRED)
-
-add_executable(echo echo.cpp)
-target_link_libraries(echo PRIVATE aevox::aevox)
-target_compile_features(echo PRIVATE cxx_std_23)
+add_executable(my_server main.cpp)
+target_link_libraries(my_server PRIVATE aevox_core)
+target_compile_features(my_server PRIVATE cxx_std_23)
 ```
 
 Build and run:
 
 ```bash
-cmake --build build && ./build/echo
+cmake --build build/debug --target my_server
+./build/debug/my_server
 ```
 
-Test with netcat:
+Test with curl:
 
 ```bash
-echo "Hello Aevox" | nc localhost 8080
-# output: Hello Aevox
+curl http://localhost:8080/
+# Hello, World!
+
+curl http://localhost:8080/hello/Alice
+# Hello, Alice!
+
+curl http://localhost:8080/missing
+# HTTP/1.1 404 Not Found
+```
+
+Press Ctrl-C to stop.
+
+---
+
+## Reading Requests
+
+Handlers receive a `Request&` with everything from the incoming HTTP request:
+
+```cpp
+app.get("/items/{id:int}", [](aevox::Request& req) {
+    // Typed path parameter — returns std::expected<int, ParamError>
+    auto id = req.param<int>("id");
+    if (!id) {
+        return aevox::Response::bad_request("invalid id");
+    }
+
+    auto content_type = req.header("Content-Type"); // std::optional<std::string_view>
+    auto body         = req.body();                 // std::string_view
+
+    return aevox::Response::ok(std::format("Item {}", *id));
+});
 ```
 
 ---
 
-## Offloading CPU Work
+## Building Responses
 
-Use `aevox::pool()` to run CPU-bound code on the dedicated CPU thread pool without blocking an I/O thread:
-
-```cpp
-#include <aevox/executor.hpp>
-#include <aevox/tcp_stream.hpp>
-#include <aevox/async.hpp>
-#include <vector>
-
-aevox::Task<void> handle(std::uint64_t, aevox::TcpStream stream) {
-    auto data = co_await stream.read();
-    if (!data) co_return;
-
-    // Compress on a CPU thread — does not block any I/O thread
-    auto compressed = co_await aevox::pool([bytes = *data]() {
-        return compress(bytes);   // runs on cpu_pool
-    });
-
-    co_await stream.write(std::span{compressed});
-}
-```
-
----
-
-## Waiting Without Blocking
-
-`aevox::sleep()` suspends the coroutine without occupying a thread:
+Use the factory methods to build responses:
 
 ```cpp
-#include <aevox/async.hpp>
-using namespace std::chrono_literals;
-
-aevox::Task<void> delayed_hello(aevox::TcpStream stream) {
-    co_await aevox::sleep(100ms);
-    co_await stream.write(/* "hello" bytes */);
-}
+aevox::Response::ok("body text")           // 200 OK
+aevox::Response::created("body text")      // 201 Created
+aevox::Response::not_found("not here")     // 404 Not Found
+aevox::Response::bad_request("bad input")  // 400 Bad Request
 ```
 
----
-
-## Concurrent Fan-Out
-
-`aevox::when_all()` runs multiple `Task<T>` concurrently and collects results:
+Add headers with the fluent builder:
 
 ```cpp
-aevox::Task<void> parallel_reads(aevox::TcpStream stream_a, aevox::TcpStream stream_b) {
-    auto [data_a, data_b] = co_await aevox::when_all(
-        stream_a.read(),
-        stream_b.read()
-    );
-    // both reads have completed
-}
+return aevox::Response::ok(json_string)
+    .content_type("application/json")
+    .header("X-Request-Id", "abc123");
 ```
-
----
-
-## Graceful Shutdown
-
-`stop()` is thread-safe and can be called from a signal handler:
-
-```cpp
-#include <csignal>
-
-std::unique_ptr<aevox::Executor> ex;
-
-int main() {
-    ex = aevox::make_executor();
-    ex->listen(8080, my_handler);
-
-    std::signal(SIGINT, [](int) { ex->stop(); });
-
-    ex->run();  // blocks until stop() is called, then drains in-flight handlers
-}
-```
-
-The drain timeout (default 30 s) gives in-flight connections time to finish cleanly.
 
 ---
 
@@ -220,10 +156,15 @@ The drain timeout (default 30 s) gives in-flight connections time to finish clea
 
 | Topic | Where |
 |---|---|
-| HTTP server with routing | [Hello World example](examples/hello-world.md) |
-| `App` / `Router` / `Request` / `Response` | [API Reference — Router and App](api/router.md) |
-| Full `Executor` API | [API Reference — Executor](api/executor.md) |
-| `TcpStream` read/write details | [API Reference — TcpStream](api/tcp_stream.md) |
-| CPU offload, timers, fan-out | [API Reference — Async Helpers](api/async.md) |
-| Coroutine mechanics | [API Reference — Task](api/task.md) |
-| Layer diagram and design decisions | [Architecture](architecture/index.md) |
+| All route pattern types and groups | [User Guide — Routing](guide/routing.md) |
+| Full Request and Response API | [User Guide — Request and Response](guide/request-response.md) |
+| Async handlers with `co_await` | [User Guide — Async Patterns](guide/async-patterns.md) |
+| Error handling with `std::expected` | [User Guide — Error Handling](guide/error-handling.md) |
+| Complete API reference | [API Reference](api/index.md) |
+
+---
+
+## See Also
+
+- [User Guide](guide/index.md) — deeper coverage of every feature with worked examples
+- [Hello World example](examples/hello-world.md) — the canonical v0.1 example in the repository

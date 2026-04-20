@@ -41,13 +41,15 @@ graph TD
 
 ## Core Philosophy
 
-**Zero-cost abstractions** — you pay only for what you use. No virtual dispatch in hot paths beyond the `Executor` boundary.
+**Zero-cost abstractions** — you pay only for what you use. Abstractions compile away; no overhead is introduced for features you do not call.
 
-**Errors as values** — `std::expected<T, E>` throughout. No exceptions for control flow, no surprise throws in handlers.
+**Performance by design** — every decision optimises for both memory and CPU efficiency. O(depth) routing, coroutine frames under 2 KB, no per-request allocation on the hot path.
 
-**Async as coroutines** — `co_await` feels like synchronous code. No callbacks, no futures, no manual state machines.
+**Designed for C++ developers** — a five-line API gets a server running. `co_await` reads like synchronous code. Errors are explicit values, not surprises.
 
-**Strict layering** — Asio and llhttp are implementation details of `src/`. They never appear in `include/aevox/`. When `std::net` standardises (C++29), the backend swaps with zero application-code changes.
+**Modern C++ throughout** — `std::expected<T, E>` for errors, `co_await` for async, concepts for constraints, `std::string_view` and `std::span` for zero-copy — no legacy patterns anywhere.
+
+**Clean layered architecture** — networking, parsing, and routing are separate layers with enforced boundaries. Swapping the async backend (Asio → `std::net` in C++29) touches one directory and nothing else.
 
 ---
 
@@ -71,3 +73,12 @@ graph TD
 - Not an HTTP/2 or HTTP/3 server — delegate to Nginx or Caddy for protocol termination
 - Not an ORM or database framework
 - Not a TLS certificate manager — place TLS in your reverse proxy
+
+---
+
+## See Also
+
+- [Getting Started](getting-started.md) — zero to a running TCP echo server in minutes
+- [User Guide](guide/index.md) — step-by-step guide to every framework feature
+- [API Reference](api/index.md) — complete symbol reference for all public headers
+- [Architecture Overview](architecture/index.md) — design rationale and layer diagram

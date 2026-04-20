@@ -1,8 +1,8 @@
 site_name: Aevox
 site_description: A modern C++23 web framework — zero-cost abstractions, maximum throughput
-site_url: https://aevox.dev
-repo_url: https://github.com/aevox/aevox
-repo_name: aevox/aevox
+site_url: https://mohammadmokhalled.github.io/Aevox/
+repo_url: https://github.com/MohammadMokhalled/Aevox
+repo_name: MohammadMokhalled/Aevox
 
 theme:
   name: material
@@ -25,6 +25,21 @@ extra_javascript:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - User Guide:
+      - Overview: guide/index.md
+      - Installation: guide/installation.md
+      - First HTTP Server: guide/first-http-server.md
+      - Routing: guide/routing.md
+      - Request and Response: guide/request-response.md
+      - Async Patterns: guide/async-patterns.md
+      - Error Handling: guide/error-handling.md
+  - Architecture:
+      - Overview: architecture/index.md
+      - Executor: architecture/executor.md
+      - Router: architecture/router.md
+      - Coroutines: architecture/coroutines.md
+      - Error Model: architecture/error-model.md
+      - Layer Diagram: architecture/layer-diagram.md
   - API Reference:
       - Overview: api/index.md
       - Executor: api/executor.md
@@ -36,8 +51,6 @@ nav:
   - Examples:
       - Overview: examples/index.md
       - Hello World: examples/hello-world.md
-  - Architecture:
-      - Overview: architecture/index.md
   - Changelog: changelog.md
 
 markdown_extensions:
