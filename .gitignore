@@ -8,7 +8,6 @@
 # -----------------------------------------------------------------------------
 Tasks/
 ProductRequirement/
-.claude/
 
 # -----------------------------------------------------------------------------
 # Build output directories
@@ -97,6 +96,8 @@ site/
 # VS Code
 .vscode/
 !.vscode/extensions.json
+*.local.json
+*.lock
 
 # CLion / JetBrains
 .idea/
