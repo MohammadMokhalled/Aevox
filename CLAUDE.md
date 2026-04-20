@@ -378,3 +378,7 @@ Ask before: deleting files, pushing commits, modifying `CMakeLists.txt` in ways 
 
 ### The PRD is the final arbiter
 When a user request conflicts with the PRD, implement the request and explicitly flag the conflict so the user can decide whether to update the PRD. Never silently abandon a PRD constraint.
+
+### Run clang-format after every code change
+
+Run `bash scripts/format.sh` after editing any `.cpp`/`.hpp` file and before any build.
