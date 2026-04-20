@@ -93,7 +93,8 @@ enum class BodyParseError : std::uint8_t
 {
     NotImplemented, ///< JSON parsing is not wired in v0.1; replaced by the JSON backend task.
     BadJson,        ///< The body is not valid JSON (reserved for the JSON backend task).
-    TypeMismatch,   ///< JSON does not match the target type schema (reserved for the JSON backend task).
+    TypeMismatch,   ///< JSON does not match the target type schema (reserved for the JSON backend
+                    ///< task).
 };
 
 // =============================================================================

@@ -72,8 +72,7 @@ template <typename HandlerFn> void run_single(HandlerFn&& handler_fn)
 // pool() tests
 // =============================================================================
 
-TEST_CASE("pool() - callable executes on CPU pool thread, not I/O thread",
-          "[executor][pool]")
+TEST_CASE("pool() - callable executes on CPU pool thread, not I/O thread", "[executor][pool]")
 {
     std::thread::id io_thread_id{};
     std::thread::id cpu_thread_id{};
@@ -143,8 +142,7 @@ TEST_CASE("pool() - exception inside fn propagates to co_await site", "[executor
 // sleep() tests
 // =============================================================================
 
-TEST_CASE("sleep() - coroutine resumes after duration without blocking thread",
-          "[executor][sleep]")
+TEST_CASE("sleep() - coroutine resumes after duration without blocking thread", "[executor][sleep]")
 {
     std::chrono::milliseconds elapsed{0};
 
@@ -246,8 +244,7 @@ TEST_CASE("when_all() - tasks run concurrently, not sequentially", "[executor][w
     REQUIRE(elapsed.count() < 80);
 }
 
-TEST_CASE("when_all() - first exception propagates, others complete",
-          "[executor][when_all]")
+TEST_CASE("when_all() - first exception propagates, others complete", "[executor][when_all]")
 {
     bool exception_caught = false;
     bool second_ran       = false;

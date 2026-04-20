@@ -37,7 +37,7 @@ namespace aevox {
  */
 enum class SerializeError : std::uint8_t
 {
-    NotImplemented,   ///< JSON serialization is not wired in v0.1; replaced by the JSON backend task.
+    NotImplemented, ///< JSON serialization is not wired in v0.1; replaced by the JSON backend task.
     TypeNotSupported, ///< The type T cannot be serialized (reserved for the JSON backend task).
 };
 

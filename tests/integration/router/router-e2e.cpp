@@ -127,8 +127,7 @@ TEST_CASE("unregistered path returns 404", "[integration][router]")
     REQUIRE(resp.find("HTTP/1.1 404") != std::string::npos);
 }
 
-TEST_CASE("wrong method returns 405 with Allow header",
-          "[integration][router]")
+TEST_CASE("wrong method returns 405 with Allow header", "[integration][router]")
 {
     const auto port = free_port();
     TestServer server{port, [](aevox::App& app) {

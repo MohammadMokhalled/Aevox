@@ -56,8 +56,7 @@ static void tcp_connect(std::uint16_t port)
 
 // ---------------------------------------------------------------------------
 
-TEST_CASE("integration - single client connect triggers handler coroutine",
-          "[net][integration]")
+TEST_CASE("integration - single client connect triggers handler coroutine", "[net][integration]")
 {
     auto port = find_free_port();
 
@@ -97,8 +96,7 @@ TEST_CASE("integration - single client connect triggers handler coroutine",
     ex->stop();
 }
 
-TEST_CASE("integration - handler receives monotonically increasing conn_id",
-          "[net][integration]")
+TEST_CASE("integration - handler receives monotonically increasing conn_id", "[net][integration]")
 {
     auto port = find_free_port();
 

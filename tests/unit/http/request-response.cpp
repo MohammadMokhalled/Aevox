@@ -91,8 +91,7 @@ template <typename T> static T drive_task(aevox::Task<T> task)
 // Request tests — header access
 // =============================================================================
 
-TEST_CASE("Request - header access - happy path, existing header returns value",
-          "[http][request]")
+TEST_CASE("Request - header access - happy path, existing header returns value", "[http][request]")
 {
     auto buf = make_buffer("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
 
@@ -197,8 +196,7 @@ TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][req
     CHECK(result->data() == stored.data());
 }
 
-TEST_CASE("Request - param<int> - non-numeric string returns BadConversion",
-          "[http][request]")
+TEST_CASE("Request - param<int> - non-numeric string returns BadConversion", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -347,8 +345,7 @@ TEST_CASE("Request - context store - set and get roundtrip typed value", "[http]
     CHECK(*val == "alice");
 }
 
-TEST_CASE("Request - context store - get returns nullopt for absent key",
-          "[http][request]")
+TEST_CASE("Request - context store - get returns nullopt for absent key", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -360,8 +357,7 @@ TEST_CASE("Request - context store - get returns nullopt for absent key",
     CHECK(!val.has_value());
 }
 
-TEST_CASE("Request - context store - get returns nullopt for type mismatch",
-          "[http][request]")
+TEST_CASE("Request - context store - get returns nullopt for type mismatch", "[http][request]")
 {
     aevox::detail::ParsedRequest pr;
     pr.method = "GET";
@@ -451,8 +447,7 @@ TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][respons
 // Response tests — fluent builder
 // =============================================================================
 
-TEST_CASE("Response - content_type() fluent lvalue overload modifies in place",
-          "[http][response]")
+TEST_CASE("Response - content_type() fluent lvalue overload modifies in place", "[http][response]")
 {
     auto res = aevox::Response::ok("body");
     // The lvalue overload mutates in place and returns *this for chaining.
@@ -493,8 +488,7 @@ TEST_CASE("Response - header() fluent lvalue overload sets header", "[http][resp
 // Response tests — move semantics
 // =============================================================================
 
-TEST_CASE("Response - move semantics - moved-from Response is valid but empty",
-          "[http][response]")
+TEST_CASE("Response - move semantics - moved-from Response is valid but empty", "[http][response]")
 {
     auto original = aevox::Response::ok("hello world");
     REQUIRE(original.status_code() == 200);
@@ -516,8 +510,7 @@ TEST_CASE("Response - move semantics - moved-from Response is valid but empty",
 // Response tests — stream()
 // =============================================================================
 
-TEST_CASE("Response - stream() returns status 200 with given content type",
-          "[http][response]")
+TEST_CASE("Response - stream() returns status 200 with given content type", "[http][response]")
 {
     auto res = aevox::Response::stream("text/event-stream");
 
