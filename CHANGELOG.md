@@ -9,6 +9,19 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `aevox::AppConfig` — runtime-configurable fields: `port`, `host`, `backlog`, `max_body_size`, `request_timeout`, `max_header_count`, `max_read_bytes`; all have named `constexpr` defaults in `include/aevox/config.hpp`
+- `aevox::App::create()` — factory that accepts an optional TOML config file path and returns `std::expected<App, ConfigErrorDetail>`; base defaults always apply when no file is provided
+- `aevox::ConfigError` enum and `aevox::ConfigErrorDetail` struct — structured error type for config loading failures (`file_not_found`, `parse_error`, `invalid_value`)
+- `aevox::to_string(ConfigError)` — human-readable error code string
+- `aevox::ExecutorConfig` — `thread_count`, `cpu_pool_threads`, `drain_timeout` now exposed in public header with named `constexpr` defaults
+- TOML config support via toml++ (confined to `src/config/`; no toml++ types in public headers)
+
+### Changed
+- `aevox::AppConfig` field initialisers now reference named `constexpr` defaults (`kDefaultPort`, `kDefaultHost`, etc.) instead of bare literals
+- `aevox::ExecutorConfig` field initialisers updated to use `kDefaultIoThreadCount`, `kDefaultCpuPoolThreads`, `kDefaultDrainTimeout`
+- `aevox::TcpStream::read()` default argument changed from bare `65536` to `kDefaultMaxReadBytes`
+
+### Added
 - `/document` skill definition in `CLAUDE.md` §17 covering User Guide creation, Architecture and Concepts pages, and consistency refactor pass; added to the skill table and invocation chain in §2
 - `docs/guide/` section with 7 pages: installation, first HTTP server, routing, request and response, async patterns, error handling, and guide index
 - `docs/architecture/` expanded with 5 new pages: executor concepts, router path-matching design, coroutines and `Task<T>`, error model, and layer diagram

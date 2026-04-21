@@ -11,6 +11,7 @@
 // Design: Tasks/architecture/AEV-001-arch.md Rev.2 §3, §7
 // PRD §5.5, §5.6 — Executor abstraction, future-proof networking
 
+#include <aevox/config.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
 
@@ -48,10 +49,13 @@ struct ExecutorConfig
     /**
      * @brief Number of worker threads in the I/O thread pool.
      *
-     * 0 (the default) means `std::max(1u, std::thread::hardware_concurrency())`.
-     * This value is resolved once at construction time.
+     * `kDefaultIoThreadCount` (0) resolves to
+     * `std::max(1u, std::thread::hardware_concurrency())` at construction time.
+     * Set an explicit positive value to pin the thread count.
+     *
+     * @note Valid config-file range: 0 to 1024.
      */
-    std::size_t thread_count{0};
+    std::size_t thread_count{kDefaultIoThreadCount};
 
     /**
      * @brief Number of threads in the dedicated CPU thread pool.
@@ -64,10 +68,12 @@ struct ExecutorConfig
      * the calling coroutine, but it occupies an I/O thread. Useful in tests to
      * avoid spawning extra threads.
      *
-     * Default (4) suits typical workloads such as image resizing, PDF generation,
-     * and large JSON serialisation.
+     * Default: kDefaultCpuPoolThreads (4). Suits typical workloads such as image
+     * resizing, PDF generation, and large JSON serialisation.
+     *
+     * @note Valid range: 0 to 256.
      */
-    std::size_t cpu_pool_threads{4};
+    std::size_t cpu_pool_threads{kDefaultCpuPoolThreads};
 
     /**
      * @brief Grace period given to in-flight coroutines after `stop()`.
@@ -77,9 +83,11 @@ struct ExecutorConfig
      * timeout expires, the I/O context is force-stopped — remaining coroutines
      * have their pending I/O cancelled and frames destroyed.
      *
-     * Default (30 s) suits most HTTP keep-alive workloads. Lower for tests.
+     * Default: kDefaultDrainTimeout (30 s). Lower for tests.
+     *
+     * @note Valid range: 1 second to 3600 seconds.
      */
-    std::chrono::seconds drain_timeout{30};
+    std::chrono::seconds drain_timeout{kDefaultDrainTimeout};
 };
 
 // =============================================================================

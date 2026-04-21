@@ -14,6 +14,7 @@
 //
 // Design: Tasks/architecture/AEV-003-arch.md §3.1
 
+#include <aevox/config.hpp>
 #include <aevox/task.hpp>
 
 #include <cstddef>
@@ -139,8 +140,11 @@ public:
      * The caller must keep the returned vector alive for as long as any
      * `std::string_view` or `std::span` derived from its contents is in scope.
      *
-     * @param max_bytes  Maximum number of bytes to read in one call.
-     *                   Must be > 0. Default (65536) matches a typical TCP receive window.
+     * @param max_bytes  Maximum number of bytes to read in one call. Must be > 0.
+     *                   Default: kDefaultMaxReadBytes (65536 bytes = 64 KiB), which
+     *                   matches a typical TCP receive window. Override via
+     *                   AppConfig::max_read_bytes to tune per-connection memory vs.
+     *                   syscall frequency.
      * @return  On success: `std::vector<std::byte>` with 1..max_bytes bytes.
      *          On `IoError::Eof`: peer closed the connection; vector is empty.
      *          On other `IoError`: an OS-level error occurred.
@@ -149,7 +153,7 @@ public:
      * @note `[[nodiscard]]` — discarding the result silently drops received data.
      */
     [[nodiscard]] Task<std::expected<std::vector<std::byte>, IoError>> read(
-        std::size_t max_bytes = 65536);
+        std::size_t max_bytes = kDefaultMaxReadBytes);
 
     /**
      * @brief Writes all bytes in `data` to the socket.

@@ -34,6 +34,16 @@
 
 namespace aevox::detail {
 
+namespace {
+// Default maximum number of request headers for the parser's safety net.
+// Not user-configurable at this level — the user-facing limit flows from
+// AppConfig::max_header_count via the connection handler.
+constexpr std::size_t kParserDefaultMaxHeaderCount{100};
+// Default maximum body size for the parser's safety net (1 MiB).
+// Overridden per-connection from AppConfig::max_body_size.
+constexpr std::size_t kParserDefaultMaxBodyBytes{1u * 1024u * 1024u};
+} // namespace
+
 // =============================================================================
 // ParseError
 // =============================================================================
@@ -100,13 +110,13 @@ struct ParsedRequest
  */
 struct ParserConfig
 {
-    /// Maximum number of headers in one request.
-    /// Default: 100. Matches Node.js HTTP_MAX_HEADERS default.
-    std::size_t max_header_count{100};
+    /// Maximum number of headers in one request. Safety-net default.
+    /// Per-connection value is always supplied from AppConfig::max_header_count.
+    std::size_t max_header_count{kParserDefaultMaxHeaderCount};
 
-    /// Maximum entity body size in bytes.
-    /// Default: 1 MiB. Chunked bodies are fully assembled before this is checked.
-    std::size_t max_body_bytes{1u * 1024u * 1024u};
+    /// Maximum entity body size in bytes. Safety-net default.
+    /// Per-connection value is always supplied from AppConfig::max_body_size.
+    std::size_t max_body_bytes{kParserDefaultMaxBodyBytes};
 };
 
 // =============================================================================

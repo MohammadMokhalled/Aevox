@@ -25,6 +25,9 @@
 
 namespace {
 
+// Reserve capacity for the accept-loops vector; covers typical multi-port scenarios.
+constexpr std::size_t kAcceptLoopsReserveSize{8};
+
 // Drives a single handler invocation to completion via symmetric transfer.
 // Uses aevox::detail::FireAndForget from <aevox/async.hpp> (included above).
 // Takes handler by reference — the AcceptLoop owns it and outlives the call.
@@ -47,7 +50,7 @@ namespace aevox::net {
 AsioExecutor::AsioExecutor(aevox::ExecutorConfig config) : config_{std::move(config)}
 {
     // Pre-allocate to avoid vector reallocation after run() co_spawns the loops.
-    accept_loops_.reserve(8);
+    accept_loops_.reserve(kAcceptLoopsReserveSize);
     io_threads_.reserve(config_.thread_count);
 
     // cpu_pool_ is created in run() (not here) to match the thread startup

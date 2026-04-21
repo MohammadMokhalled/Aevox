@@ -9,6 +9,7 @@
 //
 // Design: Tasks/architecture/AEV-004-arch.md §8
 
+#include <aevox/app.hpp>
 #include <aevox/response.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
@@ -17,11 +18,14 @@
 #include <csignal>
 #include <cstddef>
 #include <cstring>
+#include <expected>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "config/toml_loader.hpp"
 #include "http/http_parser.hpp"
 #include "http/request_impl.hpp"
 #include "http/response_impl.hpp"
@@ -38,6 +42,9 @@ namespace {
 // v0.1 constraint: one App per process. A second App::listen() overwrites this
 // global, breaking signal delivery for the first. Upgrade tracked as a future task.
 std::atomic<Executor*> g_signal_executor{nullptr};
+
+// Reserve size for the per-request HTTP response header string builder.
+constexpr std::size_t kResponseHeadReserveSize{256};
 
 void handle_signal(int) noexcept
 {
@@ -84,7 +91,7 @@ std::vector<std::byte> serialize_response(const Response& resp)
 
     // Build the response header section into a std::string buffer.
     std::string head;
-    head.reserve(256);
+    head.reserve(kResponseHeadReserveSize);
     head += std::format("HTTP/1.1 {} {}\r\n", resp.status_code(), status_text(resp.status_code()));
     head += std::format("Content-Length: {}\r\n", body.size());
 
@@ -123,6 +130,28 @@ App::~App() = default;
 
 App::App(App&&) noexcept = default;
 
+std::expected<App, ConfigErrorDetail> App::create(
+    AppConfig base_config, std::optional<std::string_view> config_path) noexcept
+{
+    if (!config_path || config_path->empty())
+        return App{std::move(base_config)};
+
+    auto merged = aevox::config::load_toml_config(*config_path, std::move(base_config));
+    if (!merged)
+        return std::unexpected(std::move(merged.error()));
+
+    return App{std::move(*merged)};
+}
+
+// =============================================================================
+// App — config accessor
+// =============================================================================
+
+const AppConfig& App::config() const noexcept
+{
+    return impl_->config_;
+}
+
 // =============================================================================
 // App — router accessors
 // =============================================================================
@@ -157,15 +186,17 @@ void App::listen(std::uint16_t port)
     std::signal(SIGINT, handle_signal);  // NOLINT: signal() is appropriate here
     std::signal(SIGTERM, handle_signal); // NOLINT
 
-    const std::size_t max_body = impl_->config_.max_body_size;
-    Router&           router   = impl_->router_;
+    const std::size_t max_body       = impl_->config_.max_body_size;
+    const std::size_t max_header_cnt = impl_->config_.max_header_count;
+    const std::size_t max_read       = impl_->config_.max_read_bytes;
+    Router&           router         = impl_->router_;
 
-    auto connection_handler = [max_body, &router](std::uint64_t /*conn_id*/,
-                                                  TcpStream stream) -> Task<void> {
-        detail::HttpParser parser{{.max_body_bytes = max_body}};
+    auto connection_handler = [max_body, max_header_cnt, max_read,
+                               &router](std::uint64_t /*conn_id*/, TcpStream stream) -> Task<void> {
+        detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
-            auto read_result = co_await stream.read();
+            auto read_result = co_await stream.read(max_read);
             if (!read_result)
                 co_return; // EOF or I/O error — close connection
 

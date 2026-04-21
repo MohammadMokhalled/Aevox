@@ -1,0 +1,30 @@
+# aevox.toml — runtime configuration for the configured-server example.
+#
+# All fields are optional. Fields absent here retain their compiled-in defaults.
+# Run the server without this file and the same defaults apply automatically.
+
+port = 9090
+host = "0.0.0.0"
+backlog = 512
+
+# Maximum request body size accepted from clients (bytes).
+max_body_size = 1048576   # 1 MiB
+
+# Hard limit on bytes read per TCP read call.
+max_read_bytes = 16384    # 16 KiB
+
+# Maximum number of headers in a single request.
+max_header_count = 50
+
+# Seconds before an idle request is dropped.
+request_timeout = 10
+
+[executor]
+# 0 = auto-detect (std::thread::hardware_concurrency()).
+thread_count = 0
+
+# Threads in the CPU-bound work pool (used by aevox::pool()).
+cpu_pool_threads = 2
+
+# Seconds to wait for in-flight requests to finish after stop().
+drain_timeout = 5
