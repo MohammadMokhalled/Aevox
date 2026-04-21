@@ -12,7 +12,10 @@
 
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
+#include <format>
 #include <fstream>
+#include <random>
 #include <string>
 
 using namespace std::chrono_literals;
@@ -21,12 +24,11 @@ using namespace std::chrono_literals;
 
 static std::string write_temp_toml(const std::string& content)
 {
-    // Write TOML content to a temporary file and return its path.
-    std::string path = std::tmpnam(nullptr); // NOLINT: fine in single-threaded test context
-    path += ".toml";
+    auto path = std::filesystem::temp_directory_path() /
+                std::format("aevox_test_{}.toml", std::random_device{}());
     std::ofstream f{path};
     f << content;
-    return path;
+    return path.string();
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────

@@ -10,8 +10,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
-#include <cstdio>
+#include <filesystem>
+#include <format>
 #include <fstream>
+#include <random>
 #include <string>
 #include <thread>
 
@@ -19,11 +21,11 @@ using namespace std::chrono_literals;
 
 static std::string write_temp_toml(const std::string& content)
 {
-    std::string path = std::tmpnam(nullptr); // NOLINT: fine in single-threaded test setup
-    path += ".toml";
+    auto path = std::filesystem::temp_directory_path() /
+                std::format("aevox_test_{}.toml", std::random_device{}());
     std::ofstream f{path};
     f << content;
-    return path;
+    return path.string();
 }
 
 TEST_CASE("Config integration - file roundtrip with real App listen", "[config][integration]")
