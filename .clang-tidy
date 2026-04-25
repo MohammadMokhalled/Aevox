@@ -5,7 +5,7 @@
 
 Checks: >
   clang-diagnostic-*,
-  modernize-*,
+  modernize-*,-modernize-use-equals-default,
   cppcoreguidelines-*,
   performance-*,
   readability-identifier-naming,
@@ -27,14 +27,16 @@ CheckOptions:
     value: CamelCase
   - key:   readability-identifier-naming.EnumCase
     value: CamelCase
-  - key:   readability-identifier-naming.EnumConstantCase
-    value: lower_case
+  # - key:   readability-identifier-naming.EnumConstantCase
+  #   value: lower_case
   - key:   readability-identifier-naming.FunctionCase
     value: lower_case
   - key:   readability-identifier-naming.MethodCase
     value: lower_case
   - key:   readability-identifier-naming.VariableCase
     value: lower_case
+  - key:   readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
   - key:   readability-identifier-naming.ParameterCase
     value: lower_case
   - key:   readability-identifier-naming.MemberCase
@@ -51,6 +53,8 @@ CheckOptions:
     value: CamelCase
   - key:   readability-identifier-naming.TypeAliasCase
     value: CamelCase
+  - key:   readability-identifier-naming.TypeAliasIgnoredRegexp
+    value: "promise_type"
   - key:   readability-identifier-naming.TypedefCase
     value: CamelCase
   - key:   readability-identifier-naming.ConceptCase

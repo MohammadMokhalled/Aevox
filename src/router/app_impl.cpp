@@ -268,4 +268,23 @@ void App::stop() noexcept
         impl_->executor_->stop();
 }
 
+// =============================================================================
+// App — middleware registration
+// =============================================================================
+
+template <typename F>
+void App::use(F&& mw)
+{
+    if (!impl_) return;
+    impl_->global_middlewares_.push_back(Middleware(std::forward<F>(mw)));
+}
+
+template <typename F>
+void App::use(std::string_view prefix, F&& mw)
+{
+    if (!impl_) return;
+    // ScopedMiddlewareEntry is defined in router_impl.hpp
+    impl_->scoped_middlewares_.push_back({std::string(prefix), Middleware(std::forward<F>(mw))});
+}
+
 } // namespace aevox

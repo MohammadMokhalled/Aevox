@@ -18,6 +18,7 @@
 
 #include <aevox/app.hpp>
 #include <aevox/executor.hpp>
+#include <aevox/middleware.hpp>
 #include <aevox/router.hpp>
 
 #include <array>
@@ -114,11 +115,20 @@ struct Router::Impl
 // App::Impl
 // =============================================================================
 
+/// @brief Scoped middleware: (path prefix, middleware).
+/// Stored as vector of pairs for simplicity; matched in registration order.
+struct ScopedMiddlewareEntry {
+    std::string prefix;
+    Middleware  middleware;
+};
+
 struct App::Impl
 {
-    AppConfig                 config_;
-    Router                    router_;
-    std::unique_ptr<Executor> executor_;
+    AppConfig                              config_;
+    Router                                 router_;
+    std::unique_ptr<Executor>              executor_;
+    std::vector<Middleware>                global_middlewares_;
+    std::vector<ScopedMiddlewareEntry>     scoped_middlewares_;
 };
 
 } // namespace aevox
