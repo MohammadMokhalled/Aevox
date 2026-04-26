@@ -15,6 +15,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::to_string(ConfigError)` — human-readable error code string
 - `aevox::ExecutorConfig` — `thread_count`, `cpu_pool_threads`, `drain_timeout` now exposed in public header with named `constexpr` defaults
 - TOML config support via toml++ (confined to `src/config/`; no toml++ types in public headers)
+- `aevox::Middleware` — composable async middleware pipeline with global and path-scoped registration; supports request/response interception and short-circuiting
+- `aevox::App::use(F&&)` — registers global middleware invoked before every route handler
+- `aevox::App::use(std::string_view, F&&)` — registers path-scoped middleware for requests matching a prefix
+- `aevox::Request::set<T>()` and `aevox::Request::get<T>()` — per-request middleware context bag for passing typed values between middleware and handlers
 
 ### Changed
 - `aevox::AppConfig` field initialisers now reference named `constexpr` defaults (`kDefaultPort`, `kDefaultHost`, etc.) instead of bare literals

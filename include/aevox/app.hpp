@@ -312,8 +312,10 @@ public:
      * });
      * @endcode
      */
-    template <typename F>
-    void use(F&& mw);
+    template <typename F> inline void use(F&& mw)
+    {
+        use_impl(Middleware(std::forward<F>(mw)));
+    }
 
     /**
      * @brief Registers route-scoped middleware for a path prefix.
@@ -329,8 +331,10 @@ public:
      * @note Not thread-safe. Must be called before `listen()`.
      * @note Multiple scoped middleware on the same prefix run in registration order.
      */
-    template <typename F>
-    void use(std::string_view prefix, F&& mw);
+    template <typename F> inline void use(std::string_view prefix, F&& mw)
+    {
+        use_impl(prefix, Middleware(std::forward<F>(mw)));
+    }
 
     /**
      * @brief Returns a child Router with a shared path prefix.
@@ -416,6 +420,9 @@ public:
     [[nodiscard]] const AppConfig& config() const noexcept;
 
 private:
+    void use_impl(Middleware mw);
+    void use_impl(std::string_view prefix, Middleware mw);
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

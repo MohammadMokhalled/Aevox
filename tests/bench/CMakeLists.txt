@@ -6,4 +6,5 @@
 #
 # Required for tasks tagged #networking or #performance (PRD §9).
 
-add_subdirectory(net)   # accept-loop throughput baseline
+add_subdirectory(net)        # accept-loop throughput baseline
+add_subdirectory(middleware) # middleware pipeline throughput benchmark

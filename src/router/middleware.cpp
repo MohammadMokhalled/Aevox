@@ -14,14 +14,13 @@
 
 namespace aevox {
 
-Task<Response> Middleware::operator()(
-    Request& req,
-    std::move_only_function<Task<Response>(Request&)> next) const
+Task<Response> Middleware::operator()(Request&                                          req,
+                                      std::move_only_function<Task<Response>(Request&)> next) const
 {
     if (!impl_) {
-        // Should not happen in normal use — middleware must be constructed
-        // via App::use(). If it does, return an internal server error.
-        co_return Response::internal_server_error("Middleware not initialized");
+        // Should not happen — middleware must be properly constructed via App::use().
+        // Return a generic error response.
+        co_return Response::bad_request("Internal middleware error");
     }
 
     // Delegate to the concrete middleware implementation.

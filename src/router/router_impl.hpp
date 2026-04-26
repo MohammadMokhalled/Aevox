@@ -117,18 +117,19 @@ struct Router::Impl
 
 /// @brief Scoped middleware: (path prefix, middleware).
 /// Stored as vector of pairs for simplicity; matched in registration order.
-struct ScopedMiddlewareEntry {
+struct ScopedMiddlewareEntry
+{
     std::string prefix;
     Middleware  middleware;
 };
 
 struct App::Impl
 {
-    AppConfig                              config_;
-    Router                                 router_;
-    std::unique_ptr<Executor>              executor_;
-    std::vector<Middleware>                global_middlewares_;
-    std::vector<ScopedMiddlewareEntry>     scoped_middlewares_;
+    AppConfig                          config_;
+    Router                             router_;
+    std::unique_ptr<Executor>          executor_;
+    std::vector<Middleware>            global_middlewares_;
+    std::vector<ScopedMiddlewareEntry> scoped_middlewares_;
 };
 
 } // namespace aevox

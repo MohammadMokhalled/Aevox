@@ -190,9 +190,12 @@ void App::listen(std::uint16_t port)
     const std::size_t max_header_cnt = impl_->config_.max_header_count;
     const std::size_t max_read       = impl_->config_.max_read_bytes;
     Router&           router         = impl_->router_;
+    const auto&       global_mw      = impl_->global_middlewares_;
+    const auto&       scoped_mw      = impl_->scoped_middlewares_;
 
-    auto connection_handler = [max_body, max_header_cnt, max_read,
-                               &router](std::uint64_t /*conn_id*/, TcpStream stream) -> Task<void> {
+    auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw,
+                               &scoped_mw](std::uint64_t /*conn_id*/,
+                                           TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
@@ -223,8 +226,51 @@ void App::listen(std::uint16_t port)
             // internal chunk_buf, which is valid until parser.reset().
             auto req = make_request_from_impl(std::move(buf), std::move(*parsed));
 
-            // Dispatch through the Router.
-            auto response = co_await router.dispatch(req);
+            // Dispatch through middleware pipeline (if any) or directly to router.
+            auto response_task = [&]() -> Task<Response> {
+                if (global_mw.empty() && scoped_mw.empty()) {
+                    // Fast path: no middleware — direct dispatch.
+                    co_return co_await router.dispatch(req);
+                }
+
+                // Middleware pipeline: collect matching scoped middleware and execute chain.
+                std::vector<const Middleware*> mw_chain;
+
+                // Add global middleware in order
+                for (const auto& mw : global_mw) {
+                    mw_chain.push_back(std::addressof(mw));
+                }
+
+                // Add matching scoped middleware
+                for (const auto& scoped_entry : scoped_mw) {
+                    if (req.path().starts_with(scoped_entry.prefix)) {
+                        mw_chain.push_back(std::addressof(scoped_entry.middleware));
+                    }
+                }
+
+                // Execute the middleware chain recursively.
+                // Lambda that runs middleware[idx] and delegates to middleware[idx+1].
+                std::function<Task<Response>(std::size_t)> execute_chain =
+                    [&](std::size_t idx) -> Task<Response> {
+                    if (idx >= mw_chain.size()) {
+                        // End of middleware chain — dispatch to router
+                        co_return co_await router.dispatch(req);
+                    }
+
+                    // Execute current middleware, passing next as a callable
+                    const Middleware* current_mw = mw_chain[idx];
+                    co_return co_await (
+                        *current_mw)(req,
+                                     std::move_only_function<Task<Response>(Request&)>(
+                                         [&execute_chain, idx](Request& /*req*/) -> Task<Response> {
+                                             co_return co_await execute_chain(idx + 1);
+                                         }));
+                };
+
+                co_return co_await execute_chain(0);
+            }();
+
+            auto response = co_await response_task;
 
             // Serialize and write the response.
             auto resp_bytes = serialize_response(response);
@@ -269,22 +315,21 @@ void App::stop() noexcept
 }
 
 // =============================================================================
-// App — middleware registration
+// App::use_impl() — middleware registration helpers
 // =============================================================================
 
-template <typename F>
-void App::use(F&& mw)
+void App::use_impl(Middleware mw)
 {
-    if (!impl_) return;
-    impl_->global_middlewares_.push_back(Middleware(std::forward<F>(mw)));
+    if (!impl_)
+        return;
+    impl_->global_middlewares_.push_back(std::move(mw));
 }
 
-template <typename F>
-void App::use(std::string_view prefix, F&& mw)
+void App::use_impl(std::string_view prefix, Middleware mw)
 {
-    if (!impl_) return;
-    // ScopedMiddlewareEntry is defined in router_impl.hpp
-    impl_->scoped_middlewares_.push_back({std::string(prefix), Middleware(std::forward<F>(mw))});
+    if (!impl_)
+        return;
+    impl_->scoped_middlewares_.push_back({std::string(prefix), std::move(mw)});
 }
 
 } // namespace aevox

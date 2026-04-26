@@ -15,6 +15,7 @@
 add_library(aevox_router OBJECT
     router_impl.cpp   # parse_pattern, trie insert/dispatch/group
     app_impl.cpp      # App lifecycle + connection handler
+    middleware.cpp    # Middleware type-erased wrapper + operator()
 )
 
 target_include_directories(aevox_router
