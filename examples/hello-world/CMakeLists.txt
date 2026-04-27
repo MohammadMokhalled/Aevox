@@ -1,7 +1,7 @@
 # examples/hello-world/CMakeLists.txt
 #
 # Demonstrates the complete Aevox v0.1 public API in a single file.
-# Not built by default (parent sets EXCLUDE_FROM_ALL).
+# Built as part of the default build.
 # Build: cmake --build --preset default --target hello-world
 
 add_executable(hello-world main.cpp)

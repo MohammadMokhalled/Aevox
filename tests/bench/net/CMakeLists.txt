@@ -17,6 +17,7 @@ target_compile_options(accept-throughput
 )
 
 add_test(NAME accept-throughput COMMAND accept-throughput)
+set_tests_properties(accept-throughput PROPERTIES LABELS bench)
 add_dependencies(aevox_tests_bench accept-throughput)
 
 # Task dispatch and pool() latency benchmarks
@@ -35,4 +36,5 @@ target_compile_options(executor-throughput
 )
 
 add_test(NAME executor-throughput COMMAND executor-throughput)
+set_tests_properties(executor-throughput PROPERTIES LABELS bench)
 add_dependencies(aevox_tests_bench executor-throughput)

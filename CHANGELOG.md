@@ -15,6 +15,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::to_string(ConfigError)` — human-readable error code string
 - `aevox::ExecutorConfig` — `thread_count`, `cpu_pool_threads`, `drain_timeout` now exposed in public header with named `constexpr` defaults
 - TOML config support via toml++ (confined to `src/config/`; no toml++ types in public headers)
+- `aevox::Middleware` — composable async middleware pipeline with global and path-scoped registration; supports request/response interception and short-circuiting
+- `aevox::App::use(F&&)` — registers global middleware invoked before every route handler
+- `aevox::App::use(std::string_view, F&&)` — registers path-scoped middleware for requests matching a prefix
+- `aevox::Request::set<T>()` and `aevox::Request::get<T>()` — per-request middleware context bag for passing typed values between middleware and handlers
+- middleware-plugin example: demonstrates middleware authoring using lambda and struct styles with scoped path-prefix guards (AEV-024)
+
+### Fixed
+- Middleware pipeline dispatch: extracted immediately-invoked coroutine lambda (IIFE) into a named free function `dispatch_with_pipeline`; the IIFE pattern caused a dangling-reference hang when the connection handler was resumed from an Asio I/O callback on a different call-stack depth, leaving router-e2e tests blocked indefinitely
 
 ### Changed
 - `aevox::AppConfig` field initialisers now reference named `constexpr` defaults (`kDefaultPort`, `kDefaultHost`, etc.) instead of bare literals

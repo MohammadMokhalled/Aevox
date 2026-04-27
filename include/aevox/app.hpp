@@ -21,6 +21,7 @@
 
 #include <aevox/config.hpp>
 #include <aevox/executor.hpp>
+#include <aevox/middleware.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
 #include <aevox/router.hpp>
@@ -286,17 +287,58 @@ public:
     template <typename Handler> void options(std::string_view pattern, Handler&& handler);
 
     /**
-     * @brief Installs a middleware function that wraps every handler.
+     * @brief Registers a global middleware that wraps every route handler.
      *
-     * In v0.1 this is a no-op stub. Middleware integration is implemented in
-     * a future middleware task.
+     * Global middleware runs for all requests in onion order: if middlewares
+     * A, B, C are registered, they execute A → B → C → handler → C → B → A.
+     * The middleware callable must accept `(Request&, next_callable)` and
+     * return `Task<Response>`. It may call `co_await next(req)` to continue
+     * the chain or return its own response to short-circuit.
      *
-     * @tparam Handler  Middleware callable. Signature defined in the middleware task.
-     * @param  handler  Middleware callable (ignored in v0.1).
+     * @tparam F  Middleware callable. Must satisfy:
+     *            `(Request&, std::move_only_function<Task<Response>(Request&)>) -> Task<Response>`
+     * @param  mw  Middleware callable, stored by value.
+     *
+     * @note Not thread-safe. Must be called before `listen()`.
+     * @note Middleware are applied in the order registered.
+     *
+     * Example:
+     * @code
+     * app.use([](aevox::Request& req, auto next) -> aevox::Task<aevox::Response> {
+     *     req.log.debug("Before handler");
+     *     auto res = co_await next(req);
+     *     res.header("X-Custom", "value");
+     *     co_return res;
+     * });
+     * @endcode
      */
-    template <typename Handler>
-    [[deprecated("use() is a v0.1 stub — middleware not yet implemented")]]
-    void use(Handler&& handler);
+    template <typename F>
+        requires MiddlewareFn<F>
+    inline void use(F&& mw)
+    {
+        use_impl(Middleware(std::forward<F>(mw)));
+    }
+
+    /**
+     * @brief Registers route-scoped middleware for a path prefix.
+     *
+     * Scoped middleware runs only for requests whose path starts with `prefix`.
+     * Scoped middleware wraps global middleware in the execution order:
+     * global A → global B → scoped (for prefix) → handler → scoped → global B → global A.
+     *
+     * @tparam F  Middleware callable. Same signature as global `use()`.
+     * @param  prefix  Path prefix (e.g., `/api`). Must start with `/`.
+     * @param  mw      Middleware callable, stored by value.
+     *
+     * @note Not thread-safe. Must be called before `listen()`.
+     * @note Multiple scoped middleware on the same prefix run in registration order.
+     */
+    template <typename F>
+        requires MiddlewareFn<F>
+    inline void use(std::string_view prefix, F&& mw)
+    {
+        use_impl(prefix, Middleware(std::forward<F>(mw)));
+    }
 
     /**
      * @brief Returns a child Router with a shared path prefix.
@@ -382,6 +424,9 @@ public:
     [[nodiscard]] const AppConfig& config() const noexcept;
 
 private:
+    void use_impl(Middleware mw);
+    void use_impl(std::string_view prefix, Middleware mw);
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
@@ -430,9 +475,5 @@ inline void aevox::App::options(std::string_view pattern, Handler&& handler)
     router().options(pattern, std::forward<Handler>(handler));
 }
 
-template <typename Handler>
-[[deprecated("use() is a v0.1 stub — middleware not yet implemented")]]
-inline void aevox::App::use(Handler&& /*handler*/)
-{
-    // v0.1 stub — middleware composition not yet implemented.
-}
+// Template implementations defined in app_impl.cpp
+// (see end of app_impl.cpp for App::use<F> and App::use(prefix, F) definitions)

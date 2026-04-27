@@ -114,6 +114,67 @@ std::vector<std::byte> serialize_response(const Response& resp)
     return bytes;
 }
 
+// =============================================================================
+// dispatch_with_pipeline — dispatch through middleware pipeline (or directly).
+//
+// Extracted from App::listen() to avoid an immediately-invoked coroutine lambda
+// (IIFE). An IIFE creates a temporary closure that is destroyed before the
+// coroutine is resumed from an Asio callback, leaving a dangling reference in
+// the coroutine frame. A named function receives its arguments by value/reference
+// into the frame without any intermediate closure lifetime hazard.
+// =============================================================================
+
+Task<Response> dispatch_with_pipeline(Request& req, Router& router,
+                                      std::vector<Middleware>&            global_mw,
+                                      std::vector<ScopedMiddlewareEntry>& scoped_mw)
+{
+    // Fast path: no middleware — direct dispatch, identical to pre-AEV-024 code.
+    if (global_mw.empty() && scoped_mw.empty()) {
+        co_return co_await router.dispatch(req);
+    }
+
+    // Innermost: the router dispatch.
+    std::move_only_function<Task<Response>(Request&)> next =
+        [&router](Request& r) -> Task<Response> { co_return co_await router.dispatch(r); };
+
+    // Collect scoped middleware whose prefix matches req.path() with boundary check.
+    // Non-const references because Middleware::operator() is non-const (std::move_only_function
+    // call operator is not const-qualified by the standard).
+    std::vector<std::reference_wrapper<Middleware>> matching_scoped;
+    for (auto& entry : scoped_mw) {
+        const auto& path = req.path();
+        if (path.starts_with(entry.prefix) &&
+            (entry.prefix.size() == path.size() || path[entry.prefix.size()] == '/'))
+        {
+            matching_scoped.push_back(std::ref(entry.middleware));
+        }
+    }
+
+    // Build the chain in two passes. The innermost layers must be wrapped first;
+    // the outermost last. Desired execution order: GlobalA → GlobalB → ScopedA → handler.
+    //
+    // Pass 1 — scoped middleware wraps immediately around the router dispatch (innermost).
+    // Iterate in reverse so that the first-registered scoped middleware executes first.
+    for (auto it = matching_scoped.rbegin(); it != matching_scoped.rend(); ++it) {
+        auto prev = std::move(next);
+        next      = [mw   = std::ref(it->get()),
+                prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+            co_return co_await mw.get()(r, std::move(prev));
+        };
+    }
+
+    // Pass 2 — global middleware wraps around the scoped chain (outermost).
+    // Iterate in reverse so that the first-registered global middleware executes first.
+    for (auto it = global_mw.rbegin(); it != global_mw.rend(); ++it) {
+        auto prev = std::move(next);
+        next = [mw = std::ref(*it), prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+            co_return co_await mw.get()(r, std::move(prev));
+        };
+    }
+
+    co_return co_await next(req);
+}
+
 } // namespace
 
 // =============================================================================
@@ -190,9 +251,12 @@ void App::listen(std::uint16_t port)
     const std::size_t max_header_cnt = impl_->config_.max_header_count;
     const std::size_t max_read       = impl_->config_.max_read_bytes;
     Router&           router         = impl_->router_;
+    auto&             global_mw      = impl_->global_middlewares_;
+    auto&             scoped_mw      = impl_->scoped_middlewares_;
 
-    auto connection_handler = [max_body, max_header_cnt, max_read,
-                               &router](std::uint64_t /*conn_id*/, TcpStream stream) -> Task<void> {
+    auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw,
+                               &scoped_mw](std::uint64_t /*conn_id*/,
+                                           TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
@@ -223,8 +287,8 @@ void App::listen(std::uint16_t port)
             // internal chunk_buf, which is valid until parser.reset().
             auto req = make_request_from_impl(std::move(buf), std::move(*parsed));
 
-            // Dispatch through the Router.
-            auto response = co_await router.dispatch(req);
+            // Dispatch through the pipeline (fast path handled inside the function).
+            auto response = co_await dispatch_with_pipeline(req, router, global_mw, scoped_mw);
 
             // Serialize and write the response.
             auto resp_bytes = serialize_response(response);
@@ -266,6 +330,24 @@ void App::stop() noexcept
 {
     if (impl_ && impl_->executor_)
         impl_->executor_->stop();
+}
+
+// =============================================================================
+// App::use_impl() — middleware registration helpers
+// =============================================================================
+
+void App::use_impl(Middleware mw)
+{
+    if (!impl_)
+        return;
+    impl_->global_middlewares_.push_back(std::move(mw));
+}
+
+void App::use_impl(std::string_view prefix, Middleware mw)
+{
+    if (!impl_)
+        return;
+    impl_->scoped_middlewares_.push_back({std::string(prefix), std::move(mw)});
 }
 
 } // namespace aevox
