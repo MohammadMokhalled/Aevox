@@ -33,6 +33,7 @@ nav:
       - Request and Response: guide/request-response.md
       - Async Patterns: guide/async-patterns.md
       - Error Handling: guide/error-handling.md
+      - Configuration: guide/configuration.md
   - Architecture:
       - Overview: architecture/index.md
       - Executor: architecture/executor.md
@@ -48,6 +49,7 @@ nav:
       - Async Helpers: api/async.md
       - Request and Response: api/request-response.md
       - Router and App: api/router.md
+      - Configuration: api/config.md
   - Examples:
       - Overview: examples/index.md
       - Hello World: examples/hello-world.md

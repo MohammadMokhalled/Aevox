@@ -34,6 +34,11 @@ namespace aevox {
 
 namespace {
 
+// Reserve capacity for the path segment vector during dispatch.
+constexpr std::size_t kRouteSegmentsReserveSize{8};
+// Reserve capacity for the captured path-parameter map during dispatch.
+constexpr std::size_t kCapturedParamsReserveSize{4};
+
 /// Method names for Allow header construction. Index = static_cast<uint8_t>(HttpMethod).
 constexpr std::array<std::string_view, kMethodCount> kMethodNames{"GET",    "POST",   "PUT",
                                                                   "PATCH",  "DELETE", "HEAD",
@@ -284,7 +289,7 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
     // Split path on '/' into string_views that point into req.path().
     std::vector<std::string_view> segs;
-    segs.reserve(8);
+    segs.reserve(kRouteSegmentsReserveSize);
     {
         std::size_t pos = (path.size() > 0 && path[0] == '/') ? 1u : 0u;
         while (pos < path.size()) {
@@ -299,7 +304,7 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
     TrieNode*                                        node = impl_->root_.get();
     std::vector<std::pair<std::string, std::string>> captured;
-    captured.reserve(4);
+    captured.reserve(kCapturedParamsReserveSize);
 
     bool wildcard_matched = false;
 

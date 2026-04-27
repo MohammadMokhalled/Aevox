@@ -1,23 +1,36 @@
 ---
 # Aevox — Clang-Tidy configuration
 # Enforces PRD §6.9 prohibition list and §6.10 code style mandate.
-# Run via: cmake --preset lint  OR  run-clang-tidy -p build/debug
+# Run via: bash scripts/tidy.sh  OR  run-clang-tidy -p build/debug
 
 Checks: >
   clang-diagnostic-*,
+  clang-analyzer-*,
+  -clang-analyzer-alpha.*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
   modernize-*,
-  cppcoreguidelines-*,
-  performance-*,
-  readability-identifier-naming,
   -modernize-use-trailing-return-type,
+  cppcoreguidelines-*,
   -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-avoid-c-arrays,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-union-use,
   -cppcoreguidelines-non-private-member-variables-in-classes,
+  concurrency-*,
+  performance-*,
+  misc-*,
+  -misc-include-cleaner,
+  readability-identifier-naming,
   -readability-magic-numbers
 
 WarningsAsErrors: "*"
 
-HeaderFilterRegex: "include/aevox/.*"
+# Include src/ so implementation headers are also linted.
+# Third-party headers (asio, llhttp, glaze, spdlog) are excluded automatically
+# because they live outside these paths.
+HeaderFilterRegex: "(include/aevox|src)/.*"
 
 CheckOptions:
   # ── Naming conventions ──────────────────────────────────────────────────────
@@ -25,42 +38,51 @@ CheckOptions:
     value: CamelCase
   - key:   readability-identifier-naming.StructCase
     value: CamelCase
+  - key:   readability-identifier-naming.StructIgnoredRegexp
+    value: "promise_type"
   - key:   readability-identifier-naming.EnumCase
     value: CamelCase
   - key:   readability-identifier-naming.EnumConstantCase
-    value: lower_case
-  - key:   readability-identifier-naming.FunctionCase
-    value: lower_case
-  - key:   readability-identifier-naming.MethodCase
-    value: lower_case
-  - key:   readability-identifier-naming.VariableCase
-    value: lower_case
-  - key:   readability-identifier-naming.ParameterCase
-    value: lower_case
-  - key:   readability-identifier-naming.MemberCase
-    value: lower_case
-  - key:   readability-identifier-naming.MemberSuffix
-    value: "_"
-  - key:   readability-identifier-naming.PrivateMemberCase
-    value: lower_case
-  - key:   readability-identifier-naming.PrivateMemberSuffix
-    value: "_"
-  - key:   readability-identifier-naming.NamespaceCase
-    value: lower_case
+    value: CamelCase
+  - key:   readability-identifier-naming.ConceptCase
+    value: CamelCase
   - key:   readability-identifier-naming.TemplateParameterCase
     value: CamelCase
   - key:   readability-identifier-naming.TypeAliasCase
     value: CamelCase
   - key:   readability-identifier-naming.TypedefCase
     value: CamelCase
-  - key:   readability-identifier-naming.ConceptCase
-    value: CamelCase
+  - key:   readability-identifier-naming.NamespaceCase
+    value: lower_case
+  - key:   readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key:   readability-identifier-naming.MethodCase
+    value: lower_case
+  - key:   readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key:   readability-identifier-naming.VariableCase
+    value: lower_case
+  - key:   readability-identifier-naming.LocalConstantCase
+    value: lower_case
+  - key:   readability-identifier-naming.ConstexprVariableCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.GlobalConstantCase
+    value: UPPER_CASE
+  - key:   readability-identifier-naming.GlobalVariableCase
+    value: lower_case
+  # Private members use trailing underscore; public/protected do not.
+  - key:   readability-identifier-naming.PrivateMemberCase
+    value: lower_case
+  - key:   readability-identifier-naming.PrivateMemberSuffix
+    value: "_"
+  - key:   readability-identifier-naming.ProtectedMemberCase
+    value: lower_case
+  - key:   readability-identifier-naming.ProtectedMemberSuffix
+    value: ""
   - key:   readability-identifier-naming.PublicMemberCase
     value: lower_case
   - key:   readability-identifier-naming.PublicMemberSuffix
     value: ""
-  - key:   readability-identifier-naming.StructIgnoredRegexp
-    value: "promise_type"
 
   # ── modernize options ────────────────────────────────────────────────────────
   - key:   modernize-use-default-member-init.UseAssignment
@@ -68,6 +90,13 @@ CheckOptions:
   - key:   modernize-loop-convert.MinConfidence
     value: reasonable
 
+  # ── bugprone options ─────────────────────────────────────────────────────────
+  # StrictMode: require argument comment spelling to match parameter name exactly.
+  - key:   bugprone-argument-comment.StrictMode
+    value: "true"
+
   # ── performance options ──────────────────────────────────────────────────────
   - key:   performance-move-const-arg.CheckTriviallyCopyableMove
+    value: "true"
+  - key:   performance-inefficient-string-concatenation.StrictMode
     value: "true"

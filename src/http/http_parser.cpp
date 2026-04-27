@@ -32,6 +32,12 @@
 
 namespace aevox::detail {
 
+namespace {
+// Reserve capacity for the headers vector on each new request.
+// Covers typical HTTP request sizes without reallocation.
+constexpr std::size_t kHeadersReserveSize{16};
+} // namespace
+
 // =============================================================================
 // HttpParser::Impl
 // =============================================================================
@@ -214,7 +220,7 @@ struct HttpParser::Impl
 HttpParser::HttpParser(ParserConfig config) noexcept : impl_{std::make_unique<Impl>()}
 {
     impl_->config = std::move(config);
-    impl_->pending.headers.reserve(16);
+    impl_->pending.headers.reserve(kHeadersReserveSize);
 
     llhttp_settings_init(&impl_->settings);
     impl_->settings.on_url              = Impl::on_url;
@@ -306,7 +312,7 @@ void HttpParser::reset() noexcept
     impl_->has_error       = false;
 
     impl_->pending.headers.clear();
-    impl_->pending.headers.reserve(16);
+    impl_->pending.headers.reserve(kHeadersReserveSize);
 }
 
 } // namespace aevox::detail

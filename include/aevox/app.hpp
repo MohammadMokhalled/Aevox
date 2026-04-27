@@ -19,6 +19,7 @@
 //
 // Design: Tasks/architecture/AEV-004-arch.md §3.2
 
+#include <aevox/config.hpp>
 #include <aevox/executor.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
@@ -28,7 +29,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -49,18 +52,18 @@ namespace aevox {
  */
 struct AppConfig
 {
-    /** @brief TCP port to bind. Default: 8080. */
-    std::uint16_t port{8080};
+    /** @brief TCP port to bind. Default: kDefaultPort (8080). */
+    std::uint16_t port{kDefaultPort};
 
     /**
-     * @brief Bind address. Default: `"0.0.0.0"` (all interfaces).
+     * @brief Bind address. Default: kDefaultHost (`"0.0.0.0"`, all interfaces).
      *
      * Pass `"127.0.0.1"` for loopback-only. IPv6 is not supported in v0.1.
      */
-    std::string host{"0.0.0.0"};
+    std::string host{std::string{kDefaultHost}};
 
-    /** @brief TCP listen backlog depth. Default: 1024. */
-    int backlog{1024};
+    /** @brief TCP listen backlog depth. Default: kDefaultBacklog (1024). */
+    int backlog{kDefaultBacklog};
 
     /**
      * @brief Enable `SO_REUSEPORT` for multi-process deployment. Default: `true`.
@@ -74,19 +77,49 @@ struct AppConfig
     ExecutorConfig executor{};
 
     /**
-     * @brief Maximum allowed request body size in bytes. Default: 10 MiB.
+     * @brief Maximum allowed request body size in bytes.
+     * Default: kDefaultMaxBodySize (10 MiB = 10,485,760 bytes).
      *
-     * Requests exceeding this size are rejected with 413 Payload Too Large.
+     * Requests exceeding this size are rejected with HTTP 413.
+     *
+     * @note Valid range: 1 byte to 2 GiB.
      */
-    std::size_t max_body_size{10UZ * 1024UZ * 1024UZ};
+    std::size_t max_body_size{kDefaultMaxBodySize};
 
     /**
-     * @brief Per-request timeout. Default: 30 seconds.
+     * @brief Per-request read timeout.
+     * Default: kDefaultRequestTimeout (30 seconds).
      *
-     * If a request is not fully received within this window, the connection is
-     * closed. Enforced by the connection handler.
+     * If a request is not fully received within this window the connection is
+     * closed.
+     *
+     * @note Valid range: 1 second to 3600 seconds.
      */
-    std::chrono::seconds request_timeout{30};
+    std::chrono::seconds request_timeout{kDefaultRequestTimeout};
+
+    /**
+     * @brief Maximum number of HTTP headers per request.
+     * Default: kDefaultMaxHeaderCount (100).
+     *
+     * Requests with more headers are rejected with HTTP 431. Plumbed through
+     * to `detail::ParserConfig::max_header_count` at connection handler
+     * construction time.
+     *
+     * @note Valid range: 1 to 1000.
+     */
+    std::size_t max_header_count{kDefaultMaxHeaderCount};
+
+    /**
+     * @brief Maximum bytes read from the TCP socket in one read() call.
+     * Default: kDefaultMaxReadBytes (65536 bytes).
+     *
+     * Passed as the `max_bytes` argument to `TcpStream::read()` in the
+     * connection handler loop. Increasing reduces syscall frequency for large
+     * requests; decreasing reduces per-connection memory pressure.
+     *
+     * @note Valid range: 512 bytes to 16 MiB.
+     */
+    std::size_t max_read_bytes{kDefaultMaxReadBytes};
 };
 
 // =============================================================================
@@ -131,6 +164,38 @@ public:
      * @param config  Configuration. All fields have defaults.
      */
     explicit App(AppConfig config = {});
+
+    /**
+     * @brief Factory that constructs App and optionally loads a TOML config file.
+     *
+     * When `config_path` is supplied and non-empty, the factory reads the file,
+     * parses it as TOML, validates each field, and merges overrides into
+     * `base_config` before constructing the App. Fields absent from the file
+     * retain their values from `base_config`. Unrecognised TOML keys are silently
+     * ignored and a warning is written to `std::clog`.
+     *
+     * When `config_path` is `std::nullopt` or empty, no file I/O is performed and
+     * `base_config` is used as-is — identical to calling `App(base_config)` directly.
+     *
+     * @param base_config  Starting configuration. All fields have constexpr
+     *                     defaults — pass `AppConfig{}` for pure-file-driven config.
+     * @param config_path  Optional filesystem path to a TOML config file.
+     * @return  `std::expected<App, ConfigErrorDetail>`:
+     *          - `App` on success.
+     *          - `ConfigErrorDetail` with `ConfigError::file_not_found` if the path
+     *            does not exist on the filesystem.
+     *          - `ConfigErrorDetail` with `ConfigError::parse_error` if the file
+     *            contains invalid TOML.
+     *          - `ConfigErrorDetail` with `ConfigError::invalid_value` and the
+     *            offending key in `ConfigErrorDetail::key` if a field fails a range
+     *            check.
+     *
+     * @note `[[nodiscard]]` — discarding the expected silently swallows config errors.
+     * @note Not thread-safe. Must be called from the main thread before `listen()`.
+     */
+    [[nodiscard]] static std::expected<App, ConfigErrorDetail> create(
+        AppConfig                       base_config = {},
+        std::optional<std::string_view> config_path = std::nullopt) noexcept;
 
     /**
      * @brief Destructs App, stopping the executor if still running.
@@ -300,6 +365,21 @@ public:
      * `listen()` has started.
      */
     void stop() noexcept;
+
+    /**
+     * @brief Returns the resolved configuration used by this App.
+     *
+     * Returns the AppConfig that was either passed to the constructor or merged
+     * from a config file by `App::create()`. Useful for inspecting which values
+     * are in effect (e.g. after config file loading).
+     *
+     * @return  Const reference to the AppConfig stored in the App's implementation.
+     *          Valid for the lifetime of this App.
+     *
+     * @note Thread-safety: safe to call concurrently after construction completes.
+     *       The returned config is immutable after construction.
+     */
+    [[nodiscard]] const AppConfig& config() const noexcept;
 
 private:
     struct Impl;

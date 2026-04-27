@@ -5,3 +5,4 @@
 # Location convention: examples/{example-name}/main.cpp
 
 add_subdirectory(hello-world)
+add_subdirectory(configured-server)

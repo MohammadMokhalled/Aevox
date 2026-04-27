@@ -14,6 +14,7 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [TcpStream](tcp_stream.md) | `<aevox/tcp_stream.hpp>` | Move-only async TCP connection — `read()` and `write()` as coroutines |
 | [Request and Response](request-response.md) | `<aevox/request.hpp>` / `<aevox/response.hpp>` | Incoming HTTP request and outgoing HTTP response — typed parameter extraction, factory methods, fluent header builder |
 | [Router and App](router.md) | `<aevox/router.hpp>` / `<aevox/app.hpp>` | URL routing and top-level server entry point — static, parameter, wildcard segments |
+| [Configuration](config.md) | `<aevox/config.hpp>` | Named defaults, `AppConfig`, `ExecutorConfig`, `ConfigError`, TOML key reference |
 
 ---
 
@@ -32,7 +33,9 @@ graph LR
     ASYNC["async.hpp<br/>pool · sleep · when_all"] --> TASK
     EXEC["executor.hpp<br/>Executor · ExecutorConfig"] --> TASK["task.hpp<br/>Task&lt;T&gt;"]
     EXEC --> TCP["tcp_stream.hpp<br/>TcpStream · IoError"]
-    APP["app.hpp"] --> ROUTER["router.hpp"]
+    APP["app.hpp<br/>App · AppConfig"] --> ROUTER["router.hpp"]
+    APP --> CFG["config.hpp<br/>ConfigError · ConfigErrorDetail"]
+    EXEC --> CFG
     ROUTER --> RR["request.hpp / response.hpp"]
     RR --> EXEC
 ```
