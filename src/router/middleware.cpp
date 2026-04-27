@@ -13,7 +13,7 @@
 namespace aevox {
 
 Task<Response> Middleware::operator()(Request&                                          req,
-                                      std::move_only_function<Task<Response>(Request&)> next) const
+                                      std::move_only_function<Task<Response>(Request&)> next)
 {
     if (!fn_) {
         co_return Response::bad_request("Internal middleware error");

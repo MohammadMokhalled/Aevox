@@ -53,18 +53,21 @@ concept MiddlewareNext = requires(F f, Request& req) {
  *
  * @tparam F Middleware callable type.
  *
+ * Deviation from ADD §3.2: The ADD specifies a two-parameter concept
+ * `MiddlewareFn<F, Next>`. This implementation uses a single-parameter form
+ * that hardcodes `std::move_only_function<Task<Response>(Request&)>` as the
+ * concrete Next type. This is intentional: `std::move_only_function` is the
+ * only Next type used anywhere in the pipeline; parameterising over Next would
+ * add complexity with no benefit. Lambdas written as `[](Request& req, auto next)`
+ * satisfy this concept because the concept instantiates `F` with the concrete
+ * `std::move_only_function` type at concept-check time.
+ *
  * Example:
  * ```cpp
  * auto logging_middleware = [](aevox::Request& req, auto next) -> aevox::Task<aevox::Response> {
- *     // Log request
- *     req.log.info("Incoming {}", req.method());
- *
- *     // Call next in the chain
+ *     // Log request before forwarding
  *     auto res = co_await next(req);
- *
- *     // Log response
- *     req.log.info("Outgoing {}", res.status());
- *
+ *     // Inspect response after handler
  *     co_return res;
  * };
  * ```
@@ -112,12 +115,13 @@ public:
      *
      * @return Awaitable task producing the final HTTP response.
      *
-     * @note This operator is `noexcept`. If the stored middleware throws,
-     *       the exception propagates to the caller (v0.2 will add top-level
-     *       exception handling in the dispatcher).
+     * @note Non-const: `std::move_only_function::operator()` is not const-qualified
+     *       by the standard. Declaring this operator const with a mutable member
+     *       creates a misleading public contract (callers observing const would not
+     *       expect state mutation on each call). Non-const is the correct design.
      */
-    [[nodiscard]] Task<Response> operator()(
-        Request& req, std::move_only_function<Task<Response>(Request&)> next) const;
+    [[nodiscard]] Task<Response> operator()(Request&                                          req,
+                                            std::move_only_function<Task<Response>(Request&)> next);
 
     // Delete copy operations; move operations are default.
     Middleware(const Middleware&)            = delete;
@@ -134,18 +138,23 @@ private:
     /**
      * @brief Constructs a Middleware from an arbitrary callable.
      *
+     * The `requires MiddlewareFn<F>` constraint ensures the diagnostic is emitted
+     * at the `Middleware(fn)` construction site, not deep inside
+     * `std::move_only_function` template instantiation.
+     *
      * @tparam F Callable type satisfying MiddlewareFn concept.
      * @param fn The middleware callable.
      */
     template <typename F>
+        requires MiddlewareFn<F>
     explicit Middleware(F&& fn)
         : fn_(std::move_only_function<
               Task<Response>(Request&, std::move_only_function<Task<Response>(Request&)>)>(
               std::forward<F>(fn)))
     {}
 
-    mutable std::move_only_function<
-        Task<Response>(Request&, std::move_only_function<Task<Response>(Request&)>)>
+    std::move_only_function<Task<Response>(Request&,
+                                           std::move_only_function<Task<Response>(Request&)>)>
         fn_;
 };
 

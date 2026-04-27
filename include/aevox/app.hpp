@@ -312,7 +312,9 @@ public:
      * });
      * @endcode
      */
-    template <typename F> inline void use(F&& mw)
+    template <typename F>
+        requires MiddlewareFn<F>
+    inline void use(F&& mw)
     {
         use_impl(Middleware(std::forward<F>(mw)));
     }
@@ -331,7 +333,9 @@ public:
      * @note Not thread-safe. Must be called before `listen()`.
      * @note Multiple scoped middleware on the same prefix run in registration order.
      */
-    template <typename F> inline void use(std::string_view prefix, F&& mw)
+    template <typename F>
+        requires MiddlewareFn<F>
+    inline void use(std::string_view prefix, F&& mw)
     {
         use_impl(prefix, Middleware(std::forward<F>(mw)));
     }

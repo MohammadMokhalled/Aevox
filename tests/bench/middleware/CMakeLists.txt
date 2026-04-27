@@ -1,7 +1,7 @@
 # tests/bench/middleware/CMakeLists.txt
 # Performance benchmark: middleware pipeline throughput.
 # Measures overhead of middleware composition vs. direct dispatch.
-# Target: < 5% overhead with 10 chained middlewares (PRD §14).
+# DoD requirement: < 5% overhead with 10 chained middlewares (PRD §14).
 
 add_executable(pipeline-throughput
     pipeline-throughput.cpp
@@ -15,7 +15,7 @@ target_include_directories(pipeline-throughput
 target_link_libraries(pipeline-throughput
     PRIVATE
         aevox_core
-        Catch2::Catch2WithMain
+        nanobench::nanobench
 )
 
 target_compile_options(pipeline-throughput

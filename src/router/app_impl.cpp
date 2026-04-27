@@ -125,8 +125,8 @@ std::vector<std::byte> serialize_response(const Response& resp)
 // =============================================================================
 
 Task<Response> dispatch_with_pipeline(Request& req, Router& router,
-                                      const std::vector<Middleware>&            global_mw,
-                                      const std::vector<ScopedMiddlewareEntry>& scoped_mw)
+                                      std::vector<Middleware>&            global_mw,
+                                      std::vector<ScopedMiddlewareEntry>& scoped_mw)
 {
     // Fast path: no middleware — direct dispatch, identical to pre-AEV-024 code.
     if (global_mw.empty() && scoped_mw.empty()) {
@@ -138,30 +138,36 @@ Task<Response> dispatch_with_pipeline(Request& req, Router& router,
         [&router](Request& r) -> Task<Response> { co_return co_await router.dispatch(r); };
 
     // Collect scoped middleware whose prefix matches req.path() with boundary check.
-    std::vector<std::reference_wrapper<const Middleware>> matching_scoped;
-    for (const auto& entry : scoped_mw) {
+    // Non-const references because Middleware::operator() is non-const (std::move_only_function
+    // call operator is not const-qualified by the standard).
+    std::vector<std::reference_wrapper<Middleware>> matching_scoped;
+    for (auto& entry : scoped_mw) {
         const auto& path = req.path();
         if (path.starts_with(entry.prefix) &&
             (entry.prefix.size() == path.size() || path[entry.prefix.size()] == '/'))
         {
-            matching_scoped.push_back(std::cref(entry.middleware));
+            matching_scoped.push_back(std::ref(entry.middleware));
         }
     }
 
-    // Wrap global middleware in reverse registration order (outermost last-registered → runs
-    // first).
-    for (auto it = global_mw.rbegin(); it != global_mw.rend(); ++it) {
+    // Build the chain in two passes. The innermost layers must be wrapped first;
+    // the outermost last. Desired execution order: GlobalA → GlobalB → ScopedA → handler.
+    //
+    // Pass 1 — scoped middleware wraps immediately around the router dispatch (innermost).
+    // Iterate in reverse so that the first-registered scoped middleware executes first.
+    for (auto it = matching_scoped.rbegin(); it != matching_scoped.rend(); ++it) {
         auto prev = std::move(next);
-        next = [mw = std::cref(*it), prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+        next      = [mw   = std::ref(it->get()),
+                prev = std::move(prev)](Request& r) mutable -> Task<Response> {
             co_return co_await mw.get()(r, std::move(prev));
         };
     }
 
-    // Wrap matching scoped middleware in reverse order.
-    for (auto it = matching_scoped.rbegin(); it != matching_scoped.rend(); ++it) {
+    // Pass 2 — global middleware wraps around the scoped chain (outermost).
+    // Iterate in reverse so that the first-registered global middleware executes first.
+    for (auto it = global_mw.rbegin(); it != global_mw.rend(); ++it) {
         auto prev = std::move(next);
-        next      = [mw   = std::cref(it->get()),
-                prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+        next = [mw = std::ref(*it), prev = std::move(prev)](Request& r) mutable -> Task<Response> {
             co_return co_await mw.get()(r, std::move(prev));
         };
     }
@@ -245,8 +251,8 @@ void App::listen(std::uint16_t port)
     const std::size_t max_header_cnt = impl_->config_.max_header_count;
     const std::size_t max_read       = impl_->config_.max_read_bytes;
     Router&           router         = impl_->router_;
-    const auto&       global_mw      = impl_->global_middlewares_;
-    const auto&       scoped_mw      = impl_->scoped_middlewares_;
+    auto&             global_mw      = impl_->global_middlewares_;
+    auto&             scoped_mw      = impl_->scoped_middlewares_;
 
     auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw,
                                &scoped_mw](std::uint64_t /*conn_id*/,
