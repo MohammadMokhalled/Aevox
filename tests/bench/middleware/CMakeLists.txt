@@ -23,4 +23,5 @@ target_compile_options(pipeline-throughput
 )
 
 add_test(NAME pipeline-throughput COMMAND pipeline-throughput)
+set_tests_properties(pipeline-throughput PROPERTIES LABELS bench)
 add_dependencies(aevox_tests_bench pipeline-throughput)

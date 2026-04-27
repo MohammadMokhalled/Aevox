@@ -20,6 +20,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::App::use(std::string_view, F&&)` — registers path-scoped middleware for requests matching a prefix
 - `aevox::Request::set<T>()` and `aevox::Request::get<T>()` — per-request middleware context bag for passing typed values between middleware and handlers
 
+### Fixed
+- Middleware pipeline dispatch: extracted immediately-invoked coroutine lambda (IIFE) into a named free function `dispatch_with_pipeline`; the IIFE pattern caused a dangling-reference hang when the connection handler was resumed from an Asio I/O callback on a different call-stack depth, leaving router-e2e tests blocked indefinitely
+
 ### Changed
 - `aevox::AppConfig` field initialisers now reference named `constexpr` defaults (`kDefaultPort`, `kDefaultHost`, etc.) instead of bare literals
 - `aevox::ExecutorConfig` field initialisers updated to use `kDefaultIoThreadCount`, `kDefaultCpuPoolThreads`, `kDefaultDrainTimeout`

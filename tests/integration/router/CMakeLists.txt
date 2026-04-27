@@ -21,5 +21,5 @@ target_compile_options(router-e2e
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-catch_discover_tests(router-e2e)
+catch_discover_tests(router-e2e PROPERTIES RESOURCE_LOCK network)
 add_dependencies(aevox_tests_integration router-e2e)

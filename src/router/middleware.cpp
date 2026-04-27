@@ -2,10 +2,8 @@
 //
 // Implementation of aevox::Middleware — type-erased middleware wrapper.
 //
-// The Middleware class uses the pimpl pattern with a virtual interface
-// (MiddlewareImpl) to enable type erasure of arbitrary middleware callables.
-// This keeps the public API simple while supporting any callable signature
-// that matches the MiddlewareFn concept.
+// Uses std::move_only_function for zero-cost type erasure (no virtual dispatch).
+// This keeps middleware invocation in the hot path with no vtable overhead.
 
 #include <aevox/middleware.hpp>
 #include <aevox/request.hpp>
@@ -17,14 +15,10 @@ namespace aevox {
 Task<Response> Middleware::operator()(Request&                                          req,
                                       std::move_only_function<Task<Response>(Request&)> next) const
 {
-    if (!impl_) {
-        // Should not happen — middleware must be properly constructed via App::use().
-        // Return a generic error response.
+    if (!fn_) {
         co_return Response::bad_request("Internal middleware error");
     }
-
-    // Delegate to the concrete middleware implementation.
-    co_return co_await impl_->invoke(req, std::move(next));
+    co_return co_await fn_(req, std::move(next));
 }
 
 } // namespace aevox

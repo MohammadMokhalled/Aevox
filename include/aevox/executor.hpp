@@ -143,9 +143,7 @@ enum class ExecutorError : std::uint8_t
  */
 template <typename F>
 concept ConnectionHandler = requires(F f, std::uint64_t conn_id, aevox::TcpStream stream) {
-    {
-        f(conn_id, std::move(stream))
-    } -> std::same_as<Task<void>>;
+    { f(conn_id, std::move(stream)) } -> std::same_as<Task<void>>;
 };
 
 // =============================================================================

@@ -114,6 +114,61 @@ std::vector<std::byte> serialize_response(const Response& resp)
     return bytes;
 }
 
+// =============================================================================
+// dispatch_with_pipeline — dispatch through middleware pipeline (or directly).
+//
+// Extracted from App::listen() to avoid an immediately-invoked coroutine lambda
+// (IIFE). An IIFE creates a temporary closure that is destroyed before the
+// coroutine is resumed from an Asio callback, leaving a dangling reference in
+// the coroutine frame. A named function receives its arguments by value/reference
+// into the frame without any intermediate closure lifetime hazard.
+// =============================================================================
+
+Task<Response> dispatch_with_pipeline(Request& req, Router& router,
+                                      const std::vector<Middleware>&            global_mw,
+                                      const std::vector<ScopedMiddlewareEntry>& scoped_mw)
+{
+    // Fast path: no middleware — direct dispatch, identical to pre-AEV-024 code.
+    if (global_mw.empty() && scoped_mw.empty()) {
+        co_return co_await router.dispatch(req);
+    }
+
+    // Innermost: the router dispatch.
+    std::move_only_function<Task<Response>(Request&)> next =
+        [&router](Request& r) -> Task<Response> { co_return co_await router.dispatch(r); };
+
+    // Collect scoped middleware whose prefix matches req.path() with boundary check.
+    std::vector<std::reference_wrapper<const Middleware>> matching_scoped;
+    for (const auto& entry : scoped_mw) {
+        const auto& path = req.path();
+        if (path.starts_with(entry.prefix) &&
+            (entry.prefix.size() == path.size() || path[entry.prefix.size()] == '/'))
+        {
+            matching_scoped.push_back(std::cref(entry.middleware));
+        }
+    }
+
+    // Wrap global middleware in reverse registration order (outermost last-registered → runs
+    // first).
+    for (auto it = global_mw.rbegin(); it != global_mw.rend(); ++it) {
+        auto prev = std::move(next);
+        next = [mw = std::cref(*it), prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+            co_return co_await mw.get()(r, std::move(prev));
+        };
+    }
+
+    // Wrap matching scoped middleware in reverse order.
+    for (auto it = matching_scoped.rbegin(); it != matching_scoped.rend(); ++it) {
+        auto prev = std::move(next);
+        next      = [mw   = std::cref(it->get()),
+                prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+            co_return co_await mw.get()(r, std::move(prev));
+        };
+    }
+
+    co_return co_await next(req);
+}
+
 } // namespace
 
 // =============================================================================
@@ -226,51 +281,8 @@ void App::listen(std::uint16_t port)
             // internal chunk_buf, which is valid until parser.reset().
             auto req = make_request_from_impl(std::move(buf), std::move(*parsed));
 
-            // Dispatch through middleware pipeline (if any) or directly to router.
-            auto response_task = [&]() -> Task<Response> {
-                if (global_mw.empty() && scoped_mw.empty()) {
-                    // Fast path: no middleware — direct dispatch.
-                    co_return co_await router.dispatch(req);
-                }
-
-                // Middleware pipeline: collect matching scoped middleware and execute chain.
-                std::vector<const Middleware*> mw_chain;
-
-                // Add global middleware in order
-                for (const auto& mw : global_mw) {
-                    mw_chain.push_back(std::addressof(mw));
-                }
-
-                // Add matching scoped middleware
-                for (const auto& scoped_entry : scoped_mw) {
-                    if (req.path().starts_with(scoped_entry.prefix)) {
-                        mw_chain.push_back(std::addressof(scoped_entry.middleware));
-                    }
-                }
-
-                // Execute the middleware chain recursively.
-                // Lambda that runs middleware[idx] and delegates to middleware[idx+1].
-                std::function<Task<Response>(std::size_t)> execute_chain =
-                    [&](std::size_t idx) -> Task<Response> {
-                    if (idx >= mw_chain.size()) {
-                        // End of middleware chain — dispatch to router
-                        co_return co_await router.dispatch(req);
-                    }
-
-                    // Execute current middleware, passing next as a callable
-                    const Middleware* current_mw = mw_chain[idx];
-                    co_return co_await (
-                        *current_mw)(req,
-                                     std::move_only_function<Task<Response>(Request&)>(
-                                         [&execute_chain, idx](Request& /*req*/) -> Task<Response> {
-                                             co_return co_await execute_chain(idx + 1);
-                                         }));
-                };
-
-                co_return co_await execute_chain(0);
-            }();
-
-            auto response = co_await response_task;
+            // Dispatch through the pipeline (fast path handled inside the function).
+            auto response = co_await dispatch_with_pipeline(req, router, global_mw, scoped_mw);
 
             // Serialize and write the response.
             auto resp_bytes = serialize_response(response);

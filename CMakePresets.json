@@ -77,18 +77,36 @@
     {
       "name": "default",
       "configurePreset": "default",
-      "output": { "outputOnFailure": true }
+      "output": { "outputOnFailure": true },
+      "filter": {
+        "exclude": { "label": "bench" }
+      }
+    },
+    {
+      "name": "bench",
+      "configurePreset": "release",
+      "description": "Run throughput benchmarks only — use release build for accurate numbers",
+      "output": { "outputOnFailure": true },
+      "filter": {
+        "include": { "label": "bench" }
+      }
     },
     {
       "name": "asan",
       "configurePreset": "asan",
-      "output": { "outputOnFailure": true }
+      "output": { "outputOnFailure": true },
+      "filter": {
+        "exclude": { "label": "bench" }
+      }
     },
     {
       "name": "windows-msvc-debug",
       "configurePreset": "windows-msvc",
       "configuration": "Debug",
-      "output": { "outputOnFailure": true }
+      "output": { "outputOnFailure": true },
+      "filter": {
+        "exclude": { "label": "bench" }
+      }
     }
   ]
 }

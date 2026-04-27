@@ -20,7 +20,6 @@
 
 #include <concepts>
 #include <functional>
-#include <memory>
 #include <string_view>
 
 namespace aevox {
@@ -41,9 +40,7 @@ class App;
  */
 template <typename F>
 concept MiddlewareNext = requires(F f, Request& req) {
-    {
-        f(req)
-    } -> std::same_as<Task<Response>>;
+    { f(req) } -> std::same_as<Task<Response>>;
 };
 
 /**
@@ -76,14 +73,18 @@ concept MiddlewareNext = requires(F f, Request& req) {
  *       All middleware must be `co_await`-able (return `Task<Response>`).
  */
 template <typename F>
-concept MiddlewareFn = true; // Checked at runtime; any callable works with Middleware pimpl
+concept MiddlewareFn =
+    requires(F fn, Request& req, std::move_only_function<Task<Response>(Request&)> next) {
+        { fn(req, std::move(next)) } -> std::same_as<Task<Response>>;
+    };
 
 /**
  * @brief Type-erased middleware handle registered with `App::use()`.
  *
- * `Middleware` wraps an arbitrary callable satisfying the `MiddlewareFn` concept.
+ * `Middleware` wraps an arbitrary callable satisfying the `MiddlewareFn` concept
+ * using `std::move_only_function` for zero-cost type erasure (no virtual dispatch).
  * This enables application code to register middleware of any type without
- * exposing type erasure details.
+ * exposing type erasure details or incurring vtable overhead.
  *
  * Constructed by `App::use()` — application code does not construct this directly.
  *
@@ -128,27 +129,7 @@ public:
     ~Middleware() = default;
 
 private:
-public:
-    // Pimpl pattern: the implementation holds a type-erased callable.
-    struct MiddlewareImpl
-    {
-        virtual ~MiddlewareImpl() = default;
-        virtual Task<Response> invoke(
-            Request& req, std::move_only_function<Task<Response>(Request&)> next) const = 0;
-    };
-
-    template <typename F> struct ConcreteMiddleware final : MiddlewareImpl
-    {
-        explicit ConcreteMiddleware(F&& fn) : callable(std::forward<F>(fn)) {}
-
-        Task<Response> invoke(Request&                                          req,
-                              std::move_only_function<Task<Response>(Request&)> next) const override
-        {
-            return callable(req, std::move(next));
-        }
-
-        std::decay_t<F> callable;
-    };
+    friend class App;
 
     /**
      * @brief Constructs a Middleware from an arbitrary callable.
@@ -158,11 +139,14 @@ public:
      */
     template <typename F>
     explicit Middleware(F&& fn)
-        : impl_(std::make_unique<ConcreteMiddleware<F>>(std::forward<F>(fn)))
+        : fn_(std::move_only_function<
+              Task<Response>(Request&, std::move_only_function<Task<Response>(Request&)>)>(
+              std::forward<F>(fn)))
     {}
 
-private:
-    std::unique_ptr<MiddlewareImpl> impl_;
+    mutable std::move_only_function<
+        Task<Response>(Request&, std::move_only_function<Task<Response>(Request&)>)>
+        fn_;
 };
 
 } // namespace aevox

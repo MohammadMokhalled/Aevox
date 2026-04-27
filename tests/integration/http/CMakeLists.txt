@@ -21,5 +21,5 @@ target_compile_options(http-parse-roundtrip
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-catch_discover_tests(http-parse-roundtrip)
+catch_discover_tests(http-parse-roundtrip PROPERTIES RESOURCE_LOCK network)
 add_dependencies(aevox_tests_integration http-parse-roundtrip)

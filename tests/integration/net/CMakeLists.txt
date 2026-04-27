@@ -16,7 +16,7 @@ target_compile_options(tcp-accept
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-catch_discover_tests(tcp-accept)
+catch_discover_tests(tcp-accept PROPERTIES RESOURCE_LOCK network)
 add_dependencies(aevox_tests_integration tcp-accept)
 
 # Thread pool and async helpers integration tests
@@ -34,5 +34,5 @@ target_compile_options(thread-pool-integration
     PRIVATE ${AEVOX_COMPILE_OPTIONS}
 )
 
-catch_discover_tests(thread-pool-integration)
+catch_discover_tests(thread-pool-integration PROPERTIES RESOURCE_LOCK network)
 add_dependencies(aevox_tests_integration thread-pool-integration)
