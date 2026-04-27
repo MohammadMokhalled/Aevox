@@ -19,6 +19,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::App::use(F&&)` — registers global middleware invoked before every route handler
 - `aevox::App::use(std::string_view, F&&)` — registers path-scoped middleware for requests matching a prefix
 - `aevox::Request::set<T>()` and `aevox::Request::get<T>()` — per-request middleware context bag for passing typed values between middleware and handlers
+- middleware-plugin example: demonstrates middleware authoring using lambda and struct styles with scoped path-prefix guards (AEV-024)
 
 ### Fixed
 - Middleware pipeline dispatch: extracted immediately-invoked coroutine lambda (IIFE) into a named free function `dispatch_with_pipeline`; the IIFE pattern caused a dangling-reference hang when the connection handler was resumed from an Asio I/O callback on a different call-stack depth, leaving router-e2e tests blocked indefinitely
