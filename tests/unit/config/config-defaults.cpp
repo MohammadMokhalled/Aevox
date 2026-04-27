@@ -146,9 +146,22 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
     }
 }
 
+TEST_CASE("Config - to_string returns exact implementation strings", "[config]")
+{
+    // These assertions pin the exact string literals returned by the implementation.
+    // A caller who matches on these strings (e.g. for logging or diagnostics) must
+    // not be surprised by a silent rename. Any change to config_impl.cpp must also
+    // update this test and docs/api/config.md.
+    CHECK(aevox::to_string(aevox::ConfigError::file_not_found) == "file not found");
+    CHECK(aevox::to_string(aevox::ConfigError::parse_error) == "TOML parse error");
+    CHECK(aevox::to_string(aevox::ConfigError::invalid_value) == "invalid field value");
+}
+
 TEST_CASE("Config - constexpr defaults match AppConfig field initialisers", "[config]")
 {
     // compile-time assertions — the test body exists to give Catch2 a REQUIRE call.
+    // AppConfig::host is std::string — not constexpr-constructible in C++23.
+    // The runtime check in "absent config file applies all defaults" covers this field.
     static_assert(aevox::AppConfig{}.port == aevox::kDefaultPort);
     static_assert(aevox::AppConfig{}.backlog == aevox::kDefaultBacklog);
     static_assert(aevox::AppConfig{}.max_body_size == aevox::kDefaultMaxBodySize);

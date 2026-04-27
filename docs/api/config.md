@@ -174,9 +174,9 @@ to a string literal — it never dangles and requires no heap allocation.
 
 | Input | Returns |
 |---|---|
-| `ConfigError::file_not_found` | `"file_not_found"` |
-| `ConfigError::parse_error` | `"parse_error"` |
-| `ConfigError::invalid_value` | `"invalid_value"` |
+| `ConfigError::file_not_found` | `"file not found"` |
+| `ConfigError::parse_error` | `"TOML parse error"` |
+| `ConfigError::invalid_value` | `"invalid field value"` |
 
 ```cpp
 #include <aevox/config.hpp>

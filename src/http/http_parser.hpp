@@ -34,7 +34,7 @@
 
 namespace aevox::detail {
 
-namespace {
+// Internal parser safety-net defaults — not user-configurable.
 // Default maximum number of request headers for the parser's safety net.
 // Not user-configurable at this level — the user-facing limit flows from
 // AppConfig::max_header_count via the connection handler.
@@ -42,7 +42,6 @@ constexpr std::size_t kParserDefaultMaxHeaderCount{100};
 // Default maximum body size for the parser's safety net (1 MiB).
 // Overridden per-connection from AppConfig::max_body_size.
 constexpr std::size_t kParserDefaultMaxBodyBytes{1u * 1024u * 1024u};
-} // namespace
 
 // =============================================================================
 // ParseError
