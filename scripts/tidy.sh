@@ -2,9 +2,19 @@
 
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-DEFAULT_BUILD_DIR="$PROJECT_ROOT/build/debug"
-BUILD_DIR="${1:-$DEFAULT_BUILD_DIR}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+JOBS="$(nproc 2>/dev/null || echo 1)"
+BUILD_DIR="$PROJECT_ROOT/build/debug"
+
+for arg in "$@"; do
+    case "$arg" in
+        -j[0-9]*)  JOBS="${arg#-j}" ;;
+        --jobs=*)  JOBS="${arg#--jobs=}" ;;
+        *)         BUILD_DIR="$arg" ;;
+    esac
+done
 
 if [ ! -f "$BUILD_DIR/compile_commands.json" ]; then
     echo "Error: compile_commands.json not found in $BUILD_DIR"
@@ -35,13 +45,12 @@ if [ "${#FILES[@]}" -eq 0 ]; then
     exit 1
 fi
 
-echo "Running clang-tidy on ${#FILES[@]} translation units (build dir: $BUILD_DIR)"
-for file in "${FILES[@]}"; do
-    echo "Checking $file"
-    clang-tidy "$file" \
-        -p "$BUILD_DIR" \
-        --config-file="$PROJECT_ROOT/.clang-tidy" \
-        --extra-arg=-isystem"$GCC_INTERNAL_INCLUDE"
-done
+echo "Running clang-tidy on ${#FILES[@]} translation units (jobs: $JOBS, build: $BUILD_DIR)"
+
+printf '%s\n' "${FILES[@]}" | xargs -P"$JOBS" -I{} \
+    clang-tidy {} \
+    -p "$BUILD_DIR" \
+    --config-file="$PROJECT_ROOT/.clang-tidy" \
+    --extra-arg=-isystem"$GCC_INTERNAL_INCLUDE"
 
 echo "Done."
