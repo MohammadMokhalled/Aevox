@@ -19,7 +19,9 @@
 
 using namespace std::chrono_literals;
 
-static std::string write_temp_toml(const std::string& content)
+namespace {
+
+std::string write_temp_toml(const std::string& content)
 {
     auto path = std::filesystem::temp_directory_path() /
                 std::format("aevox_test_{}.toml", std::random_device{}());
@@ -27,6 +29,8 @@ static std::string write_temp_toml(const std::string& content)
     f << content;
     return path.string();
 }
+
+} // namespace
 
 TEST_CASE("Config integration - file roundtrip with real App listen", "[config][integration]")
 {

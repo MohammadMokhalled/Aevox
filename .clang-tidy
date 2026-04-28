@@ -7,6 +7,7 @@ Checks: >
   clang-diagnostic-*,
   clang-analyzer-*,
   -clang-analyzer-alpha.*,
+  -clang-analyzer-unix.BlockInCriticalSection,
   bugprone-*,
   -bugprone-easily-swappable-parameters,
   modernize-*,
@@ -18,10 +19,13 @@ Checks: >
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -cppcoreguidelines-pro-type-union-use,
   -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-avoid-reference-coroutine-parameters,
+  -cppcoreguidelines-avoid-capturing-lambda-coroutines,
   concurrency-*,
   performance-*,
   misc-*,
   -misc-include-cleaner,
+  -misc-non-private-member-variables-in-classes,
   readability-identifier-naming,
   -readability-magic-numbers
 
@@ -67,9 +71,13 @@ CheckOptions:
   - key:   readability-identifier-naming.LocalConstantCase
     value: lower_case
   - key:   readability-identifier-naming.ConstexprVariableCase
-    value: UPPER_CASE
+    value: CamelCase
+  - key:   readability-identifier-naming.ConstexprVariablePrefix
+    value: k
   - key:   readability-identifier-naming.GlobalConstantCase
-    value: UPPER_CASE
+    value: CamelCase
+  - key:   readability-identifier-naming.GlobalConstantPrefix
+    value: k
   - key:   readability-identifier-naming.GlobalVariableCase
     value: lower_case
   # Private members use trailing underscore; public/protected do not.

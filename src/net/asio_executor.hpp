@@ -62,6 +62,11 @@ public:
     explicit AsioExecutor(aevox::ExecutorConfig config);
     ~AsioExecutor() override;
 
+    AsioExecutor(const AsioExecutor&)            = delete;
+    AsioExecutor& operator=(const AsioExecutor&) = delete;
+    AsioExecutor(AsioExecutor&&)                 = delete;
+    AsioExecutor& operator=(AsioExecutor&&)      = delete;
+
     [[nodiscard]] std::expected<void, aevox::ExecutorError> listen(
         std::uint16_t                                                               port,
         std::move_only_function<aevox::Task<void>(std::uint64_t, aevox::TcpStream)> handler)
@@ -87,13 +92,13 @@ private:
     // -------------------------------------------------------------------------
     // Internal state machine
     // -------------------------------------------------------------------------
-    enum class State : int
+    enum class State : std::uint8_t
     {
-        idle,
-        configured,
-        running,
-        draining,
-        stopped
+        Idle,
+        Configured,
+        Running,
+        Draining,
+        Stopped
     };
 
     // -------------------------------------------------------------------------
@@ -124,7 +129,7 @@ private:
     std::vector<std::jthread> io_threads_;
 
     std::vector<AcceptLoop>    accept_loops_;
-    std::atomic<State>         state_{State::idle};
+    std::atomic<State>         state_{State::Idle};
     std::atomic<std::uint64_t> next_conn_id_{0};
 
     // Drain timer: promise/future pair signals the timer thread.

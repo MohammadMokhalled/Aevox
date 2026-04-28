@@ -16,18 +16,18 @@
 #include <span>
 #include <string_view>
 
-int main()
+int main() // NOLINT(bugprone-exception-escape)
 {
     // std::expected — C++23 error-as-value type (PRD §6.2)
-    std::expected<int, std::string_view> e = 42;
+    std::expected<int, std::string_view> const e = 42;
     (void)e;
 
     // std::optional — C++23 nullable value (PRD §6.2)
-    std::optional<std::uint64_t> o = 0ULL;
+    std::optional<std::uint64_t> const o = 0ULL;
     (void)o;
 
     // std::span — C++23 non-owning buffer view (PRD §6.2)
-    std::span<const std::byte> s;
+    std::span<const std::byte> const s;
     (void)s;
 
     // std::format — C++23 string formatting (PRD §6.8)

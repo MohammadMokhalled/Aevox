@@ -22,7 +22,9 @@ using namespace std::chrono_literals;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-static std::string write_temp_toml(const std::string& content)
+namespace {
+
+std::string write_temp_toml(const std::string& content)
 {
     auto path = std::filesystem::temp_directory_path() /
                 std::format("aevox_test_{}.toml", std::random_device{}());
@@ -30,6 +32,8 @@ static std::string write_temp_toml(const std::string& content)
     f << content;
     return path.string();
 }
+
+} // namespace
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -90,7 +94,7 @@ TEST_CASE("Config - missing file returns ConfigError::file_not_found", "[config]
     auto result = aevox::App::create({}, "/nonexistent/path/aevox_test.toml");
 
     REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().code == aevox::ConfigError::file_not_found);
+    CHECK(result.error().code == aevox::ConfigError::FileNotFound);
     // Must not throw.
 }
 
@@ -119,7 +123,7 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         std::remove(path.c_str());
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == aevox::ConfigError::invalid_value);
+        CHECK(result.error().code == aevox::ConfigError::InvalidValue);
         CHECK(result.error().key == "port");
     }
 
@@ -130,7 +134,7 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         std::remove(path.c_str());
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == aevox::ConfigError::invalid_value);
+        CHECK(result.error().code == aevox::ConfigError::InvalidValue);
         CHECK(result.error().key == "executor.drain_timeout");
     }
 
@@ -141,7 +145,7 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         std::remove(path.c_str());
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == aevox::ConfigError::invalid_value);
+        CHECK(result.error().code == aevox::ConfigError::InvalidValue);
         CHECK(result.error().key == "max_header_count");
     }
 }
@@ -152,9 +156,9 @@ TEST_CASE("Config - to_string returns exact implementation strings", "[config]")
     // A caller who matches on these strings (e.g. for logging or diagnostics) must
     // not be surprised by a silent rename. Any change to config_impl.cpp must also
     // update this test and docs/api/config.md.
-    CHECK(aevox::to_string(aevox::ConfigError::file_not_found) == "file not found");
-    CHECK(aevox::to_string(aevox::ConfigError::parse_error) == "TOML parse error");
-    CHECK(aevox::to_string(aevox::ConfigError::invalid_value) == "invalid field value");
+    CHECK(aevox::to_string(aevox::ConfigError::FileNotFound) == "file not found");
+    CHECK(aevox::to_string(aevox::ConfigError::ParseError) == "TOML parse error");
+    CHECK(aevox::to_string(aevox::ConfigError::InvalidValue) == "invalid field value");
 }
 
 TEST_CASE("Config - constexpr defaults match AppConfig field initialisers", "[config]")

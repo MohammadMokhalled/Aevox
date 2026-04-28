@@ -51,7 +51,7 @@ struct FinalAwaitable
     template <typename P>
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<P> h) noexcept
     {
-        auto cont = h.promise().continuation_;
+        auto cont = h.promise().continuation;
         return cont ? cont : std::noop_coroutine();
     }
 
@@ -114,7 +114,8 @@ public:
      * Manages the coroutine's result, exception, and continuation chain.
      * Not intended for direct use — the compiler generates the call sites.
      */
-    class promise_type
+    class promise_type // NOLINT(readability-identifier-naming) — C++ standard requires this exact
+                       // name
     {
     public:
         /**
@@ -174,7 +175,7 @@ public:
         }
 
         // Accessed by FinalAwaitable::await_suspend and Task::await_suspend.
-        std::coroutine_handle<> continuation_{};
+        std::coroutine_handle<> continuation{};
 
     private:
         friend class Task<T>;
@@ -246,7 +247,7 @@ public:
      */
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
     {
-        handle_.promise().continuation_ = caller;
+        handle_.promise().continuation = caller;
         return handle_; // symmetric transfer — compiler tail-calls this
     }
 
@@ -264,7 +265,9 @@ public:
         if (handle_.promise().exception_) {
             std::rethrow_exception(handle_.promise().exception_);
         }
-        return std::move(*handle_.promise().result_);
+        return std::move(
+            *handle_.promise()
+                 .result_); // NOLINT(bugprone-unchecked-optional-access) — exception_ checked above
     }
 
 private:
@@ -298,7 +301,8 @@ template <> class [[nodiscard]] Task<void>
 {
 public:
     /** @brief Coroutine promise type for Task<void>. */
-    class promise_type
+    class promise_type // NOLINT(readability-identifier-naming) — C++ standard requires this exact
+                       // name
     {
     public:
         [[nodiscard]] Task<void> get_return_object() noexcept
@@ -323,7 +327,7 @@ public:
             exception_ = std::current_exception();
         }
 
-        std::coroutine_handle<> continuation_{};
+        std::coroutine_handle<> continuation{};
 
     private:
         friend class Task<void>;
@@ -366,7 +370,7 @@ public:
 
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
     {
-        handle_.promise().continuation_ = caller;
+        handle_.promise().continuation = caller;
         return handle_;
     }
 

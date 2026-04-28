@@ -31,8 +31,8 @@ static aevox::Request make_test_request(aevox::HttpMethod method, std::string_vi
     pr.target     = path;
     pr.keep_alive = true;
 
-    std::string raw = std::string{pr.method} + " " + std::string{path} + " HTTP/1.1\r\n\r\n";
-    auto        buf = make_buffer(raw);
+    std::string const raw = std::string{pr.method} + " " + std::string{path} + " HTTP/1.1\r\n\r\n";
+    auto              buf = make_buffer(raw);
 
     aevox::detail::ParsedRequest pr2;
     pr2.method = std::string_view{reinterpret_cast<const char*>(buf.data()), pr.method.size()};

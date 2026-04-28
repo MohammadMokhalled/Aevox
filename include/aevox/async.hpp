@@ -66,7 +66,8 @@ namespace detail {
  *
  * @note Valid only on executor I/O threads. std::function is empty on other threads.
  */
-extern thread_local std::function<void(std::move_only_function<void()>)> tl_post_to_cpu;
+extern thread_local std::function<void(std::move_only_function<void()>)>
+    tl_post_to_cpu; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * @brief Posts a callable to the I/O thread pool (for resuming coroutines).
@@ -77,7 +78,8 @@ extern thread_local std::function<void(std::move_only_function<void()>)> tl_post
  *
  * @note Valid only on executor I/O threads. std::function is empty on other threads.
  */
-extern thread_local std::function<void(std::move_only_function<void()>)> tl_post_to_io;
+extern thread_local std::function<void(std::move_only_function<void()>)>
+    tl_post_to_io; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 /**
  * @brief Schedules a callable after a duration using the I/O context's timer.
@@ -88,7 +90,7 @@ extern thread_local std::function<void(std::move_only_function<void()>)> tl_post
  */
 extern thread_local std::function<void(std::chrono::steady_clock::duration,
                                        std::move_only_function<void()>)>
-    tl_schedule_after;
+    tl_schedule_after; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // =============================================================================
 // FireAndForget — internal coroutine driver (no await_transform restrictions)
@@ -139,11 +141,11 @@ template <typename Fn> struct PoolAwaitable
     using R = std::invoke_result_t<Fn>;
 
     // Stored inline on the coroutine frame — no allocation.
-    Fn                                                                      fn_;
-    std::conditional_t<std::is_void_v<R>, std::monostate, std::optional<R>> result_{};
-    std::exception_ptr                                                      exception_{};
+    Fn                                                                      fn;
+    std::conditional_t<std::is_void_v<R>, std::monostate, std::optional<R>> result{};
+    std::exception_ptr                                                      exception{};
 
-    explicit PoolAwaitable(Fn&& fn) : fn_(std::forward<Fn>(fn)) {}
+    explicit PoolAwaitable(Fn&& callable) : fn(std::move(callable)) {}
 
     // Never immediately ready — always suspends.
     [[nodiscard]] bool await_ready() const noexcept
@@ -152,8 +154,8 @@ template <typename Fn> struct PoolAwaitable
     }
 
     /**
-     * Suspends the calling coroutine and posts fn_ to the CPU pool.
-     * When fn_ completes, the result/exception is stored and the caller
+     * Suspends the calling coroutine and posts fn to the CPU pool.
+     * When fn completes, the result/exception is stored and the caller
      * is resumed on the I/O pool via tl_post_to_io.
      *
      * Thread-safety: this pointer is captured; the coroutine frame (and thus
@@ -168,14 +170,14 @@ template <typename Fn> struct PoolAwaitable
         detail::tl_post_to_cpu([this, caller, resume = detail::tl_post_to_io]() mutable {
             try {
                 if constexpr (std::is_void_v<R>) {
-                    std::invoke(fn_);
+                    std::invoke(fn);
                 }
                 else {
-                    result_.emplace(std::invoke(fn_));
+                    result.emplace(std::invoke(fn));
                 }
             }
             catch (...) {
-                exception_ = std::current_exception();
+                exception = std::current_exception();
             }
             // Resume caller on the I/O pool, not the CPU pool thread.
             // asio::post ensures happens-before between writes above and
@@ -185,16 +187,17 @@ template <typename Fn> struct PoolAwaitable
     }
 
     /**
-     * Returns the result of fn_ or rethrows any exception it threw.
+     * Returns the result of fn or rethrows any exception it threw.
      * Called on the resuming I/O thread — after CPU-thread writes are visible
      * via the asio::post sequencing in await_suspend.
      */
     R await_resume()
     {
-        if (exception_)
-            std::rethrow_exception(exception_);
+        if (exception)
+            std::rethrow_exception(exception);
         if constexpr (!std::is_void_v<R>)
-            return std::move(*result_);
+            return std::move(
+                *result); // NOLINT(bugprone-unchecked-optional-access) — exception_ checked above
     }
 };
 
@@ -210,9 +213,9 @@ template <typename Fn> struct PoolAwaitable
  */
 struct SleepAwaitable
 {
-    std::chrono::steady_clock::duration duration_;
+    std::chrono::steady_clock::duration duration;
 
-    explicit SleepAwaitable(std::chrono::steady_clock::duration d) : duration_{d} {}
+    explicit SleepAwaitable(std::chrono::steady_clock::duration d) : duration{d} {}
 
     [[nodiscard]] bool await_ready() const noexcept
     {
@@ -223,7 +226,7 @@ struct SleepAwaitable
     {
         assert(detail::tl_schedule_after && "sleep() called outside an executor-managed thread");
 
-        detail::tl_schedule_after(duration_, [caller]() mutable { caller.resume(); });
+        detail::tl_schedule_after(duration, [caller]() mutable { caller.resume(); });
     }
 
     void await_resume() noexcept {}
@@ -284,7 +287,7 @@ FireAndForget when_all_subtask(Task<std::tuple_element_t<I, std::tuple<Ts...>>> 
         std::get<I>(state->results).emplace(co_await task);
     }
     catch (...) {
-        std::lock_guard lock{state->exception_mutex};
+        std::lock_guard const lock{state->exception_mutex};
         if (!state->first_exception)
             state->first_exception = std::current_exception();
     }
@@ -315,10 +318,10 @@ FireAndForget when_all_subtask(Task<std::tuple_element_t<I, std::tuple<Ts...>>> 
  */
 template <typename... Ts> struct WhenAllAwaitable
 {
-    std::tuple<Task<Ts>...>              tasks_;
-    std::shared_ptr<WhenAllState<Ts...>> state_;
+    std::tuple<Task<Ts>...>              tasks;
+    std::shared_ptr<WhenAllState<Ts...>> state;
 
-    explicit WhenAllAwaitable(Task<Ts>... tasks) : tasks_{std::move(tasks)...} {}
+    explicit WhenAllAwaitable(Task<Ts>... tasks) : tasks{std::move(tasks)...} {}
 
     [[nodiscard]] bool await_ready() const noexcept
     {
@@ -329,16 +332,15 @@ template <typename... Ts> struct WhenAllAwaitable
     {
         assert(detail::tl_post_to_io && "when_all() called outside an executor-managed thread");
 
-        state_               = std::make_shared<WhenAllState<Ts...>>(sizeof...(Ts));
-        state_->continuation = caller;
+        state               = std::make_shared<WhenAllState<Ts...>>(sizeof...(Ts));
+        state->continuation = caller;
 
         // Spawn all sub-tasks. Each captures a copy of the shared_ptr so state
         // stays alive until the last sub-task completes.
         [&]<std::size_t... I>(std::index_sequence<I...>) {
-            (detail::tl_post_to_io(
-                 [state = state_, task = std::move(std::get<I>(tasks_))]() mutable {
-                     when_all_subtask<I, Ts...>(std::move(task), std::move(state));
-                 }),
+            (detail::tl_post_to_io([state = state, task = std::move(std::get<I>(tasks))]() mutable {
+                 when_all_subtask<I, Ts...>(std::move(task), std::move(state));
+             }),
              ...);
         }(std::index_sequence_for<Ts...>{});
     }
@@ -351,11 +353,11 @@ template <typename... Ts> struct WhenAllAwaitable
      */
     std::tuple<Ts...> await_resume()
     {
-        if (state_->first_exception)
-            std::rethrow_exception(state_->first_exception);
+        if (state->first_exception)
+            std::rethrow_exception(state->first_exception);
 
         return std::apply([](auto&... opts) { return std::make_tuple(std::move(*opts)...); },
-                          state_->results);
+                          state->results);
     }
 };
 

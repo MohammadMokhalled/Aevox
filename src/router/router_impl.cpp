@@ -52,7 +52,7 @@ std::string build_allow_header(std::uint8_t method_mask)
         if (method_mask & (static_cast<std::uint8_t>(1u) << i)) {
             if (!result.empty())
                 result += ", ";
-            result += kMethodNames[i];
+            result += kMethodNames.at(i);
         }
     }
     return result;
@@ -216,12 +216,14 @@ TrieNode* Router::Impl::ensure_child(TrieNode* node, const detail::Segment& seg)
     return node->wildcard_child.get();
 }
 
-void Router::Impl::insert(TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
-                          detail::ErasedHandler handler)
+void Router::Impl::insert(
+    TrieNode* node, std::span<const detail::Segment> segs,
+    HttpMethod method, // NOLINT(misc-no-recursion) — trie insertion is inherently recursive
+    detail::ErasedHandler handler)
 {
     if (segs.empty()) {
-        const auto idx      = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
-        node->handlers[idx] = std::move(handler);
+        const auto idx         = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
+        node->handlers.at(idx) = std::move(handler);
         node->method_mask |= static_cast<std::uint8_t>(1u << idx);
         return;
     }
@@ -235,11 +237,11 @@ void Router::Impl::insert(TrieNode* node, std::span<const detail::Segment> segs,
 
 Router::Router()
 {
-    auto impl          = std::make_unique<Impl>();
-    impl->root_        = std::make_unique<TrieNode>();
-    impl->insert_root_ = impl->root_.get();
-    impl->owns_root_   = true;
-    impl_              = std::move(impl);
+    auto impl         = std::make_unique<Impl>();
+    impl->root        = std::make_unique<TrieNode>();
+    impl->insert_root = impl->root.get();
+    impl->owns_root   = true;
+    impl_             = std::move(impl);
 }
 
 Router::~Router() = default;
@@ -267,7 +269,7 @@ bool Router::valid() const noexcept
 void Router::register_route(HttpMethod method, std::span<const detail::Segment> segs,
                             ErasedHandler handler)
 {
-    impl_->insert(impl_->insert_root_, segs, method, std::move(handler));
+    impl_->insert(impl_->insert_root, segs, method, std::move(handler));
 }
 
 // =============================================================================
@@ -276,7 +278,7 @@ void Router::register_route(HttpMethod method, std::span<const detail::Segment> 
 
 aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 {
-    if (!impl_ || !impl_->root_) {
+    if (!impl_ || !impl_->root) {
         co_return aevox::Response::not_found("404 Not Found");
     }
 
@@ -302,7 +304,7 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
         }
     }
 
-    TrieNode*                                        node = impl_->root_.get();
+    TrieNode*                                        node = impl_->root.get();
     std::vector<std::pair<std::string, std::string>> captured;
     captured.reserve(kCapturedParamsReserveSize);
 
@@ -333,7 +335,7 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
         // 3. Wildcard match — greedy: captures remainder of path via offset arithmetic
         if (node->wildcard_child) {
-            const std::size_t offset = static_cast<std::size_t>(seg.data() - path.data());
+            const auto offset = static_cast<std::size_t>(seg.data() - path.data());
             captured.emplace_back(node->wildcard_child->segment, std::string{path.substr(offset)});
             node             = node->wildcard_child.get();
             wildcard_matched = true;
@@ -353,13 +355,13 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
     }
 
     // Check for a registered handler at the matched node.
-    if (node->handlers[method_idx]) {
+    if (node->handlers.at(method_idx)) {
         // Inject captured path parameters directly via friend-class access.
         req.impl_->params.clear();
         for (auto& [k, v] : captured)
             req.impl_->params.emplace(k, v);
 
-        co_return co_await node->handlers[method_idx](req);
+        co_return co_await node->handlers.at(method_idx)(req);
     }
 
     if (node->method_mask != 0) {
@@ -378,14 +380,14 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 Router Router::group(std::string_view prefix)
 {
     auto  segs = detail::parse_pattern(prefix);
-    auto* node = impl_->insert_root_;
+    auto* node = impl_->insert_root;
     for (const auto& seg : segs)
         node = impl_->ensure_child(node, seg);
 
-    auto group_impl          = std::make_unique<Impl>();
-    group_impl->root_        = nullptr; // group sub-Router does not own the root
-    group_impl->insert_root_ = node;
-    group_impl->owns_root_   = false;
+    auto group_impl         = std::make_unique<Impl>();
+    group_impl->root        = nullptr; // group sub-Router does not own the root
+    group_impl->insert_root = node;
+    group_impl->owns_root   = false;
 
     return Router{GroupTag{}, std::move(group_impl)};
 }

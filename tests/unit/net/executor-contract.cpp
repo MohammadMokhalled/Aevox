@@ -71,7 +71,9 @@ template <typename T> FireAndForget run_typed_task(aevox::Task<T> t, T* out)
 // Test helpers
 // ---------------------------------------------------------------------------
 
-static aevox::ExecutorConfig test_config()
+namespace {
+
+aevox::ExecutorConfig test_config()
 {
     return {.thread_count = 2, .drain_timeout = 2s};
 }
@@ -79,16 +81,16 @@ static aevox::ExecutorConfig test_config()
 // Binds to port 0, records the OS-assigned port, and releases it.
 // There is a brief TOCTOU window between release and the executor binding the same port;
 // this is acceptable in a unit test context (same trade-off as integration tests).
-static std::uint16_t find_free_port()
+std::uint16_t find_free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
 // Connects a raw TCP socket to the given port on loopback and immediately closes it.
 // Triggers one complete accept() cycle — used to verify the accept loop fires.
-static void connect_and_close(std::uint16_t port)
+void connect_and_close(std::uint16_t port)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket sock{ioc};
@@ -111,6 +113,8 @@ template <> void run_task<void>(aevox::Task<void> task)
 {
     run_void_task(std::move(task));
 }
+
+} // namespace
 
 // ==========================================================================
 // Executor interface tests
@@ -198,8 +202,8 @@ TEST_CASE("Executor - stop() before run() is a no-op, not a crash", "[net]")
 
 TEST_CASE("Executor - thread_count() matches construction argument", "[net]")
 {
-    aevox::ExecutorConfig cfg{.thread_count = 3, .drain_timeout = 1s};
-    auto                  ex = aevox::make_executor(cfg);
+    aevox::ExecutorConfig const cfg{.thread_count = 3, .drain_timeout = 1s};
+    auto                        ex = aevox::make_executor(cfg);
     REQUIRE(ex->thread_count() == 3);
 }
 
@@ -212,7 +216,7 @@ TEST_CASE("Task<int> - co_return value is received by co_await caller", "[net]")
 {
     auto producer = []() -> aevox::Task<int> { co_return 42; };
 
-    int result = run_task<int>(producer());
+    int const result = run_task<int>(producer());
     REQUIRE(result == 42);
 }
 

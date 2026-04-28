@@ -25,34 +25,39 @@ using namespace std::chrono_literals;
 // Test helpers
 // ---------------------------------------------------------------------------
 
-static aevox::ExecutorConfig integration_config()
+namespace {
+
+aevox::ExecutorConfig integration_config()
 {
     return {.thread_count = 4, .cpu_pool_threads = 2, .drain_timeout = 5s};
 }
 
-static std::uint16_t find_free_port()
+std::uint16_t find_free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
-static void tcp_connect(std::uint16_t port)
+void tcp_connect(std::uint16_t port)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
+              ec); // NOLINT(bugprone-unused-return-value)
 }
+
+} // namespace
 
 // ---------------------------------------------------------------------------
 
 TEST_CASE("1000 concurrent coroutines - all complete", "[integration][net][thread-safety]")
 {
-    constexpr int N = 1000;
+    constexpr int kN = 1000;
 
     std::atomic<int> handled{0};
-    std::latch       all_started{N};
+    std::latch       all_started{kN};
 
     auto ex   = aevox::make_executor(integration_config());
     auto port = find_free_port();
@@ -66,9 +71,9 @@ TEST_CASE("1000 concurrent coroutines - all complete", "[integration][net][threa
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port] {
+    std::jthread const driver{[&ex, port] {
         // Fire N connections.
-        for (int i = 0; i < N; ++i)
+        for (int i = 0; i < kN; ++i)
             tcp_connect(port);
         // Wait for all to start, then give them time to complete.
         std::this_thread::sleep_for(500ms);
@@ -77,7 +82,7 @@ TEST_CASE("1000 concurrent coroutines - all complete", "[integration][net][threa
 
     auto run_result = ex->run();
     REQUIRE(run_result.has_value());
-    REQUIRE(handled.load() == N);
+    REQUIRE(handled.load() == kN);
 }
 
 TEST_CASE("pool() does not block I/O threads", "[integration][net]")
@@ -113,7 +118,7 @@ TEST_CASE("pool() does not block I/O threads", "[integration][net]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port] {
+    std::jthread const driver{[&ex, port] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port); // triggers handler 0
         std::this_thread::sleep_for(5ms);
@@ -134,7 +139,7 @@ TEST_CASE("pool() does not block I/O threads", "[integration][net]")
 
 TEST_CASE("thread-safety - 100 concurrent pool() calls", "[integration][net][thread-safety]")
 {
-    constexpr int N = 100;
+    constexpr int kN = 100;
 
     std::atomic<int> sum{0};
 
@@ -143,7 +148,7 @@ TEST_CASE("thread-safety - 100 concurrent pool() calls", "[integration][net][thr
 
     auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
         // Each handler calls pool() with a simple computation.
-        int val = co_await aevox::pool([&] {
+        int const val = co_await aevox::pool([&] {
             // Simulate brief CPU work.
             int x = 0;
             for (int i = 0; i < 1000; ++i)
@@ -155,8 +160,8 @@ TEST_CASE("thread-safety - 100 concurrent pool() calls", "[integration][net][thr
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port] {
-        for (int i = 0; i < N; ++i)
+    std::jthread const driver{[&ex, port] {
+        for (int i = 0; i < kN; ++i)
             tcp_connect(port);
         std::this_thread::sleep_for(500ms);
         ex->stop();
@@ -166,8 +171,8 @@ TEST_CASE("thread-safety - 100 concurrent pool() calls", "[integration][net][thr
     REQUIRE(run_result.has_value());
 
     // Each pool() call computes sum 0..999 = 499500. N calls → N * 499500.
-    constexpr int expected_sum = N * 499500;
-    REQUIRE(sum.load() == expected_sum);
+    constexpr int kExpectedSum = kN * 499500;
+    REQUIRE(sum.load() == kExpectedSum);
 }
 
 TEST_CASE("when_all - concurrent sleep-based tasks", "[integration][net][when_all]")
@@ -195,7 +200,7 @@ TEST_CASE("when_all - concurrent sleep-based tasks", "[integration][net][when_al
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port] {
+    std::jthread const driver{[&ex, port] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port);
         std::this_thread::sleep_for(300ms);

@@ -21,6 +21,7 @@
 #include <expected>
 #include <format>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -41,7 +42,8 @@ namespace {
 
 // v0.1 constraint: one App per process. A second App::listen() overwrites this
 // global, breaking signal delivery for the first. Upgrade tracked as a future task.
-std::atomic<Executor*> g_signal_executor{nullptr};
+std::atomic<Executor*> g_signal_executor{
+    nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 // Reserve size for the per-request HTTP response header string builder.
 constexpr std::size_t kResponseHeadReserveSize{256};
@@ -155,9 +157,9 @@ Task<Response> dispatch_with_pipeline(Request& req, Router& router,
     //
     // Pass 1 — scoped middleware wraps immediately around the router dispatch (innermost).
     // Iterate in reverse so that the first-registered scoped middleware executes first.
-    for (auto it = matching_scoped.rbegin(); it != matching_scoped.rend(); ++it) {
+    for (auto& it : std::ranges::reverse_view(matching_scoped)) {
         auto prev = std::move(next);
-        next      = [mw   = std::ref(it->get()),
+        next      = [mw   = std::ref(it.get()),
                 prev = std::move(prev)](Request& r) mutable -> Task<Response> {
             co_return co_await mw.get()(r, std::move(prev));
         };
@@ -165,9 +167,9 @@ Task<Response> dispatch_with_pipeline(Request& req, Router& router,
 
     // Pass 2 — global middleware wraps around the scoped chain (outermost).
     // Iterate in reverse so that the first-registered global middleware executes first.
-    for (auto it = global_mw.rbegin(); it != global_mw.rend(); ++it) {
+    for (auto& it : std::ranges::reverse_view(global_mw)) {
         auto prev = std::move(next);
-        next = [mw = std::ref(*it), prev = std::move(prev)](Request& r) mutable -> Task<Response> {
+        next = [mw = std::ref(it), prev = std::move(prev)](Request& r) mutable -> Task<Response> {
             co_return co_await mw.get()(r, std::move(prev));
         };
     }
@@ -183,8 +185,8 @@ Task<Response> dispatch_with_pipeline(Request& req, Router& router,
 
 App::App(AppConfig config) : impl_{std::make_unique<Impl>()}
 {
-    impl_->config_   = std::move(config);
-    impl_->executor_ = make_executor(impl_->config_.executor);
+    impl_->config   = std::move(config);
+    impl_->executor = make_executor(impl_->config.executor);
 }
 
 App::~App() = default;
@@ -210,7 +212,7 @@ std::expected<App, ConfigErrorDetail> App::create(
 
 const AppConfig& App::config() const noexcept
 {
-    return impl_->config_;
+    return impl_->config;
 }
 
 // =============================================================================
@@ -219,12 +221,12 @@ const AppConfig& App::config() const noexcept
 
 Router& App::router() noexcept
 {
-    return impl_->router_;
+    return impl_->router;
 }
 
 const Router& App::router() const noexcept
 {
-    return impl_->router_;
+    return impl_->router;
 }
 
 // =============================================================================
@@ -233,7 +235,7 @@ const Router& App::router() const noexcept
 
 Router App::group(std::string_view prefix)
 {
-    return impl_->router_.group(prefix);
+    return impl_->router.group(prefix);
 }
 
 // =============================================================================
@@ -243,16 +245,16 @@ Router App::group(std::string_view prefix)
 void App::listen(std::uint16_t port)
 {
     // Install signal handlers so Ctrl-C stops the executor cleanly.
-    g_signal_executor.store(impl_->executor_.get(), std::memory_order_relaxed);
+    g_signal_executor.store(impl_->executor.get(), std::memory_order_relaxed);
     std::signal(SIGINT, handle_signal);  // NOLINT: signal() is appropriate here
     std::signal(SIGTERM, handle_signal); // NOLINT
 
-    const std::size_t max_body       = impl_->config_.max_body_size;
-    const std::size_t max_header_cnt = impl_->config_.max_header_count;
-    const std::size_t max_read       = impl_->config_.max_read_bytes;
-    Router&           router         = impl_->router_;
-    auto&             global_mw      = impl_->global_middlewares_;
-    auto&             scoped_mw      = impl_->scoped_middlewares_;
+    const std::size_t max_body       = impl_->config.max_body_size;
+    const std::size_t max_header_cnt = impl_->config.max_header_count;
+    const std::size_t max_read       = impl_->config.max_read_bytes;
+    Router&           router         = impl_->router;
+    auto&             global_mw      = impl_->global_middlewares;
+    auto&             scoped_mw      = impl_->scoped_middlewares;
 
     auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw,
                                &scoped_mw](std::uint64_t /*conn_id*/,
@@ -303,13 +305,13 @@ void App::listen(std::uint16_t port)
         }
     };
 
-    auto lr = impl_->executor_->listen(port, std::move(connection_handler));
+    auto lr = impl_->executor->listen(port, std::move(connection_handler));
     if (!lr) {
         // Bind or listen failed — terminate (startup defect, not recoverable).
         std::terminate();
     }
 
-    auto run_result = impl_->executor_->run();
+    auto run_result = impl_->executor->run();
     (void)run_result; // stop() → run() returns success; errors are not recoverable here
 
     // Clear signal handler so a second listen() call (UB per contract, but defensive)
@@ -319,7 +321,7 @@ void App::listen(std::uint16_t port)
 
 void App::listen()
 {
-    listen(impl_->config_.port);
+    listen(impl_->config.port);
 }
 
 // =============================================================================
@@ -328,8 +330,8 @@ void App::listen()
 
 void App::stop() noexcept
 {
-    if (impl_ && impl_->executor_)
-        impl_->executor_->stop();
+    if (impl_ && impl_->executor)
+        impl_->executor->stop();
 }
 
 // =============================================================================
@@ -340,14 +342,14 @@ void App::use_impl(Middleware mw)
 {
     if (!impl_)
         return;
-    impl_->global_middlewares_.push_back(std::move(mw));
+    impl_->global_middlewares.push_back(std::move(mw));
 }
 
 void App::use_impl(std::string_view prefix, Middleware mw)
 {
     if (!impl_)
         return;
-    impl_->scoped_middlewares_.push_back({std::string(prefix), std::move(mw)});
+    impl_->scoped_middlewares.push_back({std::string(prefix), std::move(mw)});
 }
 
 } // namespace aevox

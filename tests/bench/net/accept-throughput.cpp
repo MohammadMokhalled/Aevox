@@ -25,16 +25,20 @@
 
 using namespace std::chrono_literals;
 
-static std::uint16_t find_free_port()
+namespace {
+
+std::uint16_t find_free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
-int main()
+} // namespace
+
+int main() // NOLINT(bugprone-exception-escape)
 {
-    constexpr int connections_per_epoch = 500;
+    constexpr int kConnectionsPerEpoch = 500;
 
     auto             port = find_free_port();
     std::atomic<int> handled{0};
@@ -53,7 +57,7 @@ int main()
         return 1;
     }
 
-    std::jthread runner{[&ex] { (void)ex->run(); }};
+    std::jthread const runner{[&ex] { [[maybe_unused]] auto r = ex->run(); }};
 
     // Warm up: drain any OS connection backlog.
     {
@@ -61,7 +65,8 @@ int main()
         for (int i = 0; i < 10; ++i) {
             asio::ip::tcp::socket s{ioc};
             asio::error_code      ec;
-            s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+            s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
+                      ec); // NOLINT(bugprone-unused-return-value)
         }
         std::this_thread::sleep_for(10ms);
         handled.store(0);
@@ -70,15 +75,16 @@ int main()
     ankerl::nanobench::Bench bench;
     bench.title("accept_loop loopback throughput")
         .unit("connection")
-        .minEpochIterations(connections_per_epoch)
+        .minEpochIterations(kConnectionsPerEpoch)
         .warmup(3);
 
     bench.run("accept_loop loopback throughput", [&] {
         asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
-        s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
-        s.close(ec);
+        s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
+                  ec); // NOLINT(bugprone-unused-return-value)
+        s.close(ec);   // NOLINT(bugprone-unused-return-value)
         ankerl::nanobench::doNotOptimizeAway(handled.load());
     });
 

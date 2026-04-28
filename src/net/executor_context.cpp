@@ -17,12 +17,14 @@
 
 namespace aevox::detail {
 
-thread_local std::function<void(std::move_only_function<void()>)> tl_post_to_cpu;
+thread_local std::function<void(std::move_only_function<void()>)>
+    tl_post_to_cpu; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-thread_local std::function<void(std::move_only_function<void()>)> tl_post_to_io;
+thread_local std::function<void(std::move_only_function<void()>)>
+    tl_post_to_io; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 thread_local std::function<void(std::chrono::steady_clock::duration,
                                 std::move_only_function<void()>)>
-    tl_schedule_after;
+    tl_schedule_after; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 } // namespace aevox::detail
