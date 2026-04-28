@@ -1,0 +1,132 @@
+# .github/workflows/main.yml
+#
+# Aevox Main Branch Pipeline
+#
+# Triggers: push to main
+# Jobs:
+#   build     — GCC 15, CMake matrix [default, release], ctest
+#   asan-test — GCC 15, CMake asan preset, ASan + UBSan, ctest
+#
+# NOTE: No format-check or tidy jobs — those run only on PRs (pr.yml).
+# Format and tidy violations are caught before merge; re-checking on main
+# is redundant and wastes runner minutes.
+#
+# Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json
+# CMake: installed via Kitware APT PPA (codename: plucky) for latest stable release
+
+name: Main
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: main-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build — GCC 15, matrix [default, release], ctest
+  # Standard checkout (fetch-depth: 1) — no merge commit needed on main.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.preset }}) — Linux GCC 15
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [default, release]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install GCC 15, Ninja, and build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Install CMake (Kitware APT PPA — plucky)
+        run: |
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | sudo apt-key add -
+          sudo apt-add-repository "deb https://apt.kitware.com/ubuntu/ plucky main"
+          sudo apt-get update -q
+          sudo apt-get install -y cmake
+
+      - name: Log CMake version
+        run: cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Configure (${{ matrix.preset }} preset)
+        run: cmake --preset ${{ matrix.preset }}
+        env:
+          CC: gcc-15
+          CXX: g++-15
+
+      - name: Build (${{ matrix.preset }} preset)
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test (${{ matrix.preset }} preset)
+        run: ctest --preset ${{ matrix.preset }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ASan + UBSan — GCC 15, asan CMake preset
+  # Standard checkout (fetch-depth: 1). Separate job because ASan and release
+  # are mutually exclusive.
+  # ─────────────────────────────────────────────────────────────────────────────
+  asan-test:
+    name: ASan + UBSan — Linux GCC 15
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install GCC 15, Ninja, and build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Install CMake (Kitware APT PPA — plucky)
+        run: |
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
+            | sudo apt-key add -
+          sudo apt-add-repository "deb https://apt.kitware.com/ubuntu/ plucky main"
+          sudo apt-get update -q
+          sudo apt-get install -y cmake
+
+      - name: Log CMake version
+        run: cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+
+      - name: Configure (asan preset — ASan + UBSan)
+        run: cmake --preset asan
+        env:
+          CC: gcc-15
+          CXX: g++-15
+
+      - name: Build (asan preset)
+        run: cmake --build --preset asan
+
+      - name: Test (asan preset — ASan + UBSan)
+        run: ctest --preset asan
