@@ -298,8 +298,8 @@ TEST_CASE("Router - method not allowed", "[router]")
         REQUIRE(resp.status_code() == 405);
         auto allow = resp.get_header("Allow");
         REQUIRE(allow.has_value());
-        REQUIRE(allow->find("GET") !=
-                std::string_view::npos); // NOLINT(bugprone-unchecked-optional-access)
+        auto const pos = allow->find("GET"); // NOLINT(bugprone-unchecked-optional-access)
+        REQUIRE(pos != std::string_view::npos);
     }
 }
 

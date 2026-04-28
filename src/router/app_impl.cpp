@@ -42,8 +42,8 @@ namespace {
 
 // v0.1 constraint: one App per process. A second App::listen() overwrites this
 // global, breaking signal delivery for the first. Upgrade tracked as a future task.
-std::atomic<Executor*> g_signal_executor{
-    nullptr}; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+std::atomic<Executor*> g_signal_executor{nullptr};
 
 // Reserve size for the per-request HTTP response header string builder.
 constexpr std::size_t kResponseHeadReserveSize{256};

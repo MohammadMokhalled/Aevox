@@ -216,9 +216,8 @@ TrieNode* Router::Impl::ensure_child(TrieNode* node, const detail::Segment& seg)
     return node->wildcard_child.get();
 }
 
-void Router::Impl::insert(
-    TrieNode* node, std::span<const detail::Segment> segs,
-    HttpMethod method, // NOLINT(misc-no-recursion) — trie insertion is inherently recursive
+void Router::Impl::insert( // NOLINT(misc-no-recursion) — trie insertion is inherently recursive
+    TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
     detail::ErasedHandler handler)
 {
     if (segs.empty()) {

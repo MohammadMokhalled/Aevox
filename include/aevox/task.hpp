@@ -265,9 +265,7 @@ public:
         if (handle_.promise().exception_) {
             std::rethrow_exception(handle_.promise().exception_);
         }
-        return std::move(
-            *handle_.promise()
-                 .result_); // NOLINT(bugprone-unchecked-optional-access) — exception_ checked above
+        return std::move(*handle_.promise().result_); // NOLINT(bugprone-unchecked-optional-access)
     }
 
 private:

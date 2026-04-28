@@ -65,8 +65,8 @@ int main() // NOLINT(bugprone-exception-escape)
         for (int i = 0; i < 10; ++i) {
             asio::ip::tcp::socket s{ioc};
             asio::error_code      ec;
-            s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-                      ec); // NOLINT(bugprone-unused-return-value)
+            auto const ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+            s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
         }
         std::this_thread::sleep_for(10ms);
         handled.store(0);
@@ -82,9 +82,9 @@ int main() // NOLINT(bugprone-exception-escape)
         asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
-        s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-                  ec); // NOLINT(bugprone-unused-return-value)
-        s.close(ec);   // NOLINT(bugprone-unused-return-value)
+        auto const            ep2 = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+        s.connect(ep2, ec); // NOLINT(bugprone-unused-return-value)
+        s.close(ec);        // NOLINT(bugprone-unused-return-value)
         ankerl::nanobench::doNotOptimizeAway(handled.load());
     });
 

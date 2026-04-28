@@ -44,8 +44,8 @@ void tcp_connect(std::uint16_t port)
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-              ec); // NOLINT(bugprone-unused-return-value)
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
 }
 
 // Runs a test handler as a connection handler and blocks until it completes.
@@ -350,9 +350,9 @@ TEST_CASE("Task<T> - basic coroutine mechanics", "[executor][task]")
             auto             make     = []() -> aevox::Task<int> { co_return 99; };
             aevox::Task<int> original = make();
 
-            original_valid_before = original.valid();
-            aevox::Task<int> moved =
-                std::move(original); // NOLINT(misc-const-correctness) — co_await needs non-const
+            original_valid_before  = original.valid();
+            aevox::Task<int> moved = // NOLINT(misc-const-correctness) — co_await needs non-const
+                std::move(original);
             original_valid_after = original.valid(); // NOLINT(bugprone-use-after-move) —
                                                      // intentional: testing moved-from state
             moved_valid = moved.valid();

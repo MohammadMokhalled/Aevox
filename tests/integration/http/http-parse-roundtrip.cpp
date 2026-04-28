@@ -47,8 +47,8 @@ void tcp_send(std::uint16_t port, std::string_view data)
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-              ec); // NOLINT(bugprone-unused-return-value)
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
     if (!ec)
         asio::write(s, asio::buffer(data.data(), data.size()),
                     ec); // NOLINT(bugprone-unused-return-value)
@@ -59,8 +59,8 @@ void tcp_connect_close(std::uint16_t port)
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-              ec); // NOLINT(bugprone-unused-return-value)
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
     // Close immediately — no data sent.
 }
 
@@ -206,8 +206,8 @@ TEST_CASE("pipelined keep-alive requests", "[integration][http]")
         asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
-        s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-                  ec); // NOLINT(bugprone-unused-return-value)
+        auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+        s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
         REQUIRE_FALSE(ec);
 
         // Send first request, then second on the same connection.

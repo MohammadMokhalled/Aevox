@@ -39,8 +39,8 @@ std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port},
-              ec); // NOLINT(bugprone-unused-return-value)
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
     if (ec)
         return {};
     asio::write(s, asio::buffer(request_str.data(), request_str.size()),
