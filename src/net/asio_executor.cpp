@@ -77,12 +77,8 @@ AsioExecutor::~AsioExecutor()
 
     // Cancel the drain timer thread if still running.
     if (drain_thread_.joinable()) {
-        try {
+        if (!drain_signaled_.exchange(true))
             drain_signal_.set_value();
-        }
-        catch (const std::future_error&) { // NOLINT(bugprone-empty-catch) — set_value() already
-                                           // called; idempotent
-        }
         drain_thread_.join();
     }
 
@@ -225,20 +221,20 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
             // Bind tl_post_to_io — posts any callable to the I/O pool.
             // Takes std::move_only_function<void()> so callers can pass
             // move-only lambdas (e.g. those capturing aevox::Task<T>).
-            detail::tl_post_to_io = [io_exec](std::move_only_function<void()> fn) mutable {
+            detail::tl_post_to_io() = [io_exec](std::move_only_function<void()> fn) mutable {
                 asio::post(io_exec, std::move(fn));
             };
 
             // Bind tl_post_to_cpu — posts to CPU pool (or I/O pool if disabled).
             if (cpu_pool_ptr != nullptr) {
-                auto cpu_exec          = cpu_pool_ptr->get_executor();
-                detail::tl_post_to_cpu = [cpu_exec](std::move_only_function<void()> fn) mutable {
+                auto cpu_exec            = cpu_pool_ptr->get_executor();
+                detail::tl_post_to_cpu() = [cpu_exec](std::move_only_function<void()> fn) mutable {
                     asio::post(cpu_exec, std::move(fn));
                 };
             }
             else {
                 // No dedicated CPU pool — reuse I/O pool binding.
-                detail::tl_post_to_cpu = [io_exec](std::move_only_function<void()> fn) mutable {
+                detail::tl_post_to_cpu() = [io_exec](std::move_only_function<void()> fn) mutable {
                     asio::post(io_exec, std::move(fn));
                 };
             }
@@ -246,8 +242,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
             // Bind tl_schedule_after — creates a steady_timer and posts
             // the callable on expiry. The shared_ptr keeps the timer alive
             // until it fires, even if the awaitable is destroyed.
-            detail::tl_schedule_after = [io_exec](std::chrono::steady_clock::duration dur,
-                                                  std::move_only_function<void()>     fn) mutable {
+            detail::tl_schedule_after() = [io_exec](std::chrono::steady_clock::duration dur,
+                                                    std::move_only_function<void()> fn) mutable {
                 auto timer = std::make_shared<asio::steady_timer>(io_exec, dur);
                 timer->async_wait(
                     [timer, fn = std::move(fn)](const asio::error_code&) mutable { fn(); });
@@ -271,12 +267,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 
     // Signal the drain timer thread to exit if it hasn't already fired.
     if (drain_thread_.joinable()) {
-        try {
+        if (!drain_signaled_.exchange(true))
             drain_signal_.set_value();
-        }
-        catch (const std::future_error&) { // NOLINT(bugprone-empty-catch) — set_value() already
-                                           // called; idempotent
-        }
         drain_thread_.join();
     }
 
@@ -321,6 +313,7 @@ void AsioExecutor::stop() noexcept
 
     // 3. Start the drain timer thread.
     //    If in-flight coroutines don't finish within drain_timeout, force-stop.
+    drain_signaled_.store(false);
     drain_signal_ = std::promise<void>{};
     auto future   = drain_signal_.get_future();
     auto timeout  = config_.drain_timeout;

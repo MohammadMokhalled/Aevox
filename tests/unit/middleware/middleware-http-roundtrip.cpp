@@ -79,5 +79,6 @@ TEST_CASE("Middleware: HTTP roundtrip with middleware adding response header", "
     REQUIRE(res.body_view() == "Hello, World!");
     auto header = res.get_header("X-Middleware-Added");
     REQUIRE(header.has_value());
-    REQUIRE(*header == "true"); // NOLINT(bugprone-unchecked-optional-access)
+    if (header)
+        CHECK(*header == "true");
 }

@@ -216,18 +216,16 @@ TrieNode* Router::Impl::ensure_child(TrieNode* node, const detail::Segment& seg)
     return node->wildcard_child.get();
 }
 
-void Router::Impl::insert( // NOLINT(misc-no-recursion) — trie insertion is inherently recursive
-    TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
-    detail::ErasedHandler handler)
+void Router::Impl::insert(TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
+                          detail::ErasedHandler handler)
 {
-    if (segs.empty()) {
-        const auto idx         = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
-        node->handlers.at(idx) = std::move(handler);
-        node->method_mask |= static_cast<std::uint8_t>(1u << idx);
-        return;
+    while (!segs.empty()) {
+        node = ensure_child(node, segs[0]);
+        segs = segs.subspan(1);
     }
-    TrieNode* child = ensure_child(node, segs[0]);
-    insert(child, segs.subspan(1), method, std::move(handler));
+    const auto idx         = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
+    node->handlers.at(idx) = std::move(handler);
+    node->method_mask |= static_cast<std::uint8_t>(1u << idx);
 }
 
 // =============================================================================

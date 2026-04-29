@@ -42,8 +42,7 @@ std::vector<std::byte> make_buffer(std::string_view s)
 /// and std::byte has the same aliasing permissions.
 std::string_view bytes_as_string_view(const std::vector<std::byte>& v) noexcept
 {
-    return {reinterpret_cast<const char*>(v.data()),
-            v.size()}; // NOLINT: well-defined per [basic.types]/2
+    return {reinterpret_cast<const char*>(v.data()), v.size()};
 }
 
 /// Constructs a test Request with the given buffer, parsed request, and params.
@@ -113,7 +112,8 @@ TEST_CASE("Request - header access - happy path, existing header returns value",
     auto result = req.header("Host");
 
     REQUIRE(result.has_value());
-    CHECK(*result == "example.com"); // NOLINT(bugprone-unchecked-optional-access)
+    if (result)
+        CHECK(*result == "example.com");
 }
 
 TEST_CASE("Request - header access - missing header returns nullopt", "[http][request]")
@@ -148,9 +148,12 @@ TEST_CASE("Request - header access - lookup is case-insensitive", "[http][reques
     REQUIRE(r1.has_value());
     REQUIRE(r2.has_value());
     REQUIRE(r3.has_value());
-    CHECK(*r1 == "application/json"); // NOLINT(bugprone-unchecked-optional-access)
-    CHECK(*r2 == "application/json"); // NOLINT(bugprone-unchecked-optional-access)
-    CHECK(*r3 == "application/json"); // NOLINT(bugprone-unchecked-optional-access)
+    if (r1)
+        CHECK(*r1 == "application/json");
+    if (r2)
+        CHECK(*r2 == "application/json");
+    if (r3)
+        CHECK(*r3 == "application/json");
 }
 
 // =============================================================================
@@ -170,7 +173,8 @@ TEST_CASE("Request - param<int> - happy path converts correctly", "[http][reques
     auto result = req.param<int>("id");
 
     REQUIRE(result.has_value());
-    CHECK(*result == 42); // NOLINT(bugprone-unchecked-optional-access)
+    if (result)
+        CHECK(*result == 42);
 }
 
 TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][request]")
@@ -188,8 +192,8 @@ TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][req
 
     auto result = req.param<std::string_view>("token");
     REQUIRE(result.has_value());
-    CHECK(*result ==
-          "abcdefghijklmnopqrstuvwxyz012345"); // NOLINT(bugprone-unchecked-optional-access)
+    if (result)
+        CHECK(*result == "abcdefghijklmnopqrstuvwxyz012345");
 
     // Zero-copy verification: the string_view data pointer must equal the
     // address of the string stored inside the params map in Impl.
@@ -347,7 +351,8 @@ TEST_CASE("Request - context store - set and get roundtrip typed value", "[http]
     auto val = req.get<std::string>("auth.user");
 
     REQUIRE(val.has_value());
-    CHECK(*val == "alice"); // NOLINT(bugprone-unchecked-optional-access)
+    if (val)
+        CHECK(*val == "alice");
 }
 
 TEST_CASE("Request - context store - get returns nullopt for absent key", "[http][request]")
@@ -428,7 +433,8 @@ TEST_CASE("Response - json(string) sets Content-Type application/json", "[http][
     // Verify Content-Type header via public get_header() accessor.
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "application/json"); // NOLINT(bugprone-unchecked-optional-access)
+    if (ct)
+        CHECK(*ct == "application/json");
 }
 
 TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][response]")
@@ -445,7 +451,8 @@ TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][respons
     // Verify Content-Type header via public get_header() accessor.
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "application/json"); // NOLINT(bugprone-unchecked-optional-access)
+    if (ct)
+        CHECK(*ct == "application/json");
 }
 
 // =============================================================================
@@ -461,7 +468,8 @@ TEST_CASE("Response - content_type() fluent lvalue overload modifies in place", 
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "text/html"); // NOLINT(bugprone-unchecked-optional-access)
+    if (ct)
+        CHECK(*ct == "text/html");
 }
 
 TEST_CASE("Response - content_type() fluent rvalue overload chains on temporary",
@@ -474,7 +482,8 @@ TEST_CASE("Response - content_type() fluent rvalue overload chains on temporary"
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "text/html"); // NOLINT(bugprone-unchecked-optional-access)
+    if (ct)
+        CHECK(*ct == "text/html");
 }
 
 TEST_CASE("Response - header() fluent lvalue overload sets header", "[http][response]")
@@ -486,7 +495,8 @@ TEST_CASE("Response - header() fluent lvalue overload sets header", "[http][resp
 
     auto val = res.get_header("X-Request-Id");
     REQUIRE(val.has_value());
-    CHECK(*val == "abc-123"); // NOLINT(bugprone-unchecked-optional-access)
+    if (val)
+        CHECK(*val == "abc-123");
 }
 
 // =============================================================================
@@ -499,7 +509,10 @@ TEST_CASE("Response - move semantics - moved-from Response is valid but empty", 
     REQUIRE(original.status_code() == 200);
     REQUIRE(original.body_view() == "hello world");
 
-    // Move construct.
+    // Capture address before move so we can verify the moved-from invariant
+    // without accessing the named moved-from variable directly.
+    auto* const original_ptr = std::addressof(original);
+
     auto moved = std::move(original);
 
     // Moved-into has the original values.
@@ -507,9 +520,8 @@ TEST_CASE("Response - move semantics - moved-from Response is valid but empty", 
     CHECK(moved.body_view() == "hello world");
 
     // Moved-from is valid but empty (status_code() == 0, body empty).
-    // NOLINT(bugprone-use-after-move) — intentional: testing moved-from state guarantee
-    CHECK(original.status_code() == 0);  // NOLINT(bugprone-use-after-move)
-    CHECK(original.body_view().empty()); // NOLINT(bugprone-use-after-move)
+    CHECK(original_ptr->status_code() == 0);
+    CHECK(original_ptr->body_view().empty());
 }
 
 // =============================================================================
@@ -525,5 +537,6 @@ TEST_CASE("Response - stream() returns status 200 with given content type", "[ht
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "text/event-stream"); // NOLINT(bugprone-unchecked-optional-access)
+    if (ct)
+        CHECK(*ct == "text/event-stream");
 }

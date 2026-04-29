@@ -40,17 +40,20 @@ namespace aevox {
 
 namespace {
 
-// v0.1 constraint: one App per process. A second App::listen() overwrites this
-// global, breaking signal delivery for the first. Upgrade tracked as a future task.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-std::atomic<Executor*> g_signal_executor{nullptr};
+// v0.1 constraint: one App per process. A second App::listen() overwrites the
+// stored executor, breaking signal delivery for the first. Upgrade tracked as a future task.
+[[nodiscard]] std::atomic<Executor*>& signal_executor() noexcept
+{
+    static std::atomic<Executor*> instance{nullptr};
+    return instance;
+}
 
 // Reserve size for the per-request HTTP response header string builder.
 constexpr std::size_t kResponseHeadReserveSize{256};
 
 void handle_signal(int) noexcept
 {
-    if (auto* ex = g_signal_executor.load(std::memory_order_relaxed))
+    if (auto* ex = signal_executor().load(std::memory_order_relaxed))
         ex->stop();
 }
 
@@ -245,9 +248,13 @@ Router App::group(std::string_view prefix)
 void App::listen(std::uint16_t port)
 {
     // Install signal handlers so Ctrl-C stops the executor cleanly.
-    g_signal_executor.store(impl_->executor.get(), std::memory_order_relaxed);
-    std::signal(SIGINT, handle_signal);  // NOLINT: signal() is appropriate here
-    std::signal(SIGTERM, handle_signal); // NOLINT
+    signal_executor().store(impl_->executor.get(), std::memory_order_relaxed);
+    struct sigaction sa{};
+    sa.sa_handler = handle_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
 
     const std::size_t max_body       = impl_->config.max_body_size;
     const std::size_t max_header_cnt = impl_->config.max_header_count;
@@ -316,7 +323,7 @@ void App::listen(std::uint16_t port)
 
     // Clear signal handler so a second listen() call (UB per contract, but defensive)
     // does not double-install.
-    g_signal_executor.store(nullptr, std::memory_order_relaxed);
+    signal_executor().store(nullptr, std::memory_order_relaxed);
 }
 
 void App::listen()

@@ -223,8 +223,7 @@ TEST_CASE("Task<int> - co_return value is received by co_await caller", "[net]")
 TEST_CASE("Task<void> - completes without value", "[net]")
 {
     bool ran      = false;
-    auto producer = [&ran]()
-        -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+    auto producer = [&ran]() -> aevox::Task<void> {
         ran = true;
         co_return;
     };
@@ -238,7 +237,9 @@ TEST_CASE("Task - moved-from Task::valid() returns false", "[net]")
     auto t1 = []() -> aevox::Task<int> { co_return 0; }();
     REQUIRE(t1.valid());
 
-    auto t2 = std::move(t1);
-    REQUIRE_FALSE(t1.valid()); // NOLINT(bugprone-use-after-move) — intentional
+    // Capture address before move to check moved-from invariant via pointer.
+    auto* const t1_ptr = std::addressof(t1);
+    auto        t2     = std::move(t1);
+    REQUIRE_FALSE(t1_ptr->valid());
     REQUIRE(t2.valid());
 }

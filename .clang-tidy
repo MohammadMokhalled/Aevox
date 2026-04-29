@@ -44,6 +44,8 @@ CheckOptions:
     value: CamelCase
   - key:   readability-identifier-naming.StructIgnoredRegexp
     value: "promise_type"
+  - key:   readability-identifier-naming.ClassIgnoredRegexp
+    value: "promise_type"
   - key:   readability-identifier-naming.EnumCase
     value: CamelCase
   - key:   readability-identifier-naming.EnumConstantCase

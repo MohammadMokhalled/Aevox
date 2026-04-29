@@ -42,18 +42,19 @@ std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
     auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+    ec                       = s.connect(ep, ec);
     if (ec)
         return {};
-    asio::write(s, asio::buffer(request_str.data(), request_str.size()),
-                ec); // NOLINT(bugprone-unused-return-value)
-    if (ec)
+    std::size_t const bytes_sent =
+        asio::write(s, asio::buffer(request_str.data(), request_str.size()), ec);
+    if (ec || bytes_sent != request_str.size())
         return {};
 
-    std::string     response;
-    asio::streambuf buf;
-    asio::read(s, buf, asio::transfer_at_least(1), ec); // NOLINT(bugprone-unused-return-value)
-    response = std::string{asio::buffers_begin(buf.data()), asio::buffers_end(buf.data())};
+    std::string       response;
+    asio::streambuf   buf;
+    std::size_t const bytes_received = asio::read(s, buf, asio::transfer_at_least(1), ec);
+    response.assign(asio::buffers_begin(buf.data()),
+                    asio::buffers_begin(buf.data()) + static_cast<std::ptrdiff_t>(bytes_received));
     return response;
 }
 

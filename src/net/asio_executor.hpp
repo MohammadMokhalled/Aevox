@@ -134,6 +134,8 @@ private:
 
     // Drain timer: promise/future pair signals the timer thread.
     // Timer thread calls io_ctx_.stop() after drain_timeout if not cancelled.
+    // drain_signaled_ guards against double set_value() if both stop paths race.
+    std::atomic_bool   drain_signaled_{};
     std::promise<void> drain_signal_;
     std::thread        drain_thread_;
 };

@@ -45,7 +45,7 @@ void tcp_connect(std::uint16_t port)
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
     auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+    ec                       = s.connect(ep, ec);
 }
 
 } // namespace

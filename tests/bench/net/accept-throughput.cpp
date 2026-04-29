@@ -36,21 +36,18 @@ std::uint16_t find_free_port()
 
 } // namespace
 
-int main() // NOLINT(bugprone-exception-escape)
-{
+int main()
+try {
     constexpr int kConnectionsPerEpoch = 500;
 
     auto             port = find_free_port();
     std::atomic<int> handled{0};
 
     auto ex = aevox::make_executor({.thread_count = 2, .drain_timeout = 5s});
-    auto lr = ex->listen(
-        port,
-        [&handled](std::uint64_t, aevox::TcpStream)
-            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-            handled.fetch_add(1, std::memory_order_relaxed);
-            co_return;
-        });
+    auto lr = ex->listen(port, [&handled](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+        handled.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    });
 
     if (!lr.has_value()) {
         std::cerr << std::format("listen() failed: {}\n", aevox::to_string(lr.error()));
@@ -66,7 +63,7 @@ int main() // NOLINT(bugprone-exception-escape)
             asio::ip::tcp::socket s{ioc};
             asio::error_code      ec;
             auto const ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-            s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+            ec            = s.connect(ep, ec);
         }
         std::this_thread::sleep_for(10ms);
         handled.store(0);
@@ -83,8 +80,8 @@ int main() // NOLINT(bugprone-exception-escape)
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
         auto const            ep2 = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-        s.connect(ep2, ec); // NOLINT(bugprone-unused-return-value)
-        s.close(ec);        // NOLINT(bugprone-unused-return-value)
+        ec                        = s.connect(ep2, ec);
+        ec                        = s.close(ec);
         ankerl::nanobench::doNotOptimizeAway(handled.load());
     });
 
@@ -94,4 +91,7 @@ int main() // NOLINT(bugprone-exception-escape)
     // Report whether we hit the target.
     // nanobench prints the result; we verify separately via CI thresholds.
     return 0;
+}
+catch (...) {
+    return 1;
 }

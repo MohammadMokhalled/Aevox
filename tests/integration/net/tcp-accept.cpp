@@ -53,7 +53,7 @@ void tcp_connect(std::uint16_t port)
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
     auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+    ec                       = s.connect(ep, ec);
     // Ignore ec — the server may have closed before we read; that's fine.
 }
 
@@ -70,17 +70,14 @@ TEST_CASE("integration - single client connect triggers handler coroutine", "[ne
     std::condition_variable handler_cv;
 
     auto ex = aevox::make_executor(int_test_config());
-    auto lr = ex->listen(
-        port,
-        [&](std::uint64_t, aevox::TcpStream)
-            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-            {
-                std::scoped_lock const lk(handler_mtx);
-                handler_count.store(1, std::memory_order_relaxed);
-                handler_cv.notify_one();
-            }
-            co_return;
-        });
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+        {
+            std::scoped_lock const lk(handler_mtx);
+            handler_count.store(1, std::memory_order_relaxed);
+            handler_cv.notify_one();
+        }
+        co_return;
+    });
     REQUIRE(lr.has_value());
 
     // Run the executor in background.
@@ -113,20 +110,17 @@ TEST_CASE("integration - handler receives monotonically increasing conn_id", "[n
     std::condition_variable    handled_cv;
 
     auto ex = aevox::make_executor(int_test_config());
-    auto lr = ex->listen(
-        port,
-        [&](std::uint64_t id, aevox::TcpStream)
-            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-            int const idx = count.fetch_add(1, std::memory_order_relaxed);
-            if (idx < kN)
-                ids[static_cast<std::size_t>(idx)] = id;
-            {
-                std::scoped_lock const lk(handled_mtx);
-                handled.store(idx + 1, std::memory_order_relaxed);
-                handled_cv.notify_one();
-            }
-            co_return;
-        });
+    auto lr = ex->listen(port, [&](std::uint64_t id, aevox::TcpStream) -> aevox::Task<void> {
+        int const idx = count.fetch_add(1, std::memory_order_relaxed);
+        if (idx < kN)
+            ids[static_cast<std::size_t>(idx)] = id;
+        {
+            std::scoped_lock const lk(handled_mtx);
+            handled.store(idx + 1, std::memory_order_relaxed);
+            handled_cv.notify_one();
+        }
+        co_return;
+    });
     REQUIRE(lr.has_value());
 
     std::jthread const runner{[&ex] { [[maybe_unused]] auto run_result = ex->run(); }};
@@ -163,17 +157,14 @@ TEST_CASE("integration - 1000 sequential connections all dispatched without drop
     std::condition_variable done_cv;
 
     auto ex = aevox::make_executor({.thread_count = 4, .drain_timeout = 5s});
-    auto lr = ex->listen(
-        port,
-        [&](std::uint64_t, aevox::TcpStream)
-            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-            handled.fetch_add(1, std::memory_order_relaxed);
-            {
-                std::scoped_lock const lk(done_mtx);
-                done_cv.notify_one();
-            }
-            co_return;
-        });
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+        handled.fetch_add(1, std::memory_order_relaxed);
+        {
+            std::scoped_lock const lk(done_mtx);
+            done_cv.notify_one();
+        }
+        co_return;
+    });
     REQUIRE(lr.has_value());
 
     std::jthread const runner{[&ex] { [[maybe_unused]] auto run_result = ex->run(); }};
@@ -208,18 +199,15 @@ TEST_CASE("integration - stop() drains in-flight handlers before run() returns",
     std::atomic<bool> handler_started{false};
 
     auto ex = aevox::make_executor(int_test_config());
-    auto lr = ex->listen(
-        port,
-        [&](std::uint64_t, aevox::TcpStream)
-            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-            handler_started.store(true, std::memory_order_release);
-            handler_started.notify_all();
-            // Yield control briefly to simulate async work.
-            // In real code this would be co_await some_io_operation().
-            std::this_thread::sleep_for(50ms);
-            completed.fetch_add(1, std::memory_order_relaxed);
-            co_return;
-        });
+    auto lr = ex->listen(port, [&](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+        handler_started.store(true, std::memory_order_release);
+        handler_started.notify_all();
+        // Yield control briefly to simulate async work.
+        // In real code this would be co_await some_io_operation().
+        std::this_thread::sleep_for(50ms);
+        completed.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    });
     REQUIRE(lr.has_value());
 
     std::jthread runner{[&ex] { [[maybe_unused]] auto run_result = ex->run(); }};

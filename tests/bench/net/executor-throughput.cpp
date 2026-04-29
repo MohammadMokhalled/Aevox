@@ -41,13 +41,13 @@ void tcp_connect(std::uint16_t port)
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
     auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+    ec                       = s.connect(ep, ec);
 }
 
 } // namespace
 
-int main() // NOLINT(bugprone-exception-escape)
-{
+int main()
+try {
     // -------------------------------------------------------------------------
     // Benchmark 1: Task dispatch latency
     // Measure the round-trip time for a minimal connection handler.
@@ -133,4 +133,7 @@ int main() // NOLINT(bugprone-exception-escape)
     }
 
     return 0;
+}
+catch (...) {
+    return 1;
 }

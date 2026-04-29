@@ -114,8 +114,7 @@ public:
      * Manages the coroutine's result, exception, and continuation chain.
      * Not intended for direct use — the compiler generates the call sites.
      */
-    class promise_type // NOLINT(readability-identifier-naming) — C++ standard requires this exact
-                       // name
+    class promise_type
     {
     public:
         /**
@@ -262,10 +261,12 @@ public:
      */
     T await_resume()
     {
-        if (handle_.promise().exception_) {
-            std::rethrow_exception(handle_.promise().exception_);
-        }
-        return std::move(*handle_.promise().result_); // NOLINT(bugprone-unchecked-optional-access)
+        auto& promise = handle_.promise();
+        if (promise.exception_)
+            std::rethrow_exception(promise.exception_);
+        if (promise.result_.has_value())
+            return std::move(*promise.result_);
+        std::terminate(); // coroutine invariant: result_ always set when exception_ is null
     }
 
 private:
@@ -299,8 +300,7 @@ template <> class [[nodiscard]] Task<void>
 {
 public:
     /** @brief Coroutine promise type for Task<void>. */
-    class promise_type // NOLINT(readability-identifier-naming) — C++ standard requires this exact
-                       // name
+    class promise_type
     {
     public:
         [[nodiscard]] Task<void> get_return_object() noexcept

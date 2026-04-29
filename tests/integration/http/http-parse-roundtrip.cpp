@@ -48,10 +48,12 @@ void tcp_send(std::uint16_t port, std::string_view data)
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
     auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
-    if (!ec)
-        asio::write(s, asio::buffer(data.data(), data.size()),
-                    ec); // NOLINT(bugprone-unused-return-value)
+    ec                       = s.connect(ep, ec);
+    if (!ec) {
+        std::size_t const bytes_sent = asio::write(s, asio::buffer(data.data(), data.size()), ec);
+        if (!ec && bytes_sent != data.size())
+            ec = asio::error::eof;
+    }
 }
 
 void tcp_connect_close(std::uint16_t port)
@@ -60,7 +62,7 @@ void tcp_connect_close(std::uint16_t port)
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
     auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-    s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+    ec                       = s.connect(ep, ec);
     // Close immediately — no data sent.
 }
 
@@ -207,17 +209,17 @@ TEST_CASE("pipelined keep-alive requests", "[integration][http]")
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
         auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
-        s.connect(ep, ec); // NOLINT(bugprone-unused-return-value)
+        ec                       = s.connect(ep, ec);
         REQUIRE_FALSE(ec);
 
         // Send first request, then second on the same connection.
-        std::string_view const req1 = "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n";
-        std::string_view const req2 = "GET /second HTTP/1.1\r\nHost: localhost\r\n\r\n";
-        asio::write(s, asio::buffer(req1.data(), req1.size()),
-                    ec);                   // NOLINT(bugprone-unused-return-value)
+        std::string_view const req1   = "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        std::string_view const req2   = "GET /second HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        std::size_t const      bytes1 = asio::write(s, asio::buffer(req1.data(), req1.size()), ec);
+        REQUIRE(bytes1 == req1.size());
         std::this_thread::sleep_for(10ms); // let server process req1 first
-        asio::write(s, asio::buffer(req2.data(), req2.size()),
-                    ec); // NOLINT(bugprone-unused-return-value)
+        std::size_t const bytes2 = asio::write(s, asio::buffer(req2.data(), req2.size()), ec);
+        REQUIRE(bytes2 == req2.size());
 
         done.wait();
         ex->stop();
