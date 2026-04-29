@@ -9,7 +9,7 @@
 #   build             — compiler matrix [gcc×2 + clang-linux×2 + clang-macos×2] × [default, release], ctest
 #   asan-test         — GCC 15, CMake asan preset, ASan + UBSan, ctest
 #   asan-test-clang   — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
-#   build-windows     — MSVC 2026 (windows-latest), CMake windows-msvc preset
+#   build-windows     — MSVC 2022 (windows-latest), CMake windows-msvc preset
 #
 # Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json + compiler id + runner OS.
 #   Separate cache namespaces for gcc, clang-linux, clang-macos, and msvc to prevent ABI-incompatible
@@ -171,9 +171,10 @@ jobs:
         run: |
           brew install llvm@21 cmake ninja
           LLVM_BIN="$(brew --prefix llvm@21)/bin"
-          echo "CC=$LLVM_BIN/clang"    >> "$GITHUB_ENV"
-          echo "CXX=$LLVM_BIN/clang++" >> "$GITHUB_ENV"
-          echo "PATH=$LLVM_BIN:$PATH"  >> "$GITHUB_ENV"
+          echo "CC=$LLVM_BIN/clang"              >> "$GITHUB_ENV"
+          echo "CXX=$LLVM_BIN/clang++"             >> "$GITHUB_ENV"
+          echo "PATH=$LLVM_BIN:$PATH"              >> "$GITHUB_ENV"
+          echo "MACOSX_DEPLOYMENT_TARGET=14.0"     >> "$GITHUB_ENV"
           "$LLVM_BIN/clang" --version
           "$LLVM_BIN/clang++" --version
           cmake --version
@@ -295,12 +296,12 @@ jobs:
         run: ctest --preset asan
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Windows — MSVC 2026 (windows-latest), windows-msvc preset (multi-config, debug)
+  # Windows — MSVC 2022 (windows-latest), windows-msvc preset (multi-config, debug)
   # Retained in pr.yml only (not main.yml) because the PR gate catches Windows
   # regressions before merge; re-running on main is redundant (ADD §4.2).
   # ─────────────────────────────────────────────────────────────────────────────
   build-windows:
-    name: Build — Windows (MSVC 2026)
+    name: Build — Windows (MSVC 2022)
     runs-on: windows-latest
 
     steps:
