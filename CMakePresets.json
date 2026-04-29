@@ -36,8 +36,8 @@
     },
     {
       "name": "windows-msvc",
-      "description": "Windows Visual Studio 2022 generator — multi-config, debug/release selected at build time",
-      "generator": "Visual Studio 17 2022",
+      "description": "Windows Visual Studio 2026 generator — multi-config, debug/release selected at build time",
+      "generator": "Visual Studio 18 2026",
       "binaryDir": "${sourceDir}/build/msvc",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
       "architecture": {
