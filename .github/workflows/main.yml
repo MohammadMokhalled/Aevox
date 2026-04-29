@@ -15,7 +15,7 @@
 # Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json + compiler id + runner OS.
 #   Separate cache namespaces for gcc, clang-linux, and clang-macos to prevent ABI-incompatible
 #   binary reuse between compilers (ADD §3.4).
-# CMake: installed via Kitware APT PPA (codename: plucky) on Linux; via Homebrew on macOS.
+# CMake: installed via system apt (Ubuntu 26.04 ships cmake 3.31+) on Linux; via Homebrew on macOS.
 # macOS: Tier-2 CI platform for clang build only (continue-on-error: true). ADD §3.7.
 
 name: Main
@@ -80,14 +80,9 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y gcc-15 g++-15 ninja-build
+          sudo apt-get install -y gcc-15 g++-15 ninja-build cmake
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
-            | sudo apt-key add -
-          sudo apt-add-repository "deb https://apt.kitware.com/ubuntu/ plucky main"
-          sudo apt-get update -q
-          sudo apt-get install -y cmake
           echo "CC=${{ matrix.compiler.cc }}" >> "$GITHUB_ENV"
           echo "CXX=${{ matrix.compiler.cxx }}" >> "$GITHUB_ENV"
 
@@ -147,11 +142,8 @@ jobs:
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
 
-      - name: Install CMake (Kitware APT PPA — plucky)
+      - name: Install CMake
         run: |
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
-            | sudo apt-key add -
-          sudo apt-add-repository "deb https://apt.kitware.com/ubuntu/ plucky main"
           sudo apt-get update -q
           sudo apt-get install -y cmake
 
@@ -194,12 +186,7 @@ jobs:
       - name: Install Ninja and CMake (clang 21 expected pre-installed on runner)
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y ninja-build
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc \
-            | sudo apt-key add -
-          sudo apt-add-repository "deb https://apt.kitware.com/ubuntu/ plucky main"
-          sudo apt-get update -q
-          sudo apt-get install -y cmake
+          sudo apt-get install -y ninja-build cmake
 
       - name: Log compiler and CMake versions
         run: |
