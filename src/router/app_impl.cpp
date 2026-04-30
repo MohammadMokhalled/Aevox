@@ -249,12 +249,21 @@ void App::listen(std::uint16_t port)
 {
     // Install signal handlers so Ctrl-C stops the executor cleanly.
     signal_executor().store(impl_->executor.get(), std::memory_order_relaxed);
+#ifndef _WIN32
+    // POSIX: sigaction() gives us SA_RESTART semantics and a clean signal mask.
     struct sigaction sa{};
     sa.sa_handler = handle_signal;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     sigaction(SIGINT, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
+#else
+    // Windows: std::signal() from <csignal> is the portable equivalent.
+    // SIGTERM is defined by the MSVC CRT; SIGBREAK is Windows-specific and
+    // omitted intentionally -- SIGINT covers Ctrl+C.
+    std::signal(SIGINT, handle_signal);
+    std::signal(SIGTERM, handle_signal);
+#endif
 
     const std::size_t max_body       = impl_->config.max_body_size;
     const std::size_t max_header_cnt = impl_->config.max_header_count;
