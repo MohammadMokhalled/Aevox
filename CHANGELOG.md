@@ -11,9 +11,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Changed
 - CI upgraded to GCC 15 on Ubuntu 26.04; CMake and vcpkg baseline updated to latest stable
 - CI split into PR pipeline (`pr.yml`) with clang-format-21 check and clang-tidy-21 check-only gate, and main pipeline (`main.yml`) with build and test only; old `ci.yml` deleted
-- CI build matrix expanded to six entries: GCC 15 × {debug, release} on Linux, clang 21 × {debug, release} on Linux, and clang 21 (Homebrew `llvm@21`) × {debug, release} on macOS (Tier-2, continue-on-error); codebase now verified against two independent compilers on every push
+- CI build matrix reduced to four entries (macOS removed): GCC 15 × {debug, release} on Linux, clang 21 × {debug, release} on Linux; codebase now verified against two independent compilers on every push
+- macOS dropped from CI and supported platforms; macOS runners and Homebrew LLVM steps removed from both `pr.yml` and `main.yml`
 - `asan-test-clang` job added to both `pr.yml` and `main.yml`: runs ASan + UBSan under clang 21 on Linux as an independent sanitizer pass complementing the existing GCC 15 ASan job
-- vcpkg binary cache keys now include compiler ID (`gcc`, `clang-linux`, `clang-macos`, `msvc`) to prevent ABI-incompatible binary reuse across compilers
+- vcpkg binary cache keys now include compiler ID (`gcc`, `clang-linux`, `msvc`) to prevent ABI-incompatible binary reuse across compilers
 
 ### Added
 - `aevox::AppConfig` — runtime-configurable fields: `port`, `host`, `backlog`, `max_body_size`, `request_timeout`, `max_header_count`, `max_read_bytes`; all have named `constexpr` defaults in `include/aevox/config.hpp`

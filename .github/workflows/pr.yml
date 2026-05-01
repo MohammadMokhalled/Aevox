@@ -6,18 +6,18 @@
 # Jobs:
 #   format-check      — clang-format-21 diff over include/ src/ tests/ examples/ (fails PR on violation)
 #   tidy              — clang-tidy-21 check-only via run-clang-tidy-21 -p build/debug (fails PR on any warning)
-#   build             — compiler matrix [gcc×2 + clang-linux×2 + clang-macos×2] × [default, release], ctest
+#   build             — compiler matrix [gcc×2 + clang-linux×2] × [default, release], ctest
 #   asan-test         — GCC 15, CMake asan preset, ASan + UBSan, ctest
 #   asan-test-clang   — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
 #   build-windows     — MSVC 2022 (windows-latest), CMake windows-msvc preset
 #
 # Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json + compiler id + runner OS.
-#   Separate cache namespaces for gcc, clang-linux, clang-macos, and msvc to prevent ABI-incompatible
+#   Separate cache namespaces for gcc, clang-linux, and msvc to prevent ABI-incompatible
 #   binary reuse between compilers (ADD §3.4).
-# CMake: installed via system apt (Ubuntu 26.04 ships cmake 3.31+) on Linux; via Homebrew on macOS.
+# CMake: installed via system apt (Ubuntu 26.04 ships cmake 3.31+) on Linux.
 # Merge commit checkout: tidy, build, asan-test, asan-test-clang use refs/pull/N/merge with fetch-depth: 0
 #   to detect integration failures invisible from the PR branch tip alone (ADD §3.3).
-# macOS: Tier-2 CI platform for clang build only (continue-on-error: true). ADD §3.7.
+# Supported platforms: Linux (GCC 15, clang 21) and Windows (MSVC 2022).
 
 name: PR
 
@@ -111,43 +111,27 @@ jobs:
         run: run-clang-tidy-21 -p build/debug
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Build — compiler matrix (6 entries), ctest
-  # GCC 15 and clang 21 on Linux; clang 21 (Homebrew LLVM) on macOS (Tier-2).
-  # Each entry runs both default and release presets.
+  # Build — compiler matrix (4 entries), ctest
+  # GCC 15 and clang 21 on Linux, each running default and release presets.
   # Checks out the merge commit to catch integration issues.
-  # macOS entries use continue-on-error: true (informational — ADD §3.7).
   # ─────────────────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.preset }}) — ${{ matrix.compiler.id }}
-    runs-on: ${{ matrix.runner }}
-    continue-on-error: ${{ matrix.continue_on_error || false }}
+    runs-on: self-ubuntu26.04
     strategy:
       fail-fast: false
       matrix:
         include:
           # GCC 15 — Linux only
-          - runner: self-ubuntu26.04
-            compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
+          - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
             preset: default
-          - runner: self-ubuntu26.04
-            compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
+          - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
             preset: release
           # clang 21 — Linux
-          - runner: self-ubuntu26.04
-            compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
+          - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
             preset: default
-          - runner: self-ubuntu26.04
-            compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
+          - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
             preset: release
-          # clang (LLVM 21 via Homebrew) — macOS Tier-2 (continue-on-error)
-          - runner: macos-latest
-            compiler: { cc: brew-clang, cxx: brew-clang++, id: clang-macos }
-            preset: default
-            continue_on_error: true
-          - runner: macos-latest
-            compiler: { cc: brew-clang, cxx: brew-clang++, id: clang-macos }
-            preset: release
-            continue_on_error: true
 
     steps:
       - name: Check out merge commit
@@ -156,8 +140,7 @@ jobs:
           ref: refs/pull/${{ github.event.pull_request.number }}/merge
           fetch-depth: 0
 
-      - name: Install GCC 15, Ninja, and CMake (Linux)
-        if: runner.os == 'Linux'
+      - name: Install GCC 15, Ninja, and CMake
         run: |
           sudo apt-get update -q
           sudo apt-get install -y gcc-15 g++-15 ninja-build cmake
@@ -166,21 +149,7 @@ jobs:
           echo "CC=${{ matrix.compiler.cc }}" >> "$GITHUB_ENV"
           echo "CXX=${{ matrix.compiler.cxx }}" >> "$GITHUB_ENV"
 
-      - name: Install Homebrew LLVM 21 and CMake (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew install llvm@21 cmake ninja
-          LLVM_BIN="$(brew --prefix llvm@21)/bin"
-          echo "CC=$LLVM_BIN/clang"              >> "$GITHUB_ENV"
-          echo "CXX=$LLVM_BIN/clang++"             >> "$GITHUB_ENV"
-          echo "PATH=$LLVM_BIN:$PATH"              >> "$GITHUB_ENV"
-          echo "MACOSX_DEPLOYMENT_TARGET=14.0"     >> "$GITHUB_ENV"
-          "$LLVM_BIN/clang" --version
-          "$LLVM_BIN/clang++" --version
-          cmake --version
-
-      - name: Log compiler and CMake versions (Linux)
-        if: runner.os == 'Linux'
+      - name: Log compiler and CMake versions
         run: |
           "$CC" --version
           "$CXX" --version
