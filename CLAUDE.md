@@ -385,11 +385,9 @@ When a user request conflicts with the PRD, implement the request and explicitly
 
 Run `bash scripts/format.sh` after editing any `.cpp`/`.hpp` file and before any build.
 
+Run `bash scripts/tidy.sh` after implementing the solution and fix the errors there. Using NOLINT comments is not acceptable and you must fix everything functionally. For example, if it needs to use the return value, use the return value in a functional way.
+
 ---
-
-## 17. Document Skill Rules
-
-The `/document` skill is invoked after `/developer` marks a task Done. It produces or updates `docs/` pages so the public documentation remains synchronized with each completed implementation.
 
 ### Trigger
 
