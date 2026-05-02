@@ -50,12 +50,15 @@ struct GlazeBackend
     [[nodiscard]] std::expected<T, aevox::JsonError> deserialize(std::string_view input) const
     {
         T result{};
+        // glz::read_json requires null-terminated input; std::string_view from
+        // the HTTP parser's byte buffer is not. Copy into std::string first.
+        const std::string input_str{input};
         // glz::read_json returns glz::error_ctx; truthy when an error occurred.
         // glz::format_error formats the error relative to the input string for
         // position-annotated diagnostic messages.
-        const auto ec = glz::read_json(result, input);
+        const auto ec = glz::read_json(result, input_str);
         if (ec) {
-            return std::unexpected(aevox::JsonError{glz::format_error(ec, input)});
+            return std::unexpected(aevox::JsonError{glz::format_error(ec, input_str)});
         }
         return result;
     }
