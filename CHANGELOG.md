@@ -17,6 +17,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - vcpkg binary cache keys now include compiler ID (`gcc`, `clang-linux`, `msvc`) to prevent ABI-incompatible binary reuse across compilers
 
 ### Added
+- `aevox::JsonError` — value-type error returned by JSON operations; carries a `std::string_view message()` accessor
+- `aevox::JsonBackend<B>` — C++23 concept constraining pluggable JSON backends; requires `deserialize<T>()` and `serialize()` returning `std::expected<T, JsonError>` / `std::expected<std::string, JsonError>`
+- `aevox::internal::GlazeBackend` — production JSON backend backed by glaze 3.6.1; satisfies `JsonBackend`; hidden in `src/json/` (no glaze types exposed in public headers)
+- `aevox::Request::json<T>()` — async coroutine that deserializes the request body to `T`; returns `Task<std::expected<T, JsonError>>`
+- `aevox::Response::json(const T&)` — factory that serializes `T` to JSON and returns a 200 response with `Content-Type: application/json`; falls back to 500 on serialization failure
 - `aevox::AppConfig` — runtime-configurable fields: `port`, `host`, `backlog`, `max_body_size`, `request_timeout`, `max_header_count`, `max_read_bytes`; all have named `constexpr` defaults in `include/aevox/config.hpp`
 - `aevox::App::create()` — factory that accepts an optional TOML config file path and returns `std::expected<App, ConfigErrorDetail>`; base defaults always apply when no file is provided
 - `aevox::ConfigError` enum and `aevox::ConfigErrorDetail` struct — structured error type for config loading failures (`file_not_found`, `parse_error`, `invalid_value`)

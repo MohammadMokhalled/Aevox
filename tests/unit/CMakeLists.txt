@@ -9,3 +9,4 @@ add_subdirectory(http)       # HttpParser unit tests
 add_subdirectory(router)     # Router path matching + dispatch unit tests
 add_subdirectory(config)     # Runtime configuration system unit tests
 add_subdirectory(middleware) # Middleware pipeline ordering and composition unit tests
+add_subdirectory(json)       # JSON abstraction layer unit tests

@@ -11,8 +11,13 @@
 
 #include <aevox/response.hpp>
 
+#include <format>
 #include <string>
 #include <unordered_map>
+
+#if defined(AEVOX_JSON_BACKEND_GLAZE)
+    #include "json/glaze_backend.hpp"
+#endif
 
 namespace aevox {
 
@@ -39,12 +44,24 @@ struct Response::Impl
 
 template <typename T>
     requires aevox::Serializable<T>
-[[nodiscard]] Response Response::json(T&& /*value*/)
+[[nodiscard]] Response Response::json(const T& value)
 {
-    // v0.1 stub — real glaze serialization not yet wired via
-    // Response::Impl::do_json_serialize(). The sentinel body makes it obvious
-    // at runtime that the stub is active. Do not use this output as real JSON.
-    return Response{200, R"({"error":"not_implemented"})", "application/json"};
+#if defined(AEVOX_JSON_BACKEND_GLAZE)
+    constexpr aevox::internal::GlazeBackend kBackend{};
+    auto                                    result = kBackend.serialize(value);
+    if (!result) {
+        const auto detail = std::string{result.error().message()};
+        const auto error_body =
+            std::format(R"({{"error":"json_serialization_failed","detail":"{}"}})", detail);
+        return Response{500, error_body, "application/json"};
+    }
+    return Response{200, std::move(*result), "application/json"};
+#else
+    (void)value;
+    return Response{
+        500, R"({"error":"no_json_backend","detail":"Set AEVOX_JSON_BACKEND to glaze in CMake."})",
+        "application/json"};
+#endif
 }
 
 // =============================================================================

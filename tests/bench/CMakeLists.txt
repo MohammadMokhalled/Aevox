@@ -8,3 +8,4 @@
 
 add_subdirectory(net)        # accept-loop throughput baseline
 add_subdirectory(middleware) # middleware pipeline throughput benchmark
+add_subdirectory(json)       # JSON serialization throughput baseline

@@ -28,6 +28,8 @@ add_dependencies(aevox_tests_unit http-parser)
 # Request / Response unit tests
 # ---------------------------------------------------------------------------
 
+find_package(glaze CONFIG REQUIRED)
+
 add_executable(request-response
     request-response.cpp
 )
@@ -40,7 +42,12 @@ target_include_directories(request-response
 target_link_libraries(request-response
     PRIVATE
         aevox_core
+        glaze::glaze
         Catch2::Catch2WithMain
+)
+
+target_compile_definitions(request-response
+    PRIVATE AEVOX_JSON_BACKEND_GLAZE
 )
 
 target_compile_options(request-response

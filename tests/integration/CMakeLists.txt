@@ -9,3 +9,4 @@ add_subdirectory(http)       # HttpParser + TcpStream roundtrip integration test
 add_subdirectory(router)     # App + Router end-to-end over loopback TCP
 add_subdirectory(config)     # Config file loading integration tests
 add_subdirectory(middleware) # Middleware pipeline integration tests with real HTTP
+add_subdirectory(json)       # JSON request/response integration tests over loopback TCP
