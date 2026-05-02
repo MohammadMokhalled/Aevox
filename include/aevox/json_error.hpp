@@ -13,7 +13,7 @@ namespace aevox {
  * @brief Structured error type for JSON parse and serialization failures.
  *
  * Returned via `std::unexpected` from all `aevox::JsonBackend` operations,
- * `Request::json<T>()`, and `Response::json(T&&)`. Never thrown.
+ * `Request::json<T>()`, and `Response::json(const T&)`. Never thrown.
  *
  * @note Thread-safety: value type — safe to copy and move across threads.
  * @note Move semantics: moved-from `JsonError` has `message()` returning an
