@@ -85,7 +85,7 @@ struct HttpParser::Impl
         else {
             // Extend by re-forming the view (llhttp may call on_url multiple times for long URLs).
             const char* start = s.pending.target.data();
-            std::size_t total = static_cast<std::size_t>((at + length) - start);
+            auto const  total = static_cast<std::size_t>((at + length) - start);
             s.pending.target  = std::string_view{start, total};
         }
         return HPE_OK;
@@ -99,7 +99,7 @@ struct HttpParser::Impl
         }
         else {
             const char* start = s.pending.method.data();
-            std::size_t total = static_cast<std::size_t>((at + length) - start);
+            auto const  total = static_cast<std::size_t>((at + length) - start);
             s.pending.method  = std::string_view{start, total};
         }
         return HPE_OK;
@@ -219,7 +219,7 @@ struct HttpParser::Impl
 
 HttpParser::HttpParser(ParserConfig config) noexcept : impl_{std::make_unique<Impl>()}
 {
-    impl_->config = std::move(config);
+    impl_->config = config;
     impl_->pending.headers.reserve(kHeadersReserveSize);
 
     llhttp_settings_init(&impl_->settings);
@@ -250,13 +250,13 @@ HttpParser::~HttpParser() noexcept                       = default;
 
     // reinterpret_cast: const std::byte* → const char* for llhttp.
     // Well-defined per C++23 [basic.types.general].
-    const auto* ptr = reinterpret_cast<const char*>(data.data());
-    std::size_t len = data.size();
+    const auto*       ptr = reinterpret_cast<const char*>(data.data());
+    std::size_t const len = data.size();
 
     impl_->feed_ptr = ptr;
     impl_->feed_len = len;
 
-    llhttp_errno_t rc = llhttp_execute(&impl_->parser, ptr, len);
+    llhttp_errno_t const rc = llhttp_execute(&impl_->parser, ptr, len);
 
     impl_->feed_ptr = nullptr;
     impl_->feed_len = 0;

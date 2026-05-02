@@ -47,7 +47,7 @@ namespace aevox::net {
 // Construction / destruction
 // =============================================================================
 
-AsioExecutor::AsioExecutor(aevox::ExecutorConfig config) : config_{std::move(config)}
+AsioExecutor::AsioExecutor(aevox::ExecutorConfig config) : config_{config}
 {
     // Pre-allocate to avoid vector reallocation after run() co_spawns the loops.
     accept_loops_.reserve(kAcceptLoopsReserveSize);
@@ -77,11 +77,8 @@ AsioExecutor::~AsioExecutor()
 
     // Cancel the drain timer thread if still running.
     if (drain_thread_.joinable()) {
-        try {
+        if (!drain_signaled_.exchange(true))
             drain_signal_.set_value();
-        }
-        catch (const std::future_error&) {
-        }
         drain_thread_.join();
     }
 
@@ -100,8 +97,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::listen(
 {
     // Guard: listen() is only valid before run() starts.
     auto s = state_.load(std::memory_order_acquire);
-    if (s != State::idle && s != State::configured) {
-        return std::unexpected{aevox::ExecutorError::already_running};
+    if (s != State::Idle && s != State::Configured) {
+        return std::unexpected{aevox::ExecutorError::AlreadyRunning};
     }
 
     try {
@@ -119,16 +116,16 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::listen(
         });
 
         // Transition from idle → configured on first listen().
-        State expected = State::idle;
-        state_.compare_exchange_strong(expected, State::configured, std::memory_order_release,
+        State expected = State::Idle;
+        state_.compare_exchange_strong(expected, State::Configured, std::memory_order_release,
                                        std::memory_order_relaxed);
         return {};
     }
     catch (const asio::system_error& e) {
         if (e.code() == asio::error::address_in_use || e.code() == asio::error::access_denied) {
-            return std::unexpected{aevox::ExecutorError::bind_failed};
+            return std::unexpected{aevox::ExecutorError::BindFailed};
         }
-        return std::unexpected{aevox::ExecutorError::listen_failed};
+        return std::unexpected{aevox::ExecutorError::ListenFailed};
     }
 }
 
@@ -178,15 +175,15 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
 std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 {
     // Guard against double-run.
-    State expected = State::configured;
-    if (!state_.compare_exchange_strong(expected, State::running, std::memory_order_acq_rel,
+    State expected = State::Configured;
+    if (!state_.compare_exchange_strong(expected, State::Running, std::memory_order_acq_rel,
                                         std::memory_order_relaxed))
     {
-        State idle = State::idle;
-        if (!state_.compare_exchange_strong(idle, State::running, std::memory_order_acq_rel,
+        State idle = State::Idle;
+        if (!state_.compare_exchange_strong(idle, State::Running, std::memory_order_acq_rel,
                                             std::memory_order_relaxed))
         {
-            return std::unexpected{aevox::ExecutorError::already_running};
+            return std::unexpected{aevox::ExecutorError::AlreadyRunning};
         }
     }
 
@@ -224,20 +221,20 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
             // Bind tl_post_to_io — posts any callable to the I/O pool.
             // Takes std::move_only_function<void()> so callers can pass
             // move-only lambdas (e.g. those capturing aevox::Task<T>).
-            detail::tl_post_to_io = [io_exec](std::move_only_function<void()> fn) mutable {
+            detail::tl_post_to_io() = [io_exec](std::move_only_function<void()> fn) mutable {
                 asio::post(io_exec, std::move(fn));
             };
 
             // Bind tl_post_to_cpu — posts to CPU pool (or I/O pool if disabled).
             if (cpu_pool_ptr != nullptr) {
-                auto cpu_exec          = cpu_pool_ptr->get_executor();
-                detail::tl_post_to_cpu = [cpu_exec](std::move_only_function<void()> fn) mutable {
+                auto cpu_exec            = cpu_pool_ptr->get_executor();
+                detail::tl_post_to_cpu() = [cpu_exec](std::move_only_function<void()> fn) mutable {
                     asio::post(cpu_exec, std::move(fn));
                 };
             }
             else {
                 // No dedicated CPU pool — reuse I/O pool binding.
-                detail::tl_post_to_cpu = [io_exec](std::move_only_function<void()> fn) mutable {
+                detail::tl_post_to_cpu() = [io_exec](std::move_only_function<void()> fn) mutable {
                     asio::post(io_exec, std::move(fn));
                 };
             }
@@ -245,8 +242,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
             // Bind tl_schedule_after — creates a steady_timer and posts
             // the callable on expiry. The shared_ptr keeps the timer alive
             // until it fires, even if the awaitable is destroyed.
-            detail::tl_schedule_after = [io_exec](std::chrono::steady_clock::duration dur,
-                                                  std::move_only_function<void()>     fn) mutable {
+            detail::tl_schedule_after() = [io_exec](std::chrono::steady_clock::duration dur,
+                                                    std::move_only_function<void()> fn) mutable {
                 auto timer = std::make_shared<asio::steady_timer>(io_exec, dur);
                 timer->async_wait(
                     [timer, fn = std::move(fn)](const asio::error_code&) mutable { fn(); });
@@ -270,15 +267,12 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 
     // Signal the drain timer thread to exit if it hasn't already fired.
     if (drain_thread_.joinable()) {
-        try {
+        if (!drain_signaled_.exchange(true))
             drain_signal_.set_value();
-        }
-        catch (const std::future_error&) {
-        }
         drain_thread_.join();
     }
 
-    state_.store(State::stopped, std::memory_order_release);
+    state_.store(State::Stopped, std::memory_order_release);
     return {};
 }
 
@@ -288,8 +282,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 
 void AsioExecutor::stop() noexcept
 {
-    State expected = State::running;
-    if (!state_.compare_exchange_strong(expected, State::draining, std::memory_order_acq_rel,
+    State expected = State::Running;
+    if (!state_.compare_exchange_strong(expected, State::Draining, std::memory_order_acq_rel,
                                         std::memory_order_relaxed))
     {
         // Not running: either idle, configured, already draining, or stopped.
@@ -319,6 +313,7 @@ void AsioExecutor::stop() noexcept
 
     // 3. Start the drain timer thread.
     //    If in-flight coroutines don't finish within drain_timeout, force-stop.
+    drain_signaled_.store(false);
     drain_signal_ = std::promise<void>{};
     auto future   = drain_signal_.get_future();
     auto timeout  = config_.drain_timeout;
@@ -357,7 +352,7 @@ namespace aevox {
         config.thread_count = std::max(1u, std::thread::hardware_concurrency());
     }
     // noexcept contract: thread creation failure is unrecoverable → std::terminate.
-    return std::make_unique<net::AsioExecutor>(std::move(config));
+    return std::make_unique<net::AsioExecutor>(config);
 }
 
 // =============================================================================
@@ -367,15 +362,15 @@ namespace aevox {
 [[nodiscard]] std::string_view to_string(ExecutorError e) noexcept
 {
     switch (e) {
-        case ExecutorError::bind_failed:
+        case ExecutorError::BindFailed:
             return "bind_failed: OS refused to bind to the requested address/port";
-        case ExecutorError::listen_failed:
+        case ExecutorError::ListenFailed:
             return "listen_failed: listen() syscall failed";
-        case ExecutorError::accept_failed:
+        case ExecutorError::AcceptFailed:
             return "accept_failed: accept() call failed";
-        case ExecutorError::already_running:
+        case ExecutorError::AlreadyRunning:
             return "already_running: run() called on an already-running executor";
-        case ExecutorError::not_running:
+        case ExecutorError::NotRunning:
             return "not_running: operation attempted on a stopped executor";
     }
     return "unknown ExecutorError";

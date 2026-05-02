@@ -40,31 +40,33 @@
 
 using NextFn = std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)>;
 
-static std::vector<std::byte> make_buffer(std::string_view s)
+namespace {
+
+std::vector<std::byte> make_buffer(std::string_view s)
 {
     std::vector<std::byte> buf(s.size());
     std::memcpy(buf.data(), s.data(), s.size());
     return buf;
 }
 
-static aevox::Request make_bench_request()
+aevox::Request make_bench_request()
 {
-    constexpr std::string_view method = "GET";
-    constexpr std::string_view path   = "/bench";
+    constexpr std::string_view kMethod = "GET";
+    constexpr std::string_view kPath   = "/bench";
 
-    std::string raw = "GET /bench HTTP/1.1\r\n\r\n";
-    auto        buf = make_buffer(raw);
+    std::string const raw = "GET /bench HTTP/1.1\r\n\r\n";
+    auto              buf = make_buffer(raw);
 
     aevox::detail::ParsedRequest pr;
-    pr.method     = std::string_view{reinterpret_cast<const char*>(buf.data()), method.size()};
-    pr.target     = std::string_view{reinterpret_cast<const char*>(buf.data()) + method.size() + 1,
-                                 path.size()};
+    pr.method     = std::string_view{reinterpret_cast<const char*>(buf.data()), kMethod.size()};
+    pr.target     = std::string_view{reinterpret_cast<const char*>(buf.data()) + kMethod.size() + 1,
+                                 kPath.size()};
     pr.keep_alive = false;
 
     return aevox::make_request_from_impl(std::move(buf), std::move(pr));
 }
 
-template <typename T> static T drive_task(aevox::Task<T> task)
+template <typename T> T drive_task(aevox::Task<T> task)
 {
     auto inner = task.await_suspend(std::noop_coroutine());
     inner.resume();
@@ -74,7 +76,7 @@ template <typename T> static T drive_task(aevox::Task<T> task)
 // No-op pass-through middleware lambda.
 // Returns a new lambda each call (lambdas are not reusable across chain constructions
 // because std::move_only_function moves next out on each co_await).
-static auto noop_mw_lambda()
+auto noop_mw_lambda()
 {
     return [](aevox::Request&                                                        req,
               std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)> next)
@@ -83,7 +85,7 @@ static auto noop_mw_lambda()
 
 // Wrap one middleware lambda around an existing NextFn chain.
 // Replicates one iteration of the dispatch_with_pipeline wrapping loop.
-template <typename MwLambda> static NextFn wrap_one(MwLambda mw, NextFn prev)
+template <typename MwLambda> NextFn wrap_one(MwLambda mw, NextFn prev)
 {
     return [mw   = std::move(mw),
             prev = std::move(prev)](aevox::Request& r) mutable -> aevox::Task<aevox::Response> {
@@ -93,7 +95,7 @@ template <typename MwLambda> static NextFn wrap_one(MwLambda mw, NextFn prev)
 
 // Build a pipeline chain of `count` no-op middleware layers around a handler.
 // Must be called fresh for each benchmark iteration (move-only semantics).
-static NextFn build_chain(int count)
+NextFn build_chain(int count)
 {
     NextFn chain = [](aevox::Request& /*r*/) -> aevox::Task<aevox::Response> {
         co_return aevox::Response::ok("OK");
@@ -108,6 +110,8 @@ static NextFn build_chain(int count)
 
     return chain;
 }
+
+} // namespace
 
 // =============================================================================
 // main — nanobench measurements
@@ -199,7 +203,7 @@ int main()
     // O(1) per hop and negligible compared to the network I/O that surrounds it.
 
     if (baseline_ns > 0.0 && ten_mw_ns > 0.0) {
-        double overhead = (ten_mw_ns - baseline_ns) / baseline_ns;
+        double const overhead = (ten_mw_ns - baseline_ns) / baseline_ns;
         std::cout << std::format(
             "\nPipeline overhead check:\n"
             "  Baseline  (0 mw): {:.2f} ns/op\n"

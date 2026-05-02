@@ -133,9 +133,9 @@ inline constexpr std::chrono::seconds kDefaultDrainTimeout{30};
  */
 enum class ConfigError : std::uint8_t
 {
-    file_not_found, ///< The specified config file path does not exist on the filesystem.
-    parse_error,    ///< The file exists but is not valid TOML syntax.
-    invalid_value,  ///< A field value fails a range or type constraint.
+    FileNotFound, ///< The specified config file path does not exist on the filesystem.
+    ParseError,   ///< The file exists but is not valid TOML syntax.
+    InvalidValue, ///< A field value fails a range or type constraint.
 };
 
 /**
@@ -150,8 +150,8 @@ enum class ConfigError : std::uint8_t
  */
 struct ConfigErrorDetail
 {
-    ConfigError code{ConfigError::file_not_found}; ///< Discriminant error code.
-    std::string message;                           ///< Human-readable description.
+    ConfigError code{ConfigError::FileNotFound}; ///< Discriminant error code.
+    std::string message;                         ///< Human-readable description.
     std::string key; ///< Offending TOML key (populated for invalid_value only).
 };
 

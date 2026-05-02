@@ -26,29 +26,34 @@
 
 using namespace std::chrono_literals;
 
-static std::uint16_t find_free_port()
+namespace {
+
+std::uint16_t find_free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
-static void tcp_connect(std::uint16_t port)
+void tcp_connect(std::uint16_t port)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = s.connect(ep, ec);
 }
 
+} // namespace
+
 int main()
-{
+try {
     // -------------------------------------------------------------------------
     // Benchmark 1: Task dispatch latency
     // Measure the round-trip time for a minimal connection handler.
     // -------------------------------------------------------------------------
     {
-        constexpr int iters_per_epoch = 200;
+        constexpr int kItersPerEpoch = 200;
 
         auto             port    = find_free_port();
         std::atomic<int> handled = 0;
@@ -64,14 +69,14 @@ int main()
             return 1;
         }
 
-        std::thread runner{[&ex] { (void)ex->run(); }};
+        std::thread runner{[&ex] { [[maybe_unused]] auto r = ex->run(); }};
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(iters_per_epoch)
+            .minEpochIterations(kItersPerEpoch)
             .warmup(50)
             .title("Task dispatch latency (accept - handler returns)")
             .run("round-trip", [&] {
-                int before = handled.load(std::memory_order_relaxed);
+                int const before = handled.load(std::memory_order_relaxed);
                 tcp_connect(port);
                 // Spin until the handler increments.
                 while (handled.load(std::memory_order_relaxed) == before) {
@@ -90,7 +95,7 @@ int main()
     // Measure the overhead of suspending on pool() with a no-op callable.
     // -------------------------------------------------------------------------
     {
-        constexpr int iters_per_epoch = 200;
+        constexpr int kItersPerEpoch = 200;
 
         auto             port    = find_free_port();
         std::atomic<int> handled = 0;
@@ -107,14 +112,14 @@ int main()
             return 1;
         }
 
-        std::thread runner{[&ex] { (void)ex->run(); }};
+        std::thread runner{[&ex] { [[maybe_unused]] auto r = ex->run(); }};
 
         ankerl::nanobench::Bench()
-            .minEpochIterations(iters_per_epoch)
+            .minEpochIterations(kItersPerEpoch)
             .warmup(50)
             .title("pool() dispatch round-trip (accept - pool(noop) - handler returns)")
             .run("pool-round-trip", [&] {
-                int before = handled.load(std::memory_order_relaxed);
+                int const before = handled.load(std::memory_order_relaxed);
                 tcp_connect(port);
                 while (handled.load(std::memory_order_relaxed) == before) {
                     std::this_thread::yield();
@@ -128,4 +133,7 @@ int main()
     }
 
     return 0;
+}
+catch (...) {
+    return 1;
 }

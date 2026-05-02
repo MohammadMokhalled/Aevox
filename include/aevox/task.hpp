@@ -51,7 +51,7 @@ struct FinalAwaitable
     template <typename P>
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<P> h) noexcept
     {
-        auto cont = h.promise().continuation_;
+        auto cont = h.promise().continuation;
         return cont ? cont : std::noop_coroutine();
     }
 
@@ -174,7 +174,7 @@ public:
         }
 
         // Accessed by FinalAwaitable::await_suspend and Task::await_suspend.
-        std::coroutine_handle<> continuation_{};
+        std::coroutine_handle<> continuation{};
 
     private:
         friend class Task<T>;
@@ -246,7 +246,7 @@ public:
      */
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
     {
-        handle_.promise().continuation_ = caller;
+        handle_.promise().continuation = caller;
         return handle_; // symmetric transfer — compiler tail-calls this
     }
 
@@ -261,10 +261,12 @@ public:
      */
     T await_resume()
     {
-        if (handle_.promise().exception_) {
-            std::rethrow_exception(handle_.promise().exception_);
-        }
-        return std::move(*handle_.promise().result_);
+        auto& promise = handle_.promise();
+        if (promise.exception_)
+            std::rethrow_exception(promise.exception_);
+        if (promise.result_.has_value())
+            return std::move(*promise.result_);
+        std::terminate(); // coroutine invariant: result_ always set when exception_ is null
     }
 
 private:
@@ -323,7 +325,7 @@ public:
             exception_ = std::current_exception();
         }
 
-        std::coroutine_handle<> continuation_{};
+        std::coroutine_handle<> continuation{};
 
     private:
         friend class Task<void>;
@@ -366,7 +368,7 @@ public:
 
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
     {
-        handle_.promise().continuation_ = caller;
+        handle_.promise().continuation = caller;
         return handle_;
     }
 

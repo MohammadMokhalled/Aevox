@@ -156,7 +156,7 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     //           but int handler is more specific)
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, int>) {
-        std::string name0{param_names.empty() ? "" : param_names[0]};
+        std::string const name0{param_names.empty() ? "" : param_names[0]};
         return [h = std::forward<Handler>(h),
                 name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<int>(name0);
@@ -179,7 +179,7 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 1 — unsigned int
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, unsigned int>) {
-        std::string name0{param_names.empty() ? "" : param_names[0]};
+        std::string const name0{param_names.empty() ? "" : param_names[0]};
         return [h = std::forward<Handler>(h),
                 name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<unsigned int>(name0);
@@ -203,7 +203,7 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 1 — float
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, float>) {
-        std::string name0{param_names.empty() ? "" : param_names[0]};
+        std::string const name0{param_names.empty() ? "" : param_names[0]};
         return [h = std::forward<Handler>(h),
                 name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<float>(name0);
@@ -226,7 +226,7 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 1 — double
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, double>) {
-        std::string name0{param_names.empty() ? "" : param_names[0]};
+        std::string const name0{param_names.empty() ? "" : param_names[0]};
         return [h = std::forward<Handler>(h),
                 name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<double>(name0);
@@ -249,7 +249,7 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 1 — std::string
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, std::string>) {
-        std::string name0{param_names.empty() ? "" : param_names[0]};
+        std::string const name0{param_names.empty() ? "" : param_names[0]};
         return [h = std::forward<Handler>(h),
                 name0](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v = r.param<std::string>(name0);
@@ -273,8 +273,8 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 2 — (std::string, int)
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, std::string, int>) {
-        std::string name0{param_names.size() > 0 ? param_names[0] : ""};
-        std::string name1{param_names.size() > 1 ? param_names[1] : ""};
+        std::string const name0{param_names.size() > 0 ? param_names[0] : ""};
+        std::string const name1{param_names.size() > 1 ? param_names[1] : ""};
         return [h = std::forward<Handler>(h), name0,
                 name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<std::string>(name0);
@@ -302,8 +302,8 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 2 — (int, std::string)
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, int, std::string>) {
-        std::string name0{param_names.size() > 0 ? param_names[0] : ""};
-        std::string name1{param_names.size() > 1 ? param_names[1] : ""};
+        std::string const name0{param_names.size() > 0 ? param_names[0] : ""};
+        std::string const name1{param_names.size() > 1 ? param_names[1] : ""};
         return [h = std::forward<Handler>(h), name0,
                 name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<int>(name0);
@@ -331,8 +331,8 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 2 — (int, int)
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, int, int>) {
-        std::string name0{param_names.size() > 0 ? param_names[0] : ""};
-        std::string name1{param_names.size() > 1 ? param_names[1] : ""};
+        std::string const name0{param_names.size() > 0 ? param_names[0] : ""};
+        std::string const name1{param_names.size() > 1 ? param_names[1] : ""};
         return [h = std::forward<Handler>(h), name0,
                 name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<int>(name0);
@@ -360,8 +360,8 @@ ErasedHandler normalise_handler(Handler&& h, std::span<const std::string> param_
     // Arity 2 — (std::string, std::string)
     // -------------------------------------------------------------------------
     else if constexpr (std::is_invocable_v<Handler, aevox::Request&, std::string, std::string>) {
-        std::string name0{param_names.size() > 0 ? param_names[0] : ""};
-        std::string name1{param_names.size() > 1 ? param_names[1] : ""};
+        std::string const name0{param_names.size() > 0 ? param_names[0] : ""};
+        std::string const name1{param_names.size() > 1 ? param_names[1] : ""};
         return [h = std::forward<Handler>(h), name0,
                 name1](aevox::Request& r) -> aevox::Task<aevox::Response> {
             auto v0 = r.param<std::string>(name0);

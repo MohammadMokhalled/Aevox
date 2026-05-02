@@ -1,0 +1,295 @@
+# .github/workflows/pr.yml
+#
+# Aevox PR Pipeline
+#
+# Triggers: pull_request targeting main (merge commit checkout)
+# Jobs:
+#   format-check      — clang-format-21 diff over include/ src/ tests/ examples/ (fails PR on violation)
+#   tidy              — clang-tidy-21 check-only via run-clang-tidy-21 -p build/debug (fails PR on any warning)
+#   build             — compiler matrix [gcc×2 + clang-linux×2] × [default, release], ctest
+#   asan-test         — GCC 15, CMake asan preset, ASan + UBSan, ctest
+#   asan-test-clang   — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
+#   build-windows     — MSVC 2022 (windows-latest), CMake windows-msvc preset
+#
+# Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json + compiler id + runner OS.
+#   Separate cache namespaces for gcc, clang-linux, and msvc to prevent ABI-incompatible
+#   binary reuse between compilers (ADD §3.4).
+# CMake: installed via system apt (Ubuntu 26.04 ships cmake 3.31+) on Linux.
+# Merge commit checkout: tidy, build, asan-test, asan-test-clang use refs/pull/N/merge with fetch-depth: 0
+#   to detect integration failures invisible from the PR branch tip alone (ADD §3.3).
+# Supported platforms: Linux (GCC 15, clang 21) and Windows (MSVC 2022).
+
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Format check — clang-format-21 in-place, fail on any diff
+  # No build, no vcpkg. Uses standard checkout (fetch-depth: 1).
+  # ─────────────────────────────────────────────────────────────────────────────
+  format-check:
+    name: Format Check (clang-format-21)
+    runs-on: self-ubuntu26.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install clang-format-21
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y clang-format-21
+
+      - name: Run clang-format-21 on all source files
+        run: |
+          find include src tests examples \( -name '*.hpp' -o -name '*.cpp' \) | \
+            xargs clang-format-21 -i
+
+      - name: Fail if any formatting violations are present
+        run: |
+          git diff --exit-code || \
+            (echo "::error::Formatting violations found. Run scripts/format.sh locally and commit the result." && exit 1)
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Tidy — clang-tidy-21 check-only (no --fix, no auto-commit)
+  # Checks out the merge commit to catch integration issues.
+  # Fails the PR if any clang-tidy warning is emitted.
+  # Configures with GCC 15 to produce compile_commands.json (ADD §3.6).
+  # ─────────────────────────────────────────────────────────────────────────────
+  tidy:
+    name: Tidy Check (clang-tidy-21)
+    runs-on: self-ubuntu26.04
+
+    steps:
+      - name: Check out merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Install GCC 15, Ninja, and build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build clang-tidy-21
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Install CMake
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake
+
+      - name: Log CMake version
+        run: cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: gcc-Linux
+
+      - name: Configure (default preset — generates compile_commands.json)
+        run: cmake --preset default -DCMAKE_CXX_COMPILER="$CXX"
+        env:
+          CC: gcc-15
+          CXX: g++-15
+
+      - name: Run clang-tidy-21 (check-only, no --fix)
+        run: run-clang-tidy-21 -p build/debug
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build — compiler matrix (4 entries), ctest
+  # GCC 15 and clang 21 on Linux, each running default and release presets.
+  # Checks out the merge commit to catch integration issues.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.preset }}) — ${{ matrix.compiler.id }}
+    runs-on: self-ubuntu26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # GCC 15 — Linux only
+          - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
+            preset: default
+          - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
+            preset: release
+          # clang 21 — Linux
+          - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
+            preset: default
+          - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
+            preset: release
+
+    steps:
+      - name: Check out merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Install GCC 15, Ninja, and CMake
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build cmake
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+          echo "CC=${{ matrix.compiler.cc }}" >> "$GITHUB_ENV"
+          echo "CXX=${{ matrix.compiler.cxx }}" >> "$GITHUB_ENV"
+
+      - name: Log compiler and CMake versions
+        run: |
+          "$CC" --version
+          "$CXX" --version
+          cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: ${{ matrix.compiler.id }}-${{ runner.os }}
+
+      - name: Configure (${{ matrix.preset }} preset)
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER="$CXX"
+
+      - name: Build (${{ matrix.preset }} preset)
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test (${{ matrix.preset }} preset)
+        run: ctest --preset ${{ matrix.preset }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ASan + UBSan — GCC 15, asan CMake preset
+  # Checks out the merge commit. Separate job because ASan and release are
+  # mutually exclusive (ADD §3.9).
+  # ─────────────────────────────────────────────────────────────────────────────
+  asan-test:
+    name: ASan + UBSan — Linux GCC 15
+    runs-on: self-ubuntu26.04
+
+    steps:
+      - name: Check out merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Install GCC 15, Ninja, and build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Install CMake
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake
+
+      - name: Log CMake version
+        run: cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: gcc-Linux
+
+      - name: Configure (asan preset — ASan + UBSan)
+        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+        env:
+          CC: gcc-15
+          CXX: g++-15
+
+      - name: Build (asan preset)
+        run: cmake --build --preset asan
+
+      - name: Test (asan preset — ASan + UBSan)
+        run: ctest --preset asan
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ASan + UBSan — clang 21 (Linux), asan CMake preset
+  # Independent sanitizer pass that catches clang-specific UB and stricter
+  # constexpr evaluation errors invisible to GCC (ADD §3.9).
+  # ─────────────────────────────────────────────────────────────────────────────
+  asan-test-clang:
+    name: ASan + UBSan — Linux clang 21
+    runs-on: self-ubuntu26.04
+
+    steps:
+      - name: Check out merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+          fetch-depth: 0
+
+      - name: Install Ninja and CMake (clang 21 expected pre-installed on runner)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y ninja-build cmake
+
+      - name: Log compiler and CMake versions
+        run: |
+          clang-21 --version
+          clang++-21 --version
+          cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: clang-linux-Linux
+
+      - name: Configure (asan preset — ASan + UBSan)
+        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+        env:
+          CC: clang-21
+          CXX: clang++-21
+
+      - name: Build (asan preset)
+        run: cmake --build --preset asan
+
+      - name: Test (asan preset — ASan + UBSan)
+        run: ctest --preset asan
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Windows — MSVC 2022 (windows-latest), windows-msvc preset (multi-config, debug)
+  # Retained in pr.yml only (not main.yml) because the PR gate catches Windows
+  # regressions before merge; re-running on main is redundant (ADD §4.2).
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Build — Windows (MSVC 2022)
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: msvc-Windows
+
+      - name: Configure (windows-msvc preset)
+        run: cmake --preset windows-msvc
+
+      - name: Build Debug (windows-msvc-debug preset)
+        run: cmake --build --preset windows-msvc-debug
+
+      - name: Test Debug (windows-msvc-debug preset)
+        run: ctest --preset windows-msvc-debug

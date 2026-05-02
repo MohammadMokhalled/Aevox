@@ -12,13 +12,17 @@
 
 using namespace aevox::detail;
 
+namespace {
+
 // Helper: convert a string literal into a byte span backed by a vector.
-static std::vector<std::byte> to_bytes(std::string_view s)
+std::vector<std::byte> to_bytes(std::string_view s)
 {
     std::vector<std::byte> buf(s.size());
     std::memcpy(buf.data(), s.data(), s.size());
     return buf;
 }
+
+} // namespace
 
 // =============================================================================
 
@@ -121,10 +125,10 @@ TEST_CASE("HTTP/1.1 parser - truncated request returns Incomplete", "[http][pars
 
     SECTION("second feed with remainder returns success")
     {
-        auto first  = to_bytes("GET / HTTP/1.1\r\nHost: loc");
-        auto second = to_bytes("alhost\r\n\r\n");
-        (void)parser.feed(std::span{first});
-        auto r2 = parser.feed(std::span{second});
+        auto                  first   = to_bytes("GET / HTTP/1.1\r\nHost: loc");
+        auto                  second  = to_bytes("alhost\r\n\r\n");
+        [[maybe_unused]] auto ignored = parser.feed(std::span{first});
+        auto                  r2      = parser.feed(std::span{second});
         REQUIRE(r2.has_value());
         CHECK(r2->method == "GET");
         CHECK(r2->target == "/");
@@ -194,14 +198,14 @@ TEST_CASE("HTTP/1.1 parser - limits and edge cases", "[http][parser]")
         HttpParser parser{cfg};
 
         // Build a request with 4 headers (exceeds limit of 3).
-        std::string req    = "GET / HTTP/1.1\r\n"
-                             "A: 1\r\n"
-                             "B: 2\r\n"
-                             "C: 3\r\n"
-                             "D: 4\r\n"
-                             "\r\n";
-        auto        buf    = to_bytes(req);
-        auto        result = parser.feed(std::span{buf});
+        std::string const req    = "GET / HTTP/1.1\r\n"
+                                   "A: 1\r\n"
+                                   "B: 2\r\n"
+                                   "C: 3\r\n"
+                                   "D: 4\r\n"
+                                   "\r\n";
+        auto              buf    = to_bytes(req);
+        auto              result = parser.feed(std::span{buf});
 
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error() == ParseError::TooManyHeaders);

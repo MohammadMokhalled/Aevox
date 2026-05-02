@@ -1,0 +1,184 @@
+# .github/workflows/main.yml
+#
+# Aevox Main Branch Pipeline
+#
+# Triggers: push to main
+# Jobs:
+#   build           — compiler matrix [gcc×2 + clang-linux×2] × [default, release], ctest
+#   asan-test       — GCC 15, CMake asan preset, ASan + UBSan, ctest
+#   asan-test-clang — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
+#
+# NOTE: No format-check or tidy jobs — those run only on PRs (pr.yml).
+# Format and tidy violations are caught before merge; re-checking on main
+# is redundant and wastes runner minutes.
+#
+# Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json + compiler id + runner OS.
+#   Separate cache namespaces for gcc and clang-linux to prevent ABI-incompatible
+#   binary reuse between compilers (ADD §3.4).
+# CMake: installed via system apt (Ubuntu 26.04 ships cmake 3.31+) on Linux.
+# Supported platforms: Linux only (GCC 15, clang 21).
+
+name: Main
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: main-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build — compiler matrix (4 entries), ctest
+  # GCC 15 and clang 21 on Linux (default and release presets).
+  # Standard checkout (fetch-depth: 1) — no merge commit needed on main.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.preset }}) — ${{ matrix.compiler.id }}
+    runs-on: self-ubuntu26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # GCC 15 — Linux only
+          - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
+            preset: default
+          - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
+            preset: release
+          # clang 21 — Linux
+          - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
+            preset: default
+          - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
+            preset: release
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install GCC 15, Ninja, and CMake
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build cmake
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+          echo "CC=${{ matrix.compiler.cc }}" >> "$GITHUB_ENV"
+          echo "CXX=${{ matrix.compiler.cxx }}" >> "$GITHUB_ENV"
+
+      - name: Log compiler and CMake versions
+        run: |
+          "$CC" --version
+          "$CXX" --version
+          cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: ${{ matrix.compiler.id }}-${{ runner.os }}
+
+      - name: Configure (${{ matrix.preset }} preset)
+        run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER="$CXX"
+
+      - name: Build (${{ matrix.preset }} preset)
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test (${{ matrix.preset }} preset)
+        run: ctest --preset ${{ matrix.preset }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ASan + UBSan — GCC 15, asan CMake preset
+  # Standard checkout (fetch-depth: 1). Separate job because ASan and release
+  # are mutually exclusive (ADD §3.9).
+  # ─────────────────────────────────────────────────────────────────────────────
+  asan-test:
+    name: ASan + UBSan — Linux GCC 15
+    runs-on: self-ubuntu26.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install GCC 15, Ninja, and build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Install CMake
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y cmake
+
+      - name: Log CMake version
+        run: cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: gcc-Linux
+
+      - name: Configure (asan preset — ASan + UBSan)
+        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+        env:
+          CC: gcc-15
+          CXX: g++-15
+
+      - name: Build (asan preset)
+        run: cmake --build --preset asan
+
+      - name: Test (asan preset — ASan + UBSan)
+        run: ctest --preset asan
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # ASan + UBSan — clang 21 (Linux), asan CMake preset
+  # Independent sanitizer pass that catches clang-specific UB and stricter
+  # constexpr evaluation errors invisible to GCC (ADD §3.9).
+  # ─────────────────────────────────────────────────────────────────────────────
+  asan-test-clang:
+    name: ASan + UBSan — Linux clang 21
+    runs-on: self-ubuntu26.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Ninja and CMake (clang 21 expected pre-installed on runner)
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y ninja-build cmake
+
+      - name: Log compiler and CMake versions
+        run: |
+          clang-21 --version
+          clang++-21 --version
+          cmake --version
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: clang-linux-Linux
+
+      - name: Configure (asan preset — ASan + UBSan)
+        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+        env:
+          CC: clang-21
+          CXX: clang++-21
+
+      - name: Build (asan preset)
+        run: cmake --build --preset asan
+
+      - name: Test (asan preset — ASan + UBSan)
+        run: ctest --preset asan

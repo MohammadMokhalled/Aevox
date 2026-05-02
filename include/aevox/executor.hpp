@@ -101,11 +101,11 @@ struct ExecutorConfig
  */
 enum class ExecutorError : std::uint8_t
 {
-    bind_failed,     ///< OS refused to bind to the requested address/port.
-    listen_failed,   ///< `listen()` syscall failed after successful bind.
-    accept_failed,   ///< An individual `accept()` call failed (non-fatal, logged).
-    already_running, ///< `run()` was called on an already-running executor.
-    not_running,     ///< An operation was attempted on a stopped executor.
+    BindFailed,     ///< OS refused to bind to the requested address/port.
+    ListenFailed,   ///< `listen()` syscall failed after successful bind.
+    AcceptFailed,   ///< An individual `accept()` call failed (non-fatal, logged).
+    AlreadyRunning, ///< `run()` was called on an already-running executor.
+    NotRunning,     ///< An operation was attempted on a stopped executor.
 };
 
 /**

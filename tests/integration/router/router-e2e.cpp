@@ -23,47 +23,54 @@ using namespace std::chrono_literals;
 // Helpers
 // =============================================================================
 
+namespace {
+
 /// Returns an available ephemeral port.
-static std::uint16_t free_port()
+std::uint16_t free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
 /// Sends `request_str` to localhost:port and returns the full response as string.
-static std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
+std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = s.connect(ep, ec);
     if (ec)
         return {};
-    asio::write(s, asio::buffer(request_str.data(), request_str.size()), ec);
-    if (ec)
+    std::size_t const bytes_sent =
+        asio::write(s, asio::buffer(request_str.data(), request_str.size()), ec);
+    if (ec || bytes_sent != request_str.size())
         return {};
 
     std::string     response;
     asio::streambuf buf;
     // Read until the server closes the connection (Connection: close) or EOF.
-    asio::read(s, buf, asio::transfer_at_least(1), ec);
-    response = std::string{asio::buffers_begin(buf.data()), asio::buffers_end(buf.data())};
+    std::size_t const bytes_received = asio::read(s, buf, asio::transfer_at_least(1), ec);
+    response.assign(asio::buffers_begin(buf.data()),
+                    asio::buffers_begin(buf.data()) + static_cast<std::ptrdiff_t>(bytes_received));
     return response;
 }
 
 /// Minimal HTTP/1.0 GET request (Connection: close so server closes after reply).
-static std::string http_get(std::uint16_t port, std::string_view path)
+std::string http_get(std::uint16_t port, std::string_view path)
 {
     return http_roundtrip(port, std::format("GET {} HTTP/1.0\r\nHost: localhost\r\n\r\n", path));
 }
 
-static std::string http_post(std::uint16_t port, std::string_view path, std::string_view body = {})
+std::string http_post(std::uint16_t port, std::string_view path, std::string_view body = {})
 {
     return http_roundtrip(
         port, std::format("POST {} HTTP/1.0\r\nHost: localhost\r\nContent-Length: {}\r\n\r\n{}",
                           path, body.size(), body));
 }
+
+} // namespace
 
 // =============================================================================
 // TestServer — starts App in a background thread, stops on destruction.
@@ -91,6 +98,11 @@ struct TestServer
         app.stop();
     }
 
+    TestServer(const TestServer&)            = delete;
+    TestServer& operator=(const TestServer&) = delete;
+    TestServer(TestServer&&)                 = delete;
+    TestServer& operator=(TestServer&&)      = delete;
+
     aevox::App    app{aevox::AppConfig{.executor = {.thread_count = 2, .drain_timeout = 2s}}};
     std::uint16_t port;
     std::latch    ready{1};
@@ -103,12 +115,12 @@ struct TestServer
 
 TEST_CASE("static route returns 200", "[integration][router]")
 {
-    const auto port = free_port();
-    TestServer server{port, [](aevox::App& app) {
-                          app.get("/hello", [](aevox::Request&) {
-                              return aevox::Response::ok("Hello, World!");
-                          });
-                      }};
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/hello", [](aevox::Request&) {
+                                    return aevox::Response::ok("Hello, World!");
+                                });
+                            }};
 
     const auto resp = http_get(port, "/hello");
     REQUIRE(resp.find("HTTP/1.1 200") != std::string::npos);
@@ -117,11 +129,11 @@ TEST_CASE("static route returns 200", "[integration][router]")
 
 TEST_CASE("unregistered path returns 404", "[integration][router]")
 {
-    const auto port = free_port();
-    TestServer server{port, [](aevox::App& app) {
-                          app.get("/hello",
-                                  [](aevox::Request&) { return aevox::Response::ok("x"); });
-                      }};
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/hello",
+                                        [](aevox::Request&) { return aevox::Response::ok("x"); });
+                            }};
 
     const auto resp = http_get(port, "/notfound");
     REQUIRE(resp.find("HTTP/1.1 404") != std::string::npos);
@@ -129,11 +141,11 @@ TEST_CASE("unregistered path returns 404", "[integration][router]")
 
 TEST_CASE("wrong method returns 405 with Allow header", "[integration][router]")
 {
-    const auto port = free_port();
-    TestServer server{port, [](aevox::App& app) {
-                          app.get("/resource",
-                                  [](aevox::Request&) { return aevox::Response::ok("x"); });
-                      }};
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/resource",
+                                        [](aevox::Request&) { return aevox::Response::ok("x"); });
+                            }};
 
     const auto resp = http_post(port, "/resource");
     REQUIRE(resp.find("HTTP/1.1 405") != std::string::npos);
@@ -142,12 +154,12 @@ TEST_CASE("wrong method returns 405 with Allow header", "[integration][router]")
 
 TEST_CASE("path parameter extracted end-to-end", "[integration][router]")
 {
-    const auto port = free_port();
-    TestServer server{port, [](aevox::App& app) {
-                          app.get("/users/{id:int}", [](aevox::Request&, int id) {
-                              return aevox::Response::ok(std::to_string(id));
-                          });
-                      }};
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/users/{id:int}", [](aevox::Request&, int id) {
+                                    return aevox::Response::ok(std::to_string(id));
+                                });
+                            }};
 
     const auto resp = http_get(port, "/users/99");
     REQUIRE(resp.find("HTTP/1.1 200") != std::string::npos);
@@ -156,12 +168,12 @@ TEST_CASE("path parameter extracted end-to-end", "[integration][router]")
 
 TEST_CASE("bad typed param returns 400", "[integration][router]")
 {
-    const auto port = free_port();
-    TestServer server{port, [](aevox::App& app) {
-                          app.get("/items/{id:int}", [](aevox::Request&, int id) {
-                              return aevox::Response::ok(std::to_string(id));
-                          });
-                      }};
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/items/{id:int}", [](aevox::Request&, int id) {
+                                    return aevox::Response::ok(std::to_string(id));
+                                });
+                            }};
 
     const auto resp = http_get(port, "/items/notanumber");
     REQUIRE(resp.find("HTTP/1.1 400") != std::string::npos);
@@ -169,12 +181,13 @@ TEST_CASE("bad typed param returns 400", "[integration][router]")
 
 TEST_CASE("wildcard captures tail path", "[integration][router]")
 {
-    const auto port = free_port();
-    TestServer server{port, [](aevox::App& app) {
-                          app.get("/files/{path...}", [](aevox::Request&, std::string path) {
-                              return aevox::Response::ok(path);
-                          });
-                      }};
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/files/{path...}",
+                                        [](aevox::Request&, const std::string& path) {
+                                            return aevox::Response::ok(path);
+                                        });
+                            }};
 
     const auto resp = http_get(port, "/files/docs/readme.txt");
     REQUIRE(resp.find("HTTP/1.1 200") != std::string::npos);

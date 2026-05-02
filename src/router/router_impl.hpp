@@ -87,15 +87,15 @@ struct Router::Impl
 {
     /// Owns the root TrieNode for the main Router.
     /// Null for group sub-Routers (they reference a node in the parent's trie).
-    std::unique_ptr<TrieNode> root_;
+    std::unique_ptr<TrieNode> root;
 
     /// Registration entry point.
     /// = root_.get() for the main Router.
     /// = pointer into a parent's trie for group sub-Routers.
-    TrieNode* insert_root_{nullptr};
+    TrieNode* insert_root{nullptr};
 
     /// true iff this Impl owns root_ (i.e. not a group sub-Router).
-    bool owns_root_{true};
+    bool owns_root{true};
 
     // -------------------------------------------------------------------------
     // Registration helpers
@@ -125,11 +125,11 @@ struct ScopedMiddlewareEntry
 
 struct App::Impl
 {
-    AppConfig                          config_;
-    Router                             router_;
-    std::unique_ptr<Executor>          executor_;
-    std::vector<Middleware>            global_middlewares_;
-    std::vector<ScopedMiddlewareEntry> scoped_middlewares_;
+    AppConfig                          config;
+    Router                             router;
+    std::unique_ptr<Executor>          executor;
+    std::vector<Middleware>            global_middlewares;
+    std::vector<ScopedMiddlewareEntry> scoped_middlewares;
 };
 
 } // namespace aevox

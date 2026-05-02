@@ -25,35 +25,36 @@
 
 using namespace std::chrono_literals;
 
-static std::uint16_t find_free_port()
+namespace {
+
+std::uint16_t find_free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
+} // namespace
+
 int main()
-{
-    constexpr int connections_per_epoch = 500;
+try {
+    constexpr int kConnectionsPerEpoch = 500;
 
     auto             port = find_free_port();
     std::atomic<int> handled{0};
 
     auto ex = aevox::make_executor({.thread_count = 2, .drain_timeout = 5s});
-    auto lr = ex->listen(
-        port,
-        [&handled](std::uint64_t, aevox::TcpStream)
-            -> aevox::Task<void> { // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines)
-            handled.fetch_add(1, std::memory_order_relaxed);
-            co_return;
-        });
+    auto lr = ex->listen(port, [&handled](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> {
+        handled.fetch_add(1, std::memory_order_relaxed);
+        co_return;
+    });
 
     if (!lr.has_value()) {
         std::cerr << std::format("listen() failed: {}\n", aevox::to_string(lr.error()));
         return 1;
     }
 
-    std::jthread runner{[&ex] { (void)ex->run(); }};
+    std::jthread const runner{[&ex] { [[maybe_unused]] auto r = ex->run(); }};
 
     // Warm up: drain any OS connection backlog.
     {
@@ -61,7 +62,8 @@ int main()
         for (int i = 0; i < 10; ++i) {
             asio::ip::tcp::socket s{ioc};
             asio::error_code      ec;
-            s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+            auto const ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+            ec            = s.connect(ep, ec);
         }
         std::this_thread::sleep_for(10ms);
         handled.store(0);
@@ -70,15 +72,16 @@ int main()
     ankerl::nanobench::Bench bench;
     bench.title("accept_loop loopback throughput")
         .unit("connection")
-        .minEpochIterations(connections_per_epoch)
+        .minEpochIterations(kConnectionsPerEpoch)
         .warmup(3);
 
     bench.run("accept_loop loopback throughput", [&] {
         asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
-        s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
-        s.close(ec);
+        auto const            ep2 = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+        ec                        = s.connect(ep2, ec);
+        ec                        = s.close(ec);
         ankerl::nanobench::doNotOptimizeAway(handled.load());
     });
 
@@ -88,4 +91,7 @@ int main()
     // Report whether we hit the target.
     // nanobench prints the result; we verify separately via CI thresholds.
     return 0;
+}
+catch (...) {
+    return 1;
 }

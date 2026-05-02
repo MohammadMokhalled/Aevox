@@ -12,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 // Internal headers — gives access to Request::Impl and template definitions.
+#include <array>
 #include <coroutine>
 #include <cstring>
 #include <string>
@@ -25,8 +26,10 @@
 // Test helpers
 // =============================================================================
 
+namespace {
+
 /// Converts a string literal to a vector of bytes (owned buffer).
-static std::vector<std::byte> make_buffer(std::string_view s)
+std::vector<std::byte> make_buffer(std::string_view s)
 {
     std::vector<std::byte> buf(s.size());
     std::memcpy(buf.data(), s.data(), s.size());
@@ -37,10 +40,9 @@ static std::vector<std::byte> make_buffer(std::string_view s)
 /// std::byte* → const char* is well-defined per [basic.types]/2:
 /// any object may be accessed through a pointer to char or unsigned char,
 /// and std::byte has the same aliasing permissions.
-static std::string_view bytes_as_string_view(const std::vector<std::byte>& v) noexcept
+std::string_view bytes_as_string_view(const std::vector<std::byte>& v) noexcept
 {
-    return {reinterpret_cast<const char*>(v.data()),
-            v.size()}; // NOLINT: well-defined per [basic.types]/2
+    return {reinterpret_cast<const char*>(v.data()), v.size()};
 }
 
 /// Constructs a test Request with the given buffer, parsed request, and params.
@@ -50,9 +52,8 @@ static std::string_view bytes_as_string_view(const std::vector<std::byte>& v) no
 ///      the friend function defined in request_impl.hpp.
 ///   2. get_mutable_request_impl() returns a non-const Impl pointer (friend fn)
 ///      so we can inject the path params after construction without naming Impl.
-static aevox::Request make_test_request(std::vector<std::byte>                       buffer,
-                                        aevox::detail::ParsedRequest                 parsed,
-                                        std::unordered_map<std::string, std::string> params = {})
+aevox::Request make_test_request(std::vector<std::byte> buffer, aevox::detail::ParsedRequest parsed,
+                                 std::unordered_map<std::string, std::string> params = {})
 {
     auto req = aevox::make_request_from_impl(std::move(buffer), std::move(parsed));
     if (!params.empty()) {
@@ -74,7 +75,7 @@ static aevox::Request make_test_request(std::vector<std::byte>                  
 /// This works for the v0.1 json<T>() stub because the body co_returns immediately
 /// without suspending. Do not use this helper for Tasks that genuinely suspend on
 /// I/O — it would block the calling thread.
-template <typename T> static T drive_task(aevox::Task<T> task)
+template <typename T> T drive_task(aevox::Task<T> task)
 {
     // Task is lazy (initial_suspend = suspend_always). Steps:
     //   1. await_suspend(noop_coroutine()) registers noop as continuation
@@ -86,6 +87,8 @@ template <typename T> static T drive_task(aevox::Task<T> task)
     inner.resume();
     return task.await_resume();
 }
+
+} // namespace
 
 // =============================================================================
 // Request tests — header access
@@ -109,7 +112,8 @@ TEST_CASE("Request - header access - happy path, existing header returns value",
     auto result = req.header("Host");
 
     REQUIRE(result.has_value());
-    CHECK(*result == "example.com");
+    if (result)
+        CHECK(*result == "example.com");
 }
 
 TEST_CASE("Request - header access - missing header returns nullopt", "[http][request]")
@@ -144,9 +148,12 @@ TEST_CASE("Request - header access - lookup is case-insensitive", "[http][reques
     REQUIRE(r1.has_value());
     REQUIRE(r2.has_value());
     REQUIRE(r3.has_value());
-    CHECK(*r1 == "application/json");
-    CHECK(*r2 == "application/json");
-    CHECK(*r3 == "application/json");
+    if (r1)
+        CHECK(*r1 == "application/json");
+    if (r2)
+        CHECK(*r2 == "application/json");
+    if (r3)
+        CHECK(*r3 == "application/json");
 }
 
 // =============================================================================
@@ -166,7 +173,8 @@ TEST_CASE("Request - param<int> - happy path converts correctly", "[http][reques
     auto result = req.param<int>("id");
 
     REQUIRE(result.has_value());
-    CHECK(*result == 42);
+    if (result)
+        CHECK(*result == 42);
 }
 
 TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][request]")
@@ -184,7 +192,8 @@ TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][req
 
     auto result = req.param<std::string_view>("token");
     REQUIRE(result.has_value());
-    CHECK(*result == "abcdefghijklmnopqrstuvwxyz012345");
+    if (result)
+        CHECK(*result == "abcdefghijklmnopqrstuvwxyz012345");
 
     // Zero-copy verification: the string_view data pointer must equal the
     // address of the string stored inside the params map in Impl.
@@ -235,7 +244,7 @@ TEST_CASE("Request - body() - returns correct span into owned buffer", "[http][r
     // body() returns the span stored in ParsedRequest::body, which is a span
     // into the parser's chunk_buf (not into our owned buffer). For the test we
     // use a static array as a stand-in chunk_buf.
-    static const std::byte body_data[]{std::byte{'h'}, std::byte{'i'}};
+    static const std::array<std::byte, 2> body_data{std::byte{'h'}, std::byte{'i'}};
 
     aevox::detail::ParsedRequest pr;
     pr.method = "POST";
@@ -342,7 +351,8 @@ TEST_CASE("Request - context store - set and get roundtrip typed value", "[http]
     auto val = req.get<std::string>("auth.user");
 
     REQUIRE(val.has_value());
-    CHECK(*val == "alice");
+    if (val)
+        CHECK(*val == "alice");
 }
 
 TEST_CASE("Request - context store - get returns nullopt for absent key", "[http][request]")
@@ -423,7 +433,8 @@ TEST_CASE("Response - json(string) sets Content-Type application/json", "[http][
     // Verify Content-Type header via public get_header() accessor.
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "application/json");
+    if (ct)
+        CHECK(*ct == "application/json");
 }
 
 TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][response]")
@@ -440,7 +451,8 @@ TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][respons
     // Verify Content-Type header via public get_header() accessor.
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "application/json");
+    if (ct)
+        CHECK(*ct == "application/json");
 }
 
 // =============================================================================
@@ -456,7 +468,8 @@ TEST_CASE("Response - content_type() fluent lvalue overload modifies in place", 
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "text/html");
+    if (ct)
+        CHECK(*ct == "text/html");
 }
 
 TEST_CASE("Response - content_type() fluent rvalue overload chains on temporary",
@@ -469,7 +482,8 @@ TEST_CASE("Response - content_type() fluent rvalue overload chains on temporary"
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "text/html");
+    if (ct)
+        CHECK(*ct == "text/html");
 }
 
 TEST_CASE("Response - header() fluent lvalue overload sets header", "[http][response]")
@@ -481,7 +495,8 @@ TEST_CASE("Response - header() fluent lvalue overload sets header", "[http][resp
 
     auto val = res.get_header("X-Request-Id");
     REQUIRE(val.has_value());
-    CHECK(*val == "abc-123");
+    if (val)
+        CHECK(*val == "abc-123");
 }
 
 // =============================================================================
@@ -494,7 +509,10 @@ TEST_CASE("Response - move semantics - moved-from Response is valid but empty", 
     REQUIRE(original.status_code() == 200);
     REQUIRE(original.body_view() == "hello world");
 
-    // Move construct.
+    // Capture address before move so we can verify the moved-from invariant
+    // without accessing the named moved-from variable directly.
+    auto* const original_ptr = std::addressof(original);
+
     auto moved = std::move(original);
 
     // Moved-into has the original values.
@@ -502,8 +520,8 @@ TEST_CASE("Response - move semantics - moved-from Response is valid but empty", 
     CHECK(moved.body_view() == "hello world");
 
     // Moved-from is valid but empty (status_code() == 0, body empty).
-    CHECK(original.status_code() == 0);
-    CHECK(original.body_view().empty());
+    CHECK(original_ptr->status_code() == 0);
+    CHECK(original_ptr->body_view().empty());
 }
 
 // =============================================================================
@@ -519,5 +537,6 @@ TEST_CASE("Response - stream() returns status 200 with given content type", "[ht
 
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
-    CHECK(*ct == "text/event-stream");
+    if (ct)
+        CHECK(*ct == "text/event-stream");
 }

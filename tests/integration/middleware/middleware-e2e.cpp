@@ -25,39 +25,46 @@ using namespace std::chrono_literals;
 // Helpers — identical pattern to tests/integration/router/router-e2e.cpp
 // =============================================================================
 
+namespace {
+
 /// Returns an available ephemeral port.
-static std::uint16_t free_port()
+std::uint16_t free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
 /// Sends `request_str` over a loopback TCP connection and returns the full response.
-static std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
+std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = s.connect(ep, ec);
     if (ec)
         return {};
-    asio::write(s, asio::buffer(request_str.data(), request_str.size()), ec);
-    if (ec)
+    std::size_t const bytes_sent =
+        asio::write(s, asio::buffer(request_str.data(), request_str.size()), ec);
+    if (ec || bytes_sent != request_str.size())
         return {};
 
-    std::string     response;
-    asio::streambuf buf;
-    asio::read(s, buf, asio::transfer_at_least(1), ec);
-    response = std::string{asio::buffers_begin(buf.data()), asio::buffers_end(buf.data())};
+    std::string       response;
+    asio::streambuf   buf;
+    std::size_t const bytes_received = asio::read(s, buf, asio::transfer_at_least(1), ec);
+    response.assign(asio::buffers_begin(buf.data()),
+                    asio::buffers_begin(buf.data()) + static_cast<std::ptrdiff_t>(bytes_received));
     return response;
 }
 
 /// Minimal HTTP/1.0 GET (Connection: close so server closes after reply).
-static std::string http_get(std::uint16_t port, std::string_view path)
+std::string http_get(std::uint16_t port, std::string_view path)
 {
     return http_roundtrip(port, std::format("GET {} HTTP/1.0\r\nHost: localhost\r\n\r\n", path));
 }
+
+} // namespace
 
 // =============================================================================
 // TestServer — starts App in a background thread, stops on destruction.
@@ -83,6 +90,11 @@ struct TestServer
         app.stop();
     }
 
+    TestServer(const TestServer&)            = delete;
+    TestServer& operator=(const TestServer&) = delete;
+    TestServer(TestServer&&)                 = delete;
+    TestServer& operator=(TestServer&&)      = delete;
+
     aevox::App    app{aevox::AppConfig{.executor = {.thread_count = 2, .drain_timeout = 2s}}};
     std::uint16_t port;
     std::latch    ready{1};
@@ -95,8 +107,8 @@ struct TestServer
 
 TEST_CASE("global middleware adds response header", "[middleware][integration]")
 {
-    const auto port = free_port();
-    TestServer server{
+    const auto       port = free_port();
+    TestServer const server{
         port, [](aevox::App& app) {
             app.use([](aevox::Request&                                                        req,
                        std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)> next)
@@ -116,8 +128,8 @@ TEST_CASE("global middleware adds response header", "[middleware][integration]")
 TEST_CASE("scoped middleware runs on matching prefix, not on non-matching path",
           "[middleware][integration]")
 {
-    const auto port = free_port();
-    TestServer server{
+    const auto       port = free_port();
+    TestServer const server{
         port, [](aevox::App& app) {
             app.use("/api",
                     [](aevox::Request&                                                        req,
@@ -144,8 +156,8 @@ TEST_CASE("scoped middleware runs on matching prefix, not on non-matching path",
 
 TEST_CASE("middleware can short-circuit and return 401", "[middleware][integration]")
 {
-    const auto port = free_port();
-    TestServer server{
+    const auto       port = free_port();
+    TestServer const server{
         port, [](aevox::App& app) {
             app.use(
                 [](aevox::Request& /*req*/,
@@ -167,17 +179,17 @@ TEST_CASE("global runs before scoped - execution order", "[middleware][integrati
     // Global appends "global"; scoped on /api appends "scoped".
     // The resulting header value must be "global,scoped" — proving global is outermost.
 
-    const auto port = free_port();
-    TestServer server{
+    const auto       port = free_port();
+    TestServer const server{
         port, [](aevox::App& app) {
             // Global middleware: runs outermost (first pre, last post)
             app.use([](aevox::Request&                                                        req,
                        std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)> next)
                         -> aevox::Task<aevox::Response> {
-                auto        res      = co_await next(req);
-                auto        existing = res.get_header("X-Order");
-                std::string val      = existing ? std::string(*existing) + ",global" : "global";
-                res                  = std::move(res).header("X-Order", val);
+                auto              res      = co_await next(req);
+                auto              existing = res.get_header("X-Order");
+                std::string const val = existing ? std::string(*existing) + ",global" : "global";
+                res                   = std::move(res).header("X-Order", val);
                 co_return res;
             });
 
@@ -186,10 +198,11 @@ TEST_CASE("global runs before scoped - execution order", "[middleware][integrati
                     [](aevox::Request&                                                        req,
                        std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)> next)
                         -> aevox::Task<aevox::Response> {
-                        auto        res      = co_await next(req);
-                        auto        existing = res.get_header("X-Order");
-                        std::string val = existing ? std::string(*existing) + ",scoped" : "scoped";
-                        res             = std::move(res).header("X-Order", val);
+                        auto              res      = co_await next(req);
+                        auto              existing = res.get_header("X-Order");
+                        std::string const val =
+                            existing ? std::string(*existing) + ",scoped" : "scoped";
+                        res = std::move(res).header("X-Order", val);
                         co_return res;
                     });
 

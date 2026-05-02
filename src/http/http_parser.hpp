@@ -41,7 +41,7 @@ namespace aevox::detail {
 constexpr std::size_t kParserDefaultMaxHeaderCount{100};
 // Default maximum body size for the parser's safety net (1 MiB).
 // Overridden per-connection from AppConfig::max_body_size.
-constexpr std::size_t kParserDefaultMaxBodyBytes{1u * 1024u * 1024u};
+constexpr std::size_t kParserDefaultMaxBodyBytes{static_cast<std::size_t>(1u * 1024u * 1024u)};
 
 // =============================================================================
 // ParseError

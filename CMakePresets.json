@@ -83,6 +83,14 @@
       }
     },
     {
+      "name": "release",
+      "configurePreset": "release",
+      "output": { "outputOnFailure": true },
+      "filter": {
+        "exclude": { "label": "bench" }
+      }
+    },
+    {
       "name": "bench",
       "configurePreset": "release",
       "description": "Run throughput benchmarks only — use release build for accurate numbers",

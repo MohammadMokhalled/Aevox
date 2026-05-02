@@ -12,6 +12,7 @@
 
 #include "toml_loader.hpp"
 
+#include <array>
 #include <filesystem>
 #include <format>
 #include <iostream>
@@ -22,13 +23,13 @@ namespace aevox::config {
 namespace {
 
 // Known top-level TOML key names. Used to detect unrecognised keys.
-constexpr std::string_view kKnownTopLevelKeys[]{
+constexpr std::array<std::string_view, 8> kKnownTopLevelKeys{
     "port",           "host",     "backlog", "max_body_size", "request_timeout", "max_header_count",
     "max_read_bytes", "executor",
 };
 
 // Known executor-section key names.
-constexpr std::string_view kKnownExecutorKeys[]{
+constexpr std::array<std::string_view, 3> kKnownExecutorKeys{
     "thread_count",
     "cpu_pool_threads",
     "drain_timeout",
@@ -46,7 +47,7 @@ bool is_known_key(std::string_view key, std::span<const std::string_view> known)
 ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
 {
     return ConfigErrorDetail{
-        .code    = ConfigError::invalid_value,
+        .code    = ConfigError::InvalidValue,
         .message = std::format("invalid value for '{}': {}", key, reason),
         .key     = std::string{key},
     };
@@ -61,7 +62,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     // which would be indistinguishable from a TOML syntax error without this check.
     if (!std::filesystem::exists(std::filesystem::path{path})) {
         return std::unexpected(ConfigErrorDetail{
-            .code    = ConfigError::file_not_found,
+            .code    = ConfigError::FileNotFound,
             .message = std::format("config file not found: '{}'", path),
             .key     = {},
         });
@@ -73,14 +74,14 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     }
     catch (const toml::parse_error& e) {
         return std::unexpected(ConfigErrorDetail{
-            .code    = ConfigError::parse_error,
+            .code    = ConfigError::ParseError,
             .message = std::format("TOML parse error in '{}': {}", path, e.description()),
             .key     = {},
         });
     }
     catch (...) {
         return std::unexpected(ConfigErrorDetail{
-            .code    = ConfigError::parse_error,
+            .code    = ConfigError::ParseError,
             .message = std::format("could not read config file '{}'", path),
             .key     = {},
         });
@@ -162,7 +163,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
         const auto* ex = ex_node->as_table();
         if (!ex)
             return std::unexpected(ConfigErrorDetail{
-                .code    = ConfigError::invalid_value,
+                .code    = ConfigError::InvalidValue,
                 .message = "'executor' must be a TOML table section",
                 .key     = "executor",
             });

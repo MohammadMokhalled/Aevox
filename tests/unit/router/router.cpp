@@ -27,7 +27,9 @@
 // Test helpers
 // =============================================================================
 
-static std::vector<std::byte> make_buffer(std::string_view s)
+namespace {
+
+std::vector<std::byte> make_buffer(std::string_view s)
 {
     std::vector<std::byte> buf(s.size());
     std::memcpy(buf.data(), s.data(), s.size());
@@ -35,7 +37,7 @@ static std::vector<std::byte> make_buffer(std::string_view s)
 }
 
 /// Builds a minimal Request for the given method and path.
-static aevox::Request make_test_request(aevox::HttpMethod method, std::string_view path)
+aevox::Request make_test_request(aevox::HttpMethod method, std::string_view path)
 {
     aevox::detail::ParsedRequest pr;
     pr.method     = aevox::to_string(method);
@@ -43,8 +45,13 @@ static aevox::Request make_test_request(aevox::HttpMethod method, std::string_vi
     pr.keep_alive = true;
 
     // Buffer must own the strings that ParsedRequest views point into.
-    std::string raw = std::string{pr.method} + " " + std::string{path} + " HTTP/1.1\r\n\r\n";
-    auto        buf = make_buffer(raw);
+    std::string raw;
+    raw.reserve(pr.method.size() + 1 + path.size() + 11);
+    raw += pr.method;
+    raw += ' ';
+    raw += path;
+    raw += " HTTP/1.1\r\n\r\n";
+    auto buf = make_buffer(raw);
 
     // Build via the internal factory. Recalculate views into buf.
     aevox::detail::ParsedRequest pr2;
@@ -58,12 +65,14 @@ static aevox::Request make_test_request(aevox::HttpMethod method, std::string_vi
 }
 
 /// Drives a lazy Task<T> to completion synchronously (no event loop).
-template <typename T> static T drive_task(aevox::Task<T> task)
+template <typename T> T drive_task(aevox::Task<T> task)
 {
     auto inner = task.await_suspend(std::noop_coroutine());
     inner.resume();
     return task.await_resume();
 }
+
+} // namespace
 
 // =============================================================================
 // Static path matching
@@ -113,8 +122,9 @@ TEST_CASE("Router - named parameter extraction", "[router]")
     SECTION("string param is extracted")
     {
         aevox::Router r;
-        r.get("/users/{name}",
-              [](aevox::Request& /*req*/, std::string name) { return aevox::Response::ok(name); });
+        r.get("/users/{name}", [](aevox::Request& /*req*/, const std::string& name) {
+            return aevox::Response::ok(name);
+        });
 
         auto req  = make_test_request(aevox::HttpMethod::GET, "/users/alice");
         auto resp = drive_task(r.dispatch(req));
@@ -148,8 +158,13 @@ TEST_CASE("Router - named parameter extraction", "[router]")
     SECTION("two params extracted left-to-right")
     {
         aevox::Router r;
-        r.get("/a/{x}/b/{y}", [](aevox::Request&, std::string x, std::string y) {
-            return aevox::Response::ok(x + "+" + y);
+        r.get("/a/{x}/b/{y}", [](aevox::Request&, const std::string& x, const std::string& y) {
+            std::string body;
+            body.reserve(x.size() + 1 + y.size());
+            body += x;
+            body += '+';
+            body += y;
+            return aevox::Response::ok(body);
         });
 
         auto req  = make_test_request(aevox::HttpMethod::GET, "/a/foo/b/bar");
@@ -169,7 +184,7 @@ TEST_CASE("Router - wildcard capture", "[router]")
     {
         aevox::Router r;
         r.get("/files/{path...}",
-              [](aevox::Request&, std::string p) { return aevox::Response::ok(p); });
+              [](aevox::Request&, const std::string& p) { return aevox::Response::ok(p); });
 
         auto req  = make_test_request(aevox::HttpMethod::GET, "/files/a/b/c");
         auto resp = drive_task(r.dispatch(req));
@@ -181,7 +196,7 @@ TEST_CASE("Router - wildcard capture", "[router]")
     {
         aevox::Router r;
         r.get("/files/{path...}",
-              [](aevox::Request&, std::string p) { return aevox::Response::ok(p); });
+              [](aevox::Request&, const std::string& p) { return aevox::Response::ok(p); });
 
         auto req  = make_test_request(aevox::HttpMethod::GET, "/files/readme.txt");
         auto resp = drive_task(r.dispatch(req));
@@ -193,7 +208,7 @@ TEST_CASE("Router - wildcard capture", "[router]")
     {
         aevox::Router r;
         r.get("/files/{path...}",
-              [](aevox::Request&, std::string p) { return aevox::Response::ok(p); });
+              [](aevox::Request&, const std::string& p) { return aevox::Response::ok(p); });
 
         auto req  = make_test_request(aevox::HttpMethod::GET, "/other/readme.txt");
         auto resp = drive_task(r.dispatch(req));
@@ -235,7 +250,7 @@ TEST_CASE("Router - handler invocation", "[router]")
     {
         aevox::Router r;
         r.get("/echo/{name}",
-              [](aevox::Request&, std::string name) { return aevox::Response::ok(name); });
+              [](aevox::Request&, const std::string& name) { return aevox::Response::ok(name); });
 
         auto req  = make_test_request(aevox::HttpMethod::GET, "/echo/world");
         auto resp = drive_task(r.dispatch(req));
@@ -246,7 +261,7 @@ TEST_CASE("Router - handler invocation", "[router]")
     SECTION("sync arity-2 (string, int) handler")
     {
         aevox::Router r;
-        r.get("/repo/{owner}/{num:int}", [](aevox::Request&, std::string owner, int num) {
+        r.get("/repo/{owner}/{num:int}", [](aevox::Request&, const std::string& owner, int num) {
             return aevox::Response::ok(owner + "/" + std::to_string(num));
         });
 
@@ -283,7 +298,8 @@ TEST_CASE("Router - method not allowed", "[router]")
         REQUIRE(resp.status_code() == 405);
         auto allow = resp.get_header("Allow");
         REQUIRE(allow.has_value());
-        REQUIRE(allow->find("GET") != std::string_view::npos);
+        auto const pos = allow ? allow->find("GET") : std::string_view::npos;
+        REQUIRE(pos != std::string_view::npos);
     }
 }
 
@@ -365,8 +381,9 @@ TEST_CASE("Router - match priority", "[router]")
     {
         aevox::Router r;
         r.get("/users/me", [](aevox::Request&) { return aevox::Response::ok("me"); });
-        r.get("/users/{id}",
-              [](aevox::Request&, std::string id) { return aevox::Response::ok("id:" + id); });
+        r.get("/users/{id}", [](aevox::Request&, const std::string& id) {
+            return aevox::Response::ok("id:" + id);
+        });
 
         auto req_me  = make_test_request(aevox::HttpMethod::GET, "/users/me");
         auto resp_me = drive_task(r.dispatch(req_me));
@@ -382,9 +399,10 @@ TEST_CASE("Router - match priority", "[router]")
     SECTION("param takes priority over wildcard at same level")
     {
         aevox::Router r;
-        r.get("/a/{id}",
-              [](aevox::Request&, std::string id) { return aevox::Response::ok("param:" + id); });
-        r.get("/a/{rest...}", [](aevox::Request&, std::string rest) {
+        r.get("/a/{id}", [](aevox::Request&, const std::string& id) {
+            return aevox::Response::ok("param:" + id);
+        });
+        r.get("/a/{rest...}", [](aevox::Request&, const std::string& rest) {
             return aevox::Response::ok("wild:" + rest);
         });
 

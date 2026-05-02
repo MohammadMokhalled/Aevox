@@ -25,24 +25,27 @@ using namespace std::chrono_literals;
 // Test infrastructure
 // ---------------------------------------------------------------------------
 
-static aevox::ExecutorConfig unit_config()
+namespace {
+
+aevox::ExecutorConfig unit_config()
 {
     return {.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 2s};
 }
 
-static std::uint16_t find_free_port()
+std::uint16_t find_free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
-static void tcp_connect(std::uint16_t port)
+void tcp_connect(std::uint16_t port)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = s.connect(ep, ec);
 }
 
 // Runs a test handler as a connection handler and blocks until it completes.
@@ -56,7 +59,7 @@ template <typename HandlerFn> void run_single(HandlerFn&& handler_fn)
     auto result = ex->listen(port, std::forward<HandlerFn>(handler_fn));
     REQUIRE(result.has_value());
 
-    std::jthread stopper{[&ex, port] {
+    std::jthread const stopper{[&ex, port] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port);
         // Give the handler time to complete before stopping.
@@ -67,6 +70,8 @@ template <typename HandlerFn> void run_single(HandlerFn&& handler_fn)
     auto run_result = ex->run();
     REQUIRE(run_result.has_value());
 }
+
+} // namespace
 
 // =============================================================================
 // pool() tests
@@ -126,7 +131,7 @@ TEST_CASE("pool() - exception inside fn propagates to co_await site", "[executor
         });
     REQUIRE(listen_result.has_value());
 
-    std::jthread stopper{[&ex, port] {
+    std::jthread const stopper{[&ex, port] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port);
         std::this_thread::sleep_for(300ms);
@@ -176,7 +181,7 @@ TEST_CASE("sleep() - other coroutines can run while sleeping", "[executor][sleep
     REQUIRE(lr.has_value());
 
     // Connect twice from the stopper thread.
-    std::jthread stopper{[&ex, port, &both_started] {
+    std::jthread const stopper{[&ex, port, &both_started] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port); // triggers handler 1
         tcp_connect(port); // triggers handler 2 (also sleeping)
@@ -213,7 +218,7 @@ TEST_CASE("when_all() - two tasks return correct results in declaration order",
     });
 
     REQUIRE(int_result == 7);
-    REQUIRE(double_result == 3.14); // NOLINT(cppcoreguidelines-avoid-magic-numbers)
+    REQUIRE(double_result == 3.14);
 }
 
 TEST_CASE("when_all() - tasks run concurrently, not sequentially", "[executor][when_all]")
@@ -276,7 +281,7 @@ TEST_CASE("when_all() - first exception propagates, others complete", "[executor
     });
     REQUIRE(lr.has_value());
 
-    std::jthread stopper{[&ex, port] {
+    std::jthread const stopper{[&ex, port] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port);
         std::this_thread::sleep_for(200ms);
@@ -345,11 +350,16 @@ TEST_CASE("Task<T> - basic coroutine mechanics", "[executor][task]")
             auto             make     = []() -> aevox::Task<int> { co_return 99; };
             aevox::Task<int> original = make();
 
-            original_valid_before  = original.valid();
-            aevox::Task<int> moved = std::move(original);
-            original_valid_after   = original.valid();
-            moved_valid            = moved.valid();
-            result                 = co_await moved;
+            original_valid_before = original.valid();
+            // Capture address before move to check moved-from invariant via pointer.
+            auto* const      original_ptr = std::addressof(original);
+            aevox::Task<int> moved        = std::move(original);
+            original_valid_after          = original_ptr->valid();
+            // Pass moved by non-const ref: unambiguous non-const use that satisfies
+            // misc-const-correctness. clang-tidy does not model co_await as requiring
+            // non-const access to the awaitable, so the explicit ref arg is needed.
+            moved_valid = [](aevox::Task<int>& t) noexcept { return t.valid(); }(moved);
+            result      = co_await moved;
             co_return;
         });
 
@@ -389,7 +399,7 @@ TEST_CASE("ExecutorConfig - cpu_pool_threads respected", "[executor][config]")
     // When cpu_pool_threads > 0, pool() callable runs on a DIFFERENT thread than I/O.
     // When cpu_pool_threads == 0, pool() posts to I/O pool — may be same or different thread.
     // This test verifies cpu_pool_threads=2 gives a distinct CPU thread ID.
-    aevox::ExecutorConfig cfg{.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 2s};
+    aevox::ExecutorConfig const cfg{.thread_count = 2, .cpu_pool_threads = 2, .drain_timeout = 2s};
 
     std::thread::id io_id{};
     std::thread::id cpu_id{};
@@ -404,7 +414,7 @@ TEST_CASE("ExecutorConfig - cpu_pool_threads respected", "[executor][config]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread stopper{[&ex, port] {
+    std::jthread const stopper{[&ex, port] {
         std::this_thread::sleep_for(10ms);
         tcp_connect(port);
         std::this_thread::sleep_for(200ms);

@@ -1,56 +1,28 @@
 #!/usr/bin/env bash
-
+# scripts/tidy.sh
+#
+# Run clang-tidy-21 over all source files using run-clang-tidy-21.
+# Mirrors the CI tidy job exactly so local results match what the PR
+# pipeline reports.
+#
+# Prerequisites:
+#   - clang-tidy-21 installed (sudo apt-get install clang-tidy-21)
+#   - project configured with the default preset:
+#       cmake --preset default
+#
+# Usage: bash scripts/tidy.sh
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
-JOBS="$(nproc 2>/dev/null || echo 1)"
-BUILD_DIR="$PROJECT_ROOT/build/debug"
-
-for arg in "$@"; do
-    case "$arg" in
-        -j[0-9]*)  JOBS="${arg#-j}" ;;
-        --jobs=*)  JOBS="${arg#--jobs=}" ;;
-        *)         BUILD_DIR="$arg" ;;
-    esac
-done
-
-if [ ! -f "$BUILD_DIR/compile_commands.json" ]; then
-    echo "Error: compile_commands.json not found in $BUILD_DIR"
-    echo "Configure first, e.g.: cmake --preset default"
+if [ ! -f "build/debug/compile_commands.json" ]; then
+    echo "Error: build/debug/compile_commands.json not found." >&2
+    echo "Configure first: cmake --preset default" >&2
     exit 1
 fi
 
-if ! command -v clang-tidy >/dev/null 2>&1; then
-    echo "Error: clang-tidy not found in PATH"
+if ! command -v run-clang-tidy-21 >/dev/null 2>&1; then
+    echo "Error: run-clang-tidy-21 not found in PATH." >&2
+    echo "Install with: sudo apt-get install clang-tidy-21" >&2
     exit 1
 fi
 
-if ! command -v g++ >/dev/null 2>&1; then
-    echo "Error: g++ not found in PATH"
-    exit 1
-fi
-
-# clang-tidy on some setups misses GCC internal C headers (e.g. stddef.h).
-GCC_INTERNAL_INCLUDE="$(g++ -print-file-name=include)"
-
-mapfile -t FILES < <(grep -oE '"file"[[:space:]]*:[[:space:]]*"[^"]+"' \
-    "$BUILD_DIR/compile_commands.json" \
-    | sed -E 's/.*"file"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/' \
-    | sort -u)
-
-if [ "${#FILES[@]}" -eq 0 ]; then
-    echo "Error: no files found in $BUILD_DIR/compile_commands.json"
-    exit 1
-fi
-
-echo "Running clang-tidy on ${#FILES[@]} translation units (jobs: $JOBS, build: $BUILD_DIR)"
-
-printf '%s\n' "${FILES[@]}" | xargs -P"$JOBS" -I{} \
-    clang-tidy {} \
-    -p "$BUILD_DIR" \
-    --config-file="$PROJECT_ROOT/.clang-tidy" \
-    --extra-arg=-isystem"$GCC_INTERNAL_INCLUDE"
-
-echo "Done."
+run-clang-tidy-21 -p build/debug

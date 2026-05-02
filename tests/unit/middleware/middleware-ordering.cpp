@@ -43,8 +43,8 @@ static aevox::Request make_test_request(aevox::HttpMethod method, std::string_vi
     pr.target     = path;
     pr.keep_alive = true;
 
-    std::string raw = std::string{pr.method} + " " + std::string{path} + " HTTP/1.1\r\n\r\n";
-    auto        buf = make_buffer(raw);
+    std::string const raw = std::string{pr.method} + " " + std::string{path} + " HTTP/1.1\r\n\r\n";
+    auto              buf = make_buffer(raw);
 
     aevox::detail::ParsedRequest pr2;
     pr2.method = std::string_view{reinterpret_cast<const char*>(buf.data()), pr.method.size()};
@@ -93,7 +93,7 @@ auto short_circuit_middleware(std::vector<std::string>& log)
     return [&log](aevox::Request& /*req*/,
                   std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)> /*next*/)
                -> aevox::Task<aevox::Response> {
-        log.push_back("short_circuit");
+        log.emplace_back("short_circuit");
         co_return aevox::Response::unauthorized("Unauthorized");
     };
 }
@@ -131,7 +131,7 @@ TEST_CASE("Middleware: single middleware runs before handler", "[middleware]")
         auto req = make_test_request(aevox::HttpMethod::GET, "/test");
 
         auto handler = [&log](aevox::Request& /*req*/) -> aevox::Task<aevox::Response> {
-            log.push_back("handler");
+            log.emplace_back("handler");
             co_return aevox::Response::ok("OK");
         };
 
@@ -157,7 +157,7 @@ TEST_CASE("Middleware: short-circuit middleware stops request", "[middleware]")
         auto req = make_test_request(aevox::HttpMethod::GET, "/test");
 
         auto handler = [&log](aevox::Request& /*req*/) -> aevox::Task<aevox::Response> {
-            log.push_back("handler");
+            log.emplace_back("handler");
             co_return aevox::Response::ok("OK");
         };
 
@@ -203,7 +203,7 @@ TEST_CASE("Middleware: zero overhead when no middleware registered", "[middlewar
         auto req = make_test_request(aevox::HttpMethod::GET, "/test");
 
         auto handler = [&log](aevox::Request& /*req*/) -> aevox::Task<aevox::Response> {
-            log.push_back("handler");
+            log.emplace_back("handler");
             co_return aevox::Response::ok("OK");
         };
 
@@ -228,7 +228,7 @@ TEST_CASE("Middleware pipeline - onion ordering with three middlewares", "[middl
 
     // Innermost: the route handler.
     NextFn chain = [&log](aevox::Request& /*r*/) -> aevox::Task<aevox::Response> {
-        log.push_back("handler");
+        log.emplace_back("handler");
         co_return aevox::Response::ok("OK");
     };
 
@@ -323,7 +323,7 @@ TEST_CASE("Middleware pipeline - middleware that does not call next returns its 
 
     // Innermost: handler (must not be reached)
     NextFn chain = [&log](aevox::Request& /*r*/) -> aevox::Task<aevox::Response> {
-        log.push_back("handler");
+        log.emplace_back("handler");
         co_return aevox::Response::ok("OK");
     };
 

@@ -11,11 +11,11 @@ namespace aevox {
 std::string_view to_string(ConfigError e) noexcept
 {
     switch (e) {
-        case ConfigError::file_not_found:
+        case ConfigError::FileNotFound:
             return "file not found";
-        case ConfigError::parse_error:
+        case ConfigError::ParseError:
             return "TOML parse error";
-        case ConfigError::invalid_value:
+        case ConfigError::InvalidValue:
             return "invalid field value";
     }
     return "unknown config error";

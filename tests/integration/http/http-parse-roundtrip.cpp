@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstring>
@@ -27,36 +28,45 @@ using namespace std::chrono_literals;
 // Helpers
 // ---------------------------------------------------------------------------
 
-static aevox::ExecutorConfig make_cfg()
+namespace {
+
+aevox::ExecutorConfig make_cfg()
 {
     return {.thread_count = 2, .drain_timeout = 3s};
 }
 
-static std::uint16_t free_port()
+std::uint16_t free_port()
 {
-    asio::io_context        ioc;
-    asio::ip::tcp::acceptor a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
 }
 
-static void tcp_send(std::uint16_t port, std::string_view data)
+void tcp_send(std::uint16_t port, std::string_view data)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
-    if (!ec)
-        asio::write(s, asio::buffer(data.data(), data.size()), ec);
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = s.connect(ep, ec);
+    if (!ec) {
+        std::size_t const bytes_sent = asio::write(s, asio::buffer(data.data(), data.size()), ec);
+        if (!ec && bytes_sent != data.size())
+            ec = asio::error::eof;
+    }
 }
 
-static void tcp_connect_close(std::uint16_t port)
+void tcp_connect_close(std::uint16_t port)
 {
     asio::io_context      ioc;
     asio::ip::tcp::socket s{ioc};
     asio::error_code      ec;
-    s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = s.connect(ep, ec);
     // Close immediately — no data sent.
 }
+
+} // namespace
 
 // ==============================================================================
 
@@ -89,7 +99,7 @@ TEST_CASE("GET request roundtrip via loopback", "[integration][http]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port, &done] {
+    std::jthread const driver{[&ex, port, &done] {
         std::this_thread::sleep_for(10ms);
         tcp_send(port, "GET /hello HTTP/1.1\r\nHost: localhost\r\n\r\n");
         done.wait();
@@ -134,7 +144,7 @@ TEST_CASE("POST with body roundtrip via loopback", "[integration][http]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port, &done] {
+    std::jthread const driver{[&ex, port, &done] {
         std::this_thread::sleep_for(10ms);
         tcp_send(port, "POST /data HTTP/1.1\r\n"
                        "Host: localhost\r\n"
@@ -158,9 +168,9 @@ TEST_CASE("pipelined keep-alive requests", "[integration][http]")
     // Requests are sent sequentially so each arrives in its own read() call,
     // avoiding the need to track byte offsets across pipelined buffers.
 
-    std::atomic<int> request_count{0};
-    std::string      targets[2];
-    std::latch       done{1};
+    std::atomic<int>           request_count{0};
+    std::array<std::string, 2> targets{};
+    std::latch                 done{1};
 
     auto ex   = aevox::make_executor(make_cfg());
     auto port = free_port();
@@ -177,9 +187,9 @@ TEST_CASE("pipelined keep-alive requests", "[integration][http]")
             accumulator.insert(accumulator.end(), data->begin(), data->end());
             auto res = parser.feed(std::span{accumulator});
             if (res.has_value()) {
-                int idx = request_count.fetch_add(1);
+                int const idx = request_count.fetch_add(1);
                 if (idx < 2)
-                    targets[idx] = std::string{res->target};
+                    targets.at(static_cast<std::size_t>(idx)) = std::string{res->target};
                 accumulator.clear();
                 parser.reset();
                 if (request_count.load() >= 2) {
@@ -194,19 +204,22 @@ TEST_CASE("pipelined keep-alive requests", "[integration][http]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port, &done] {
+    std::jthread const driver{[&ex, port, &done] {
         asio::io_context      ioc;
         asio::ip::tcp::socket s{ioc};
         asio::error_code      ec;
-        s.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+        auto const            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+        ec                       = s.connect(ep, ec);
         REQUIRE_FALSE(ec);
 
         // Send first request, then second on the same connection.
-        std::string_view req1 = "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n";
-        std::string_view req2 = "GET /second HTTP/1.1\r\nHost: localhost\r\n\r\n";
-        asio::write(s, asio::buffer(req1.data(), req1.size()), ec);
+        std::string_view const req1   = "GET /first HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        std::string_view const req2   = "GET /second HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        std::size_t const      bytes1 = asio::write(s, asio::buffer(req1.data(), req1.size()), ec);
+        REQUIRE(bytes1 == req1.size());
         std::this_thread::sleep_for(10ms); // let server process req1 first
-        asio::write(s, asio::buffer(req2.data(), req2.size()), ec);
+        std::size_t const bytes2 = asio::write(s, asio::buffer(req2.data(), req2.size()), ec);
+        REQUIRE(bytes2 == req2.size());
 
         done.wait();
         ex->stop();
@@ -251,7 +264,7 @@ TEST_CASE("malformed request - 400 path", "[integration][http]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port, &done] {
+    std::jthread const driver{[&ex, port, &done] {
         std::this_thread::sleep_for(10ms);
         tcp_send(port, "GARBAGE BYTES NOT HTTP AT ALL\r\n\r\n");
         done.wait();
@@ -282,7 +295,7 @@ TEST_CASE("connection EOF mid-request", "[integration][http]")
     });
     REQUIRE(lr.has_value());
 
-    std::jthread driver{[&ex, port, &done] {
+    std::jthread const driver{[&ex, port, &done] {
         std::this_thread::sleep_for(10ms);
         tcp_connect_close(port); // connect then immediately close — EOF
         done.wait();

@@ -1,6 +1,6 @@
 # Aevox
 
-[![CI](https://github.com/MohammadMokhalled/Aevox/actions/workflows/ci.yml/badge.svg)](https://github.com/MohammadMokhalled/Aevox/actions/workflows/ci.yml)
+[![CI](https://github.com/MohammadMokhalled/Aevox/actions/workflows/main.yml/badge.svg)](https://github.com/MohammadMokhalled/Aevox/actions/workflows/main.yml)
 
 A high-performance C++23 web framework targeting 1M+ HTTP/1.1 requests/second on commodity hardware.
 
