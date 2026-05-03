@@ -20,14 +20,17 @@
 #include <aevox/executor.hpp>
 #include <aevox/middleware.hpp>
 #include <aevox/router.hpp>
+#include <aevox/websocket_handler.hpp>
 
 #include <array>
 #include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
+#include "net/topic_bus.hpp"
 #include "router/handler_wrap.hpp"
 
 namespace aevox {
@@ -130,6 +133,14 @@ struct App::Impl
     std::unique_ptr<Executor>          executor;
     std::vector<Middleware>            global_middlewares;
     std::vector<ScopedMiddlewareEntry> scoped_middlewares;
+
+    // WebSocket route handlers: keyed by path pattern.
+    // App::ws() stores handlers here and registers an internal GET handler on the router.
+    std::unordered_map<std::string, aevox::WebSocketHandler> ws_handlers;
+
+    // In-process pub/sub topic bus — one instance per App.
+    // Initialized at construction; its lifetime is tied to App::Impl.
+    aevox::net::TopicBus topic_bus;
 };
 
 } // namespace aevox

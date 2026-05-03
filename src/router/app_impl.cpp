@@ -13,6 +13,7 @@
 #include <aevox/response.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
+#include <aevox/websocket_handler.hpp>
 
 #include <atomic>
 #include <csignal>
@@ -30,6 +31,7 @@
 #include "http/http_parser.hpp"
 #include "http/request_impl.hpp"
 #include "http/response_impl.hpp"
+#include "net/websocket_session.hpp"
 #include "router/router_impl.hpp"
 
 namespace aevox {
@@ -272,9 +274,12 @@ void App::listen(std::uint16_t port)
     auto&             global_mw      = impl_->global_middlewares;
     auto&             scoped_mw      = impl_->scoped_middlewares;
 
-    auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw,
-                               &scoped_mw](std::uint64_t /*conn_id*/,
-                                           TcpStream stream) -> Task<void> {
+    // Capture topic_bus pointer (stable pointer — App::Impl owns it).
+    aevox::net::TopicBus* topic_bus = &impl_->topic_bus;
+
+    auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw, &scoped_mw,
+                               topic_bus](std::uint64_t /*conn_id*/,
+                                          TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
@@ -305,8 +310,23 @@ void App::listen(std::uint16_t port)
             // internal chunk_buf, which is valid until parser.reset().
             auto req = make_request_from_impl(std::move(buf), std::move(*parsed));
 
+            // Set the TcpStream pointer and TopicBus on the Request::Impl so that
+            // upgrade_websocket() can consume the stream.
+            {
+                auto* req_impl        = get_mutable_request_impl(req);
+                req_impl->stream      = &stream;
+                req_impl->topic_bus   = topic_bus;
+                req_impl->max_payload = max_body;
+            }
+
             // Dispatch through the pipeline (fast path handled inside the function).
             auto response = co_await dispatch_with_pipeline(req, router, global_mw, scoped_mw);
+
+            // Status 101 signals a WebSocket upgrade — the connection has been handed
+            // to a WebSocketSession; the stream is no longer ours. Stop the HTTP loop.
+            if (response.status_code() == 101) {
+                co_return;
+            }
 
             // Serialize and write the response.
             auto resp_bytes = serialize_response(response);
@@ -366,6 +386,80 @@ void App::use_impl(std::string_view prefix, Middleware mw)
     if (!impl_)
         return;
     impl_->scoped_middlewares.push_back({std::string(prefix), std::move(mw)});
+}
+
+// =============================================================================
+// App::ws() — WebSocket route registration
+// =============================================================================
+
+void App::ws(std::string_view path_pattern, WebSocketHandler handler)
+{
+    if (!impl_)
+        return;
+
+    // Store the handler under the pattern key.
+    const std::string pattern_key{path_pattern};
+    impl_->ws_handlers[pattern_key] = std::move(handler);
+
+    // Register an internal GET handler on the router that performs the upgrade.
+    // We capture the pattern key and a pointer to App::Impl so the handler can
+    // look up the WebSocketHandler and access the TopicBus.
+    //
+    // Safety: impl_ is owned by this App and outlives all connections.
+    App::Impl* app_impl = impl_.get();
+
+    impl_->router.get(path_pattern,
+                      [app_impl, pattern_key](aevox::Request& req) -> aevox::Task<aevox::Response> {
+                          // Check upgrade headers.
+                          if (!req.is_websocket_upgrade()) {
+                              co_return aevox::Response::bad_request("WebSocket upgrade required");
+                          }
+
+                          // Look up the WebSocket handler by pattern.
+                          auto it = app_impl->ws_handlers.find(pattern_key);
+                          if (it == app_impl->ws_handlers.end()) {
+                              co_return aevox::Response::bad_request("No WebSocket handler found");
+                          }
+
+                          // Set the handler and context on the request impl before upgrade.
+                          auto* req_impl        = aevox::get_mutable_request_impl(req);
+                          req_impl->topic_bus   = &app_impl->topic_bus;
+                          req_impl->max_payload = app_impl->config.max_body_size;
+                          req_impl->ws_handler  = it->second; // copy handler callbacks
+
+                          // Perform the upgrade handshake.
+                          auto ws_result = co_await req.upgrade_websocket();
+                          if (!ws_result) {
+                              co_return aevox::Response::bad_request("WebSocket upgrade failed");
+                          }
+
+                          auto& ws = *ws_result;
+
+                          // Fire on_open — application may call subscribe() here.
+                          it->second.on_open(ws);
+
+                          // Retrieve session from the WebSocket handle.
+                          // We need to start the read loop and wait for close.
+                          // get_websocket_impl() is a friend of WebSocket declared in websocket.hpp
+                          // and defined in src/net/websocket.cpp. It returns the complete
+                          // Impl type (defined in websocket_session.hpp, included above).
+                          // Unqualified call — get_websocket_impl is a friend of WebSocket,
+                          // injected into namespace aevox; ADL on WebSocket& finds it there.
+                          auto* ws_impl = get_websocket_impl(ws);
+                          if (ws_impl && ws_impl->session) {
+                              auto session = ws_impl->session;
+                              session->start_read_loop(session);
+                              // Park the connection coroutine until the session closes.
+                              co_await session->wait_for_close();
+                          }
+
+                          // Return a dummy response — the upgrade has already sent HTTP 101;
+                          // this response is never serialized for WebSocket connections.
+                          // The connection handler must detect the upgrade state and not
+                          // write this response to the socket.
+                          // We use a special status code 101 to signal the upgrade was done.
+                          co_return aevox::Response::switching_protocols();
+                      });
 }
 
 } // namespace aevox

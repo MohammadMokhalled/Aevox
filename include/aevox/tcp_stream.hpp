@@ -188,6 +188,12 @@ private:
     // Only AsioTcpStream (in src/net/) may call the private constructor.
     friend class aevox::net::AsioTcpStream;
 
+    // Internal accessor for WebSocketSession strand construction.
+    // Returns a mutable pointer to TcpStream::Impl for use by internal net/ code.
+    // Resolved to aevox::get_tcp_stream_impl by ADL once the definition is visible
+    // (defined in asio_tcp_stream.cpp / websocket_session.cpp).
+    friend Impl* get_tcp_stream_impl(TcpStream&) noexcept;
+
     // Private constructor: called exclusively by AsioTcpStream::make().
     explicit TcpStream(std::unique_ptr<Impl> impl) noexcept;
 };

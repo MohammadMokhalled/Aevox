@@ -24,6 +24,18 @@ target_include_directories(aevox_router
         ${CMAKE_SOURCE_DIR}/include  # for #include <aevox/router.hpp> etc.
 )
 
+# app_impl.cpp includes net/websocket_session.hpp which uses Asio.
+# Asio is header-only; linking PRIVATE gives the include path without propagating it.
+target_link_libraries(aevox_router
+    PRIVATE asio::asio
+)
+
+target_compile_definitions(aevox_router
+    PRIVATE
+        ASIO_STANDALONE
+        ASIO_NO_DEPRECATED
+)
+
 target_compile_features(aevox_router
     PUBLIC cxx_std_23
 )

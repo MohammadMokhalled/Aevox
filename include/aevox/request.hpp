@@ -19,6 +19,7 @@
 
 #include <aevox/concepts.hpp>
 #include <aevox/task.hpp>
+#include <aevox/websocket_error.hpp>
 
 #include <any>
 #include <cstddef>
@@ -32,6 +33,11 @@
 #include <vector>
 
 namespace aevox {
+
+// Forward declaration — full definition in include/aevox/websocket.hpp.
+// Declared here so that upgrade_websocket() can return WebSocket by value
+// without including the full header (which avoids circular dependency issues).
+class WebSocket;
 
 // =============================================================================
 // HttpMethod
@@ -318,6 +324,56 @@ public:
      * @note   Zero-cost absent case — no exception, no RTTI beyond `std::any`.
      */
     template <typename T> [[nodiscard]] std::optional<T> get(std::string_view key) const;
+
+    // -------------------------------------------------------------------------
+    // WebSocket upgrade
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Returns `true` if this request carries the WebSocket upgrade headers.
+     *
+     * Checks for the presence of all three required headers:
+     * - `Upgrade: websocket` (case-insensitive value)
+     * - `Connection: Upgrade` (case-insensitive value contains "upgrade")
+     * - `Sec-WebSocket-Key` (any non-empty value)
+     *
+     * This predicate is a cheap synchronous check — it performs no I/O.
+     * The full validity of the key is verified only inside
+     * `upgrade_websocket()`.
+     *
+     * @return `true` when all three headers are present and well-formed.
+     * @note   noexcept — never allocates.
+     */
+    [[nodiscard]] bool is_websocket_upgrade() const noexcept;
+
+    /**
+     * @brief Performs the HTTP/1.1 to WebSocket upgrade handshake.
+     *
+     * Validates the upgrade headers, computes `Sec-WebSocket-Accept`, writes
+     * the HTTP 101 response to the underlying `TcpStream`, and transfers
+     * ownership of the socket to a new `WebSocketSession`.
+     *
+     * On success the `Request`'s underlying `TcpStream` is consumed — the
+     * connection now belongs to the returned `WebSocket`. After `co_await`ing
+     * this method the `Request` must not be used for any further HTTP I/O.
+     *
+     * On failure a `WebSocketError` is returned and the connection is still in
+     * HTTP mode — the caller may write an HTTP error response (e.g. 400) and
+     * close normally.
+     *
+     * @return `Task<std::expected<WebSocket, WebSocketError>>`.
+     *         Success: fully constructed `WebSocket` ready for `send()`.
+     *         `WebSocketError::invalid_handshake` if upgrade headers are
+     *         absent or malformed.
+     *         `WebSocketError::send_failed` if writing the 101 response failed.
+     * @note  Must be called from the connection coroutine — the same strand
+     *        that owns this `Request`. Not thread-safe.
+     * @note  The `Request` is in an unspecified state after a successful
+     *        upgrade; do not call any other method on it.
+     * @throws Nothing. All errors surface via `std::unexpected`.
+     */
+    [[nodiscard]] aevox::Task<std::expected<aevox::WebSocket, aevox::WebSocketError>>
+    upgrade_websocket();
 
 private:
     // Impl is private — the full layout is defined in src/http/request_impl.hpp.

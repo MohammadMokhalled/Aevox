@@ -44,4 +44,12 @@ public:
                                                asio::io_context&     io_ctx);
 };
 
+/**
+ * Returns the io_context executor associated with a TcpStream.
+ * Used by WebSocketSession::create() to construct the connection strand.
+ * Defined in asio_tcp_stream.cpp where TcpStream::Impl is complete.
+ */
+[[nodiscard]] asio::io_context::executor_type get_tcp_stream_executor(
+    aevox::TcpStream& stream) noexcept;
+
 } // namespace aevox::net
