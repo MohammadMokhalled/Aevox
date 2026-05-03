@@ -18,6 +18,7 @@
 // Design: Tasks/architecture/AEV-005-arch.md §3.2
 
 #include <aevox/concepts.hpp>
+#include <aevox/json_error.hpp>
 #include <aevox/task.hpp>
 #include <aevox/websocket_error.hpp>
 
@@ -84,23 +85,6 @@ enum class ParamError : std::uint8_t
 {
     NotFound,      ///< No path parameter with the given name was captured by the router.
     BadConversion, ///< The raw string could not be converted to the requested type T.
-};
-
-// =============================================================================
-// BodyParseError
-// =============================================================================
-
-/**
- * @brief Error codes for `Request::json<T>()`.
- *
- * `NotImplemented` is the only value returned in v0.1. The JSON backend extends this.
- */
-enum class BodyParseError : std::uint8_t
-{
-    NotImplemented, ///< JSON parsing is not wired in v0.1; replaced by the JSON backend task.
-    BadJson,        ///< The body is not valid JSON (reserved for the JSON backend task).
-    TypeMismatch,   ///< JSON does not match the target type schema (reserved for the JSON backend
-                    ///< task).
 };
 
 // =============================================================================
@@ -274,24 +258,40 @@ public:
     // -------------------------------------------------------------------------
 
     /**
-     * @brief Asynchronously parses the request body as JSON into type `T`.
+     * @brief Deserializes the request body as JSON into type `T`.
      *
-     * In v0.1 this always returns `BodyParseError::NotImplemented`. The JSON backend
-     * replaces the implementation stub with a real glaze-backed deserializer.
+     * Reads the raw body bytes held by this request and passes them to the
+     * active `aevox::JsonBackend`. The backend performs compile-time schema
+     * inference — no runtime type map is required. For `GlazeBackend`, any
+     * struct with public fields is automatically reflectable.
      *
-     * The coroutine suspends immediately and resumes with the error in v0.1.
-     * Handlers must `co_await` this — it is not synchronous.
-     *
-     * @tparam T  Target deserialization type. Must satisfy `aevox::Deserializable`.
-     *            The constraint is a stub in v0.1 (always satisfied).
-     * @return    `Task<std::expected<T, BodyParseError>>` — always resolves to
-     *            `BodyParseError::NotImplemented` in v0.1.
-     * @note      The implementation hook is `Request::Impl::do_json_parse()`.
-     *            See Tasks/architecture/AEV-005-arch.md §4.3.
+     * @tparam T  Target type. Must be default-constructible and satisfy the
+     *            active backend's deserialization requirements. For
+     *            `GlazeBackend`: any aggregate struct or standard container
+     *            with public fields. Compilation fails for non-reflectable
+     *            types at the `GlazeBackend::deserialize<T>` call site.
+     * @return    `Task` resolving to `std::expected<T, aevox::JsonError>`.
+     *            The error branch is populated on parse failure, missing
+     *            required fields, type mismatches, or invalid UTF-8. The
+     *            `aevox::JsonError::message()` contains a human-readable
+     *            description of the failure.
+     * @note      Thread-safety: safe to call concurrently on separate
+     *            `Request` instances. Not safe to call from multiple threads
+     *            on the same `Request` instance.
+     * @note      Body caching: the body bytes are stable for the full
+     *            request lifetime (owned by `Request::Impl`). Each call to
+     *            `json<T>()` re-parses the body bytes. If the same type is
+     *            needed multiple times, cache the result in the handler.
+     *            Calling with two different types `T` and `U` on the same
+     *            request is supported and parses twice.
+     * @note      The coroutine suspends and resumes synchronously (no I/O
+     *            is performed). The `co_await` is required for consistency
+     *            with the async handler signature.
+     * @throws    Nothing. All errors surface via `std::unexpected`.
      */
     template <typename T>
         requires aevox::Deserializable<T>
-    [[nodiscard]] aevox::Task<std::expected<T, BodyParseError>> json() const;
+    [[nodiscard]] aevox::Task<std::expected<T, aevox::JsonError>> json() const;
 
     // -------------------------------------------------------------------------
     // Middleware context store

@@ -22,6 +22,7 @@
 // Design: Tasks/architecture/AEV-005-arch.md §3.3
 
 #include <aevox/concepts.hpp>
+#include <aevox/json_error.hpp>
 
 #include <memory>
 #include <optional>
@@ -29,17 +30,6 @@
 #include <string_view>
 
 namespace aevox {
-
-/**
- * @brief Error codes for `Response::json<T>()` serialization.
- *
- * `NotImplemented` is the only value produced in v0.1. The JSON backend extends this.
- */
-enum class SerializeError : std::uint8_t
-{
-    NotImplemented, ///< JSON serialization is not wired in v0.1; replaced by the JSON backend task.
-    TypeNotSupported, ///< The type T cannot be serialized (reserved for the JSON backend task).
-};
 
 /**
  * @brief A fully formed HTTP/1.1 response, ready for serialization.
@@ -251,21 +241,35 @@ public:
     /**
      * @brief Creates a 200 OK JSON response by serializing `value` to JSON.
      *
-     * In v0.1 this always returns a `Response` whose body is the error sentinel
-     * string `{\"error\":\"not_implemented\"}`. The JSON backend task replaces the stub
-     * with real glaze serialization.
+     * Calls the active `aevox::JsonBackend::serialize()` synchronously.
+     * Serialization is CPU-bound work with no I/O; glaze serialization of
+     * typical API structs completes in microseconds. If the application
+     * serializes extremely large bodies (>1 MB), it should offload to
+     * `co_await aevox::pool(...)` before calling this factory.
+     *
+     * On serialization failure, returns a 500 Internal Server Error response
+     * with a JSON body `{"error":"json_serialization_failed","detail":"..."}`,
+     * where `"detail"` contains the `JsonError::message()` string. This
+     * ensures the function always returns a valid `Response` without throwing.
      *
      * @tparam T  Type to serialize. Must satisfy `aevox::Serializable`.
-     *            The constraint is a stub in v0.1 (always satisfied).
-     * @param  value  The value to serialize. Moved from the caller.
-     * @return        Response with status 200 and `Content-Type: application/json`.
-     *                Body content is a stub in v0.1.
-     * @note          The serialization hook is `Response::Impl::do_json_serialize()`. See
-     *                Tasks/architecture/AEV-005-arch.md §4.3.
+     *            For `GlazeBackend`: any aggregate struct or standard
+     *            container with public fields. Compilation fails for
+     *            non-reflectable types at the `GlazeBackend::serialize<T>`
+     *            call site.
+     * @param  value  The value to serialize. Accepts lvalue or rvalue.
+     * @return        `Response` with status 200 and
+     *                `Content-Type: application/json` on success.
+     *                `Response` with status 500 and a JSON error body on
+     *                serialization failure (see above).
+     * @note   Thread-safety: `GlazeBackend` carries no mutable state;
+     *         safe to call concurrently from separate handlers.
+     * @note   `value` is taken by const-ref. Both lvalues and rvalues bind.
+     * @throws Nothing. Serialization errors surface as a 500 response.
      */
     template <typename T>
         requires aevox::Serializable<T>
-    [[nodiscard]] static Response json(T&& value);
+    [[nodiscard]] static Response json(const T& value);
 
     /**
      * @brief Creates a streaming response sentinel with the given Content-Type.

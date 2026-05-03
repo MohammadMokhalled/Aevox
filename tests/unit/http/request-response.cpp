@@ -72,9 +72,9 @@ aevox::Request make_test_request(std::vector<std::byte> buffer, aevox::detail::P
 ///   2. Resumes the inner handle, running the coroutine body to completion.
 ///   3. Calls await_resume() to retrieve the stored result.
 ///
-/// This works for the v0.1 json<T>() stub because the body co_returns immediately
-/// without suspending. Do not use this helper for Tasks that genuinely suspend on
-/// I/O — it would block the calling thread.
+/// This works for json<T>() because the body co_returns immediately without
+/// suspending on I/O. Do not use for Tasks that genuinely suspend on I/O — it
+/// would block the calling thread.
 template <typename T> T drive_task(aevox::Task<T> task)
 {
     // Task is lazy (initial_suspend = suspend_always). Steps:
@@ -89,6 +89,20 @@ template <typename T> T drive_task(aevox::Task<T> task)
 }
 
 } // namespace
+
+// Structs for json<T>() tests — must have external linkage (not in anonymous
+// namespace) because glaze uses extern template variable declarations.
+struct SimpleDto
+{
+    std::string name;
+    int         age{};
+};
+
+struct RequestResponseDto
+{
+    std::string key;
+    int         value{};
+};
 
 // =============================================================================
 // Request tests — header access
@@ -263,20 +277,53 @@ TEST_CASE("Request - body() - returns correct span into owned buffer", "[http][r
 // Request tests — json<T>()
 // =============================================================================
 
-TEST_CASE("Request - json<T>() - returns NotImplemented in v0.1", "[http][request]")
+TEST_CASE("Request - json<T>() - valid body returns parsed struct", "[http][request]")
 {
+    static const std::string            json_input = R"({"name":"alice","age":30})";
+    static const std::vector<std::byte> body_bytes = [] {
+        std::vector<std::byte> bytes(json_input.size());
+        for (std::size_t i = 0; i < json_input.size(); ++i) {
+            bytes[i] = static_cast<std::byte>(json_input[i]);
+        }
+        return bytes;
+    }();
+
     aevox::detail::ParsedRequest pr;
     pr.method = "POST";
     pr.target = "/";
+    pr.body   = std::span<const std::byte>{body_bytes};
 
-    auto req  = make_test_request({}, std::move(pr));
-    auto task = req.json<int>();
+    auto req    = make_test_request({}, std::move(pr));
+    auto result = drive_task(req.json<SimpleDto>());
 
-    // Drive the lazy coroutine to completion synchronously.
-    auto result = drive_task(std::move(task));
+    REQUIRE(result.has_value());
+    if (result) {
+        CHECK(result->name == "alice");
+        CHECK(result->age == 30);
+    }
+}
+
+TEST_CASE("Request - json<T>() - malformed body returns JsonError", "[http][request]")
+{
+    static const std::string            bad_json       = "{bad json}";
+    static const std::vector<std::byte> bad_body_bytes = [] {
+        std::vector<std::byte> bytes(bad_json.size());
+        for (std::size_t i = 0; i < bad_json.size(); ++i) {
+            bytes[i] = static_cast<std::byte>(bad_json[i]);
+        }
+        return bytes;
+    }();
+
+    aevox::detail::ParsedRequest pr;
+    pr.method = "POST";
+    pr.target = "/";
+    pr.body   = std::span<const std::byte>{bad_body_bytes};
+
+    auto req    = make_test_request({}, std::move(pr));
+    auto result = drive_task(req.json<SimpleDto>());
 
     REQUIRE(!result.has_value());
-    CHECK(result.error() == aevox::BodyParseError::NotImplemented);
+    CHECK(!result.error().message().empty());
 }
 
 // =============================================================================
@@ -437,18 +484,13 @@ TEST_CASE("Response - json(string) sets Content-Type application/json", "[http][
         CHECK(*ct == "application/json");
 }
 
-TEST_CASE("Response - json<T>() produces sentinel body in v0.1", "[http][response]")
+TEST_CASE("Response - json<T>() - struct returns 200 with application/json", "[http][response]")
 {
-    struct MyType
-    {
-        int x;
-    };
-    auto res = aevox::Response::json(MyType{42});
+    auto res = aevox::Response::json(RequestResponseDto{.key = "hello", .value = 42});
 
     CHECK(res.status_code() == 200);
-    CHECK(res.body_view() == R"({"error":"not_implemented"})");
+    CHECK(!res.body_view().empty());
 
-    // Verify Content-Type header via public get_header() accessor.
     auto ct = res.get_header("Content-Type");
     REQUIRE(ct.has_value());
     if (ct)
