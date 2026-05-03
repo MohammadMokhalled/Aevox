@@ -32,6 +32,10 @@
 
 #include "http/http_parser.hpp"
 
+#if defined(AEVOX_JSON_BACKEND_GLAZE)
+    #include "json/glaze_backend.hpp"
+#endif
+
 namespace aevox {
 
 // =============================================================================
@@ -124,10 +128,22 @@ template <typename T>
 
 template <typename T>
     requires aevox::Deserializable<T>
-[[nodiscard]] aevox::Task<std::expected<T, BodyParseError>> Request::json() const
+[[nodiscard]] aevox::Task<std::expected<T, aevox::JsonError>> Request::json() const
 {
-    // v0.1 stub — real JSON implementation not yet wired.
-    co_return std::unexpected(BodyParseError::NotImplemented);
+#if defined(AEVOX_JSON_BACKEND_GLAZE)
+    // Body bytes are stable for the request lifetime (owned by Impl::buffer).
+    // The body span points into the parser's buffer; convert to string_view
+    // for the backend. No copy is performed.
+    // reinterpret_cast: std::byte* -> const char* — well-defined per
+    // [basic.types]/2 as std::byte is an alias for unsigned char.
+    const auto body_sv = std::string_view{reinterpret_cast<const char*>(impl_->parsed.body.data()),
+                                          impl_->parsed.body.size()};
+    constexpr aevox::internal::GlazeBackend kBackend{};
+    co_return kBackend.template deserialize<T>(body_sv);
+#else
+    co_return std::unexpected(aevox::JsonError{"No JSON backend configured. "
+                                               "Set AEVOX_JSON_BACKEND to 'glaze' in CMake."});
+#endif
 }
 
 // =============================================================================

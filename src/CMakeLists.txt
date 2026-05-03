@@ -16,6 +16,26 @@ find_package(asio CONFIG REQUIRED)
 find_package(llhttp CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
 
+# ── JSON backend selection ────────────────────────────────────────────────────
+# Default backend is glaze. To use a custom backend:
+#   cmake ... -DAEVOX_JSON_BACKEND=custom
+# Custom backends must satisfy aevox::JsonBackend — see include/aevox/json_backend.hpp.
+set(AEVOX_JSON_BACKEND "glaze" CACHE STRING
+    "JSON backend to compile into aevox_core. Supported values: glaze | custom.")
+
+if(AEVOX_JSON_BACKEND STREQUAL "glaze")
+    find_package(glaze CONFIG REQUIRED)
+elseif(AEVOX_JSON_BACKEND STREQUAL "custom")
+    message(STATUS
+        "aevox: AEVOX_JSON_BACKEND=custom. "
+        "Define AEVOX_JSON_BACKEND_CUSTOM and provide a type satisfying "
+        "aevox::JsonBackend in your build. See include/aevox/json_backend.hpp.")
+else()
+    message(FATAL_ERROR
+        "AEVOX_JSON_BACKEND='${AEVOX_JSON_BACKEND}' is not a recognized value. "
+        "Supported values: glaze | custom.")
+endif()
+
 add_subdirectory(http)    # aevox_http OBJECT library (HttpParser + llhttp)
 add_subdirectory(router)  # aevox_router OBJECT library (Router + App)
 
@@ -25,6 +45,7 @@ add_library(aevox_core STATIC
     net/asio_tcp_stream.cpp    # TcpStream pimpl implementation
     config/toml_loader.cpp     # TOML config file loading (toml++ confined here)
     config/config_impl.cpp     # to_string(ConfigError) implementation
+    json/json_error.cpp        # JsonError::message() — out-of-line to prevent false-positive analyser hits
     $<TARGET_OBJECTS:aevox_http>
     $<TARGET_OBJECTS:aevox_router>
 )
@@ -53,9 +74,18 @@ target_compile_options(aevox_core
 # Do NOT change to PUBLIC without Architect review (ADR-1 violation).
 target_compile_definitions(aevox_core
     PRIVATE
-        ASIO_STANDALONE      # Use standalone Asio, not Boost.Asio
-        ASIO_NO_DEPRECATED   # Eliminate the deprecated Asio API surface
+        ASIO_STANDALONE          # Use standalone Asio, not Boost.Asio
+        ASIO_NO_DEPRECATED       # Eliminate the deprecated Asio API surface
 )
+
+# JSON backend compile definition — set when glaze backend is active.
+# PRIVATE: the preprocessor guard in request_impl.hpp / response_impl.hpp gates
+# the glaze include. Must not be PUBLIC (would expose the define to user code).
+if(AEVOX_JSON_BACKEND STREQUAL "glaze")
+    target_compile_definitions(aevox_core
+        PRIVATE AEVOX_JSON_BACKEND_GLAZE
+    )
+endif()
 
 # Asio link — PRIVATE: keeps asio:: include paths out of aevox_core consumers.
 # llhttp link — PRIVATE: llhttp types must not appear in public headers (ADR compliance).
@@ -67,3 +97,11 @@ target_link_libraries(aevox_core
         llhttp::llhttp_static
         tomlplusplus::tomlplusplus
 )
+
+# glaze link — PRIVATE: glaze is header-only; link provides include dirs only.
+# No glaze types may appear in public headers (CLAUDE.md §3.2).
+# Kept in the same if() guard as find_package(glaze) and target_compile_definitions
+# to ensure all three glaze-conditional operations are consistent and auditable together.
+if(AEVOX_JSON_BACKEND STREQUAL "glaze")
+    target_link_libraries(aevox_core PRIVATE glaze::glaze)
+endif()

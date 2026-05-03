@@ -17,6 +17,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - vcpkg binary cache keys now include compiler ID (`gcc`, `clang-linux`, `msvc`) to prevent ABI-incompatible binary reuse across compilers
 
 ### Added
+- `aevox::JsonError` — value-type error returned by JSON operations; carries a `std::string_view message()` accessor
+- `aevox::JsonBackend<B>` — C++23 concept constraining pluggable JSON backends; requires `deserialize<T>()` and `serialize()` returning `std::expected<T, JsonError>` / `std::expected<std::string, JsonError>`
+- `aevox::internal::GlazeBackend` — production JSON backend backed by glaze 3.6.1; satisfies `JsonBackend`; hidden in `src/json/` (no glaze types exposed in public headers)
+- `aevox::Request::json<T>()` — async coroutine that deserializes the request body to `T`; returns `Task<std::expected<T, JsonError>>`
+- `aevox::Response::json(const T&)` — factory that serializes `T` to JSON and returns a 200 response with `Content-Type: application/json`; falls back to 500 on serialization failure
 - `aevox::AppConfig` — runtime-configurable fields: `port`, `host`, `backlog`, `max_body_size`, `request_timeout`, `max_header_count`, `max_read_bytes`; all have named `constexpr` defaults in `include/aevox/config.hpp`
 - `aevox::App::create()` — factory that accepts an optional TOML config file path and returns `std::expected<App, ConfigErrorDetail>`; base defaults always apply when no file is provided
 - `aevox::ConfigError` enum and `aevox::ConfigErrorDetail` struct — structured error type for config loading failures (`file_not_found`, `parse_error`, `invalid_value`)
@@ -28,6 +33,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::App::use(std::string_view, F&&)` — registers path-scoped middleware for requests matching a prefix
 - `aevox::Request::set<T>()` and `aevox::Request::get<T>()` — per-request middleware context bag for passing typed values between middleware and handlers
 - middleware-plugin example: demonstrates middleware authoring using lambda and struct styles with scoped path-prefix guards (AEV-024)
+
+### Removed
+- `aevox::BodyParseError` — stub enum superseded by `aevox::JsonError`; the single value `NotImplemented` is no longer needed now that `Request::json<T>()` is fully implemented
+- `aevox::SerializeError` — stub enum superseded by `aevox::JsonError`; serialization failures now surface as a 500 response with a structured JSON body
 
 ### Fixed
 - Middleware pipeline dispatch: extracted immediately-invoked coroutine lambda (IIFE) into a named free function `dispatch_with_pipeline`; the IIFE pattern caused a dangling-reference hang when the connection handler was resumed from an Asio I/O callback on a different call-stack depth, leaving router-e2e tests blocked indefinitely

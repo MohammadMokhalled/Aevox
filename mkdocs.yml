@@ -35,6 +35,7 @@ nav:
       - Error Handling: guide/error-handling.md
       - Configuration: guide/configuration.md
       - Middleware: guide/middleware.md
+      - JSON: guide/json.md
   - Architecture:
       - Overview: architecture/index.md
       - Executor: architecture/executor.md
@@ -52,6 +53,7 @@ nav:
       - Router and App: api/router.md
       - Middleware: api/middleware.md
       - Configuration: api/config.md
+      - JSON: api/json.md
   - Examples:
       - Overview: examples/index.md
       - Hello World: examples/hello-world.md
