@@ -50,6 +50,14 @@ class WebSocket;
  * Returned by `Request::method()`. The parser maps the raw method string to
  * this enum — unknown verbs yield `HttpMethod::Unknown`.
  */
+// <winnt.h> (pulled in by Asio on Windows) defines DELETE as a numeric macro.
+// Push and suppress it while the enumerator is declared, then restore.
+#ifdef DELETE
+    #pragma push_macro("DELETE")
+    #undef DELETE
+    #define AEVOX_WIN32_DELETE_PUSHED
+#endif
+
 enum class HttpMethod : std::uint8_t
 {
     GET,
@@ -61,6 +69,11 @@ enum class HttpMethod : std::uint8_t
     OPTIONS,
     Unknown, ///< Any verb not listed above (treated as a client error by the router).
 };
+
+#ifdef AEVOX_WIN32_DELETE_PUSHED
+    #pragma pop_macro("DELETE")
+    #undef AEVOX_WIN32_DELETE_PUSHED
+#endif
 
 /**
  * @brief Returns the canonical string representation of an HttpMethod.
