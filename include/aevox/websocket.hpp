@@ -51,8 +51,8 @@ namespace aevox {
  *       an internal Asio strand in `src/net/`. `subscribe()` and `publish()`
  *       are safe to call from any thread — the `TopicBus` uses a `shared_mutex`.
  * @note Move semantics: move-only. A moved-from `WebSocket` is in the
- *       `closed` state — all operations return
- *       `std::unexpected(WebSocketError{WebSocketErrorCode::closed, "moved-from"})`.
+ *       `Closed` state — all operations return
+ *       `std::unexpected(WebSocketError{WebSocketErrorCode::Closed, "moved-from"})`.
  * @note Ownership: destroying a `WebSocket` without calling `close()` first
  *       triggers an immediate close handshake on the next event-loop tick
  *       (the destructor posts a close to the internal strand).
@@ -82,11 +82,11 @@ public:
      *                 returned `Task` completes (the data is copied into the
      *                 internal send buffer during this coroutine).
      * @return         `Task<std::expected<void, WebSocketError>>`.
-     *                 `WebSocketError::closed` if the connection is already closed.
-     *                 `WebSocketError::send_failed` on underlying I/O error.
+     *                 `WebSocketErrorCode::Closed` if the connection is already closed.
+     *                 `WebSocketErrorCode::SendFailed` on underlying I/O error.
      * @note  Thread-safety: safe to call from any coroutine on any thread.
      * @note  Move semantics: on a moved-from `WebSocket` always returns
-     *        `std::unexpected(WebSocketError{closed, "moved-from"})`.
+     *        `std::unexpected(WebSocketError{WebSocketErrorCode::Closed, "moved-from"})`.
      * @throws Nothing. All errors surface via `std::unexpected`.
      */
     [[nodiscard]] aevox::Task<std::expected<void, WebSocketError>> send(std::string_view message);

@@ -158,6 +158,10 @@ private:
     /// Enqueue a pre-built frame for sending. Thread-safe (posts to strand).
     void enqueue_frame(std::vector<std::byte> frame);
 
+    /// Enqueue a control frame with head-of-queue priority (push_front, no depth limit).
+    /// Thread-safe: posts to strand. Used for Close, Pong, and error close frames.
+    void enqueue_priority_frame(std::vector<std::byte> frame);
+
     /// Drain the send queue — runs on the strand.
     [[nodiscard]] aevox::Task<void> drain_send_queue();
 
@@ -200,9 +204,10 @@ private:
     std::atomic<bool> closed_{false};
     bool              close_sent_{false}; // true after we sent a Close frame
 
-    // Wait-for-close: coroutine continuation registered by wait_for_close().
-    // When the read loop exits, it resumes this continuation.
-    std::coroutine_handle<> close_waiter_{};
+    // Wait-for-close: atomic handle address registered by wait_for_close().
+    // Written by await_suspend (connection coroutine), read by do_read_loop (io_context thread).
+    // std::atomic<void*> satisfies the C++ memory model — avoids data race on close_waiter_.
+    std::atomic<void*> close_waiter_addr_{nullptr};
 };
 
 } // namespace aevox::net

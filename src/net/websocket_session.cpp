@@ -187,6 +187,10 @@ void WebSocketSession::send_from_bus(std::string_view message)
     asio::post(strand_, [self = shared_from_this(), msg = std::move(msg_copy)]() mutable {
         if (self->closed_.load(std::memory_order_acquire))
             return;
+        // M-4: enforce the same depth limit as enqueue_frame() — bus publishes are
+        // not exempt; an unchecked bus with a slow consumer would exhaust memory.
+        if (self->send_queue_.size() >= kMaxSendQueueDepth)
+            return;
         auto frame = emit_frame(Opcode::Text, true,
                                 std::as_bytes(std::span<const char>{msg.data(), msg.size()}));
         self->send_queue_.push_back(std::move(frame));
@@ -218,6 +222,24 @@ void WebSocketSession::enqueue_frame(std::vector<std::byte> frame)
             self->sending_ = true;
             // ff_drain_queue is a FireAndForget wrapper — frame self-destructs
             // when drain_send_queue finishes. Return value is void (discarded).
+            self->ff_drain_queue();
+        }
+    });
+}
+
+// =============================================================================
+// WebSocketSession::enqueue_priority_frame
+// =============================================================================
+
+void WebSocketSession::enqueue_priority_frame(std::vector<std::byte> frame)
+{
+    // Control frames (Close, Pong) go to the front of the queue bypassing the depth limit.
+    // RFC 6455 §5.5 requires control frames to be responded to promptly; dropping them
+    // would violate the protocol. push_front ensures they are sent before pending data frames.
+    asio::post(strand_, [self = shared_from_this(), f = std::move(frame)]() mutable {
+        self->send_queue_.push_front(std::move(f));
+        if (!self->sending_) {
+            self->sending_ = true;
             self->ff_drain_queue();
         }
     });
@@ -266,22 +288,43 @@ void WebSocketSession::start_read_loop(std::shared_ptr<WebSocketSession> self_pt
 
 aevox::Task<void> WebSocketSession::wait_for_close()
 {
-    if (closed_.load(std::memory_order_acquire)) {
+    if (closed_.load(std::memory_order_seq_cst)) {
         co_return;
     }
-    // Park this coroutine until the read loop sets close_waiter_ and resumes it.
+    // Park this coroutine until do_read_loop signals via close_waiter_addr_.
+    //
+    // M-5 fix: close_waiter_addr_ is std::atomic<void*>. The TOCTOU window between
+    // await_ready() returning false and await_suspend() storing the handle is closed by
+    // a double-check in await_suspend: if closed_ became true in the window, we CAS
+    // the handle back out and return false (resume immediately) rather than staying
+    // suspended and never waking up.
     struct WaitAwaitable
     {
-        WebSocketSession* session;
+        WebSocketSession* const session;
 
         [[nodiscard]] bool await_ready() const noexcept
         {
-            return session->closed_.load(std::memory_order_acquire);
+            return session->closed_.load(std::memory_order_seq_cst);
         }
 
-        void await_suspend(std::coroutine_handle<> h) noexcept
+        bool await_suspend(std::coroutine_handle<> h) noexcept
         {
-            session->close_waiter_ = h;
+            // Store atomically so do_read_loop can see it from any thread.
+            session->close_waiter_addr_.store(h.address(), std::memory_order_seq_cst);
+
+            if (!session->closed_.load(std::memory_order_seq_cst)) {
+                return true; // genuinely suspended — read loop will resume us
+            }
+
+            // closed_ became true in the window between await_ready and here.
+            // Attempt to reclaim our handle via CAS before the read loop's exchange
+            // takes it. If we win: resume immediately (return false). If the read loop
+            // already claimed it (address already null): stay suspended and let the
+            // loop resume us via h.resume().
+            void* expected = h.address();
+            return !session->close_waiter_addr_.compare_exchange_strong(expected, nullptr,
+                                                                        std::memory_order_seq_cst,
+                                                                        std::memory_order_seq_cst);
         }
 
         void await_resume() noexcept {}
@@ -313,30 +356,29 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
     std::vector<std::byte> accumulator;
     constexpr std::size_t  kReadChunkSize = 4096;
 
-    auto close_session = [&](std::uint16_t code, std::string_view reason) {
-        if (!close_sent_) {
-            close_sent_ = true;
-            auto frame  = emit_close_frame(code, reason);
-            // We do a best-effort synchronous-ish write by posting to the send queue.
-            send_queue_.clear(); // discard pending sends
-            send_queue_.push_front(std::move(frame));
-        }
-        closed_.store(true, std::memory_order_release);
-    };
+    // M-1 + M-2 fix: do_read_loop runs on the raw io_context executor (not the strand_).
+    // drain_send_queue() runs on strand_ and also calls stream_.write(). Two concurrent
+    // writes to the same socket = UB. Fix: all writes in this loop go through
+    // enqueue_priority_frame() which posts to strand_ — never calling stream_.write() here.
+    //
+    // close_session() only marks the session as closed. The caller is responsible for
+    // enqueuing the appropriate close frame via enqueue_priority_frame() BEFORE calling
+    // close_session() so that close_sent_ is set before closed_ becomes true.
+    auto close_session = [&]() { closed_.store(true, std::memory_order_seq_cst); };
 
     for (;;) {
         // Read more data.
         auto read_result = co_await stream_.read(kReadChunkSize);
         if (!read_result) {
-            // I/O error or EOF.
-            close_session(1006, "Abnormal closure");
+            // I/O error or EOF — connection already broken, no close frame to send.
+            close_session();
             break;
         }
 
         auto& chunk = *read_result;
         if (chunk.empty()) {
-            // EOF.
-            close_session(1006, "Abnormal closure");
+            // EOF — connection already broken.
+            close_session();
             break;
         }
 
@@ -351,18 +393,20 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                             true /* expect_masked — client frames must be masked */);
 
             if (!parse_result) {
-                const auto& err = parse_result.error();
-                if (err.code() == aevox::WebSocketErrorCode::FrameTooLarge) {
-                    // Send Close 1009 (Message Too Big).
-                    auto close_frame = emit_close_frame(1009, "Message too large");
-                    (void)(co_await stream_.write(std::span{close_frame}));
+                // M-2 fix: set close_sent_ before enqueuing so the Close opcode handler
+                // (if somehow reached after a parse error on the same data) won't send a
+                // second frame. Then enqueue the correct close code — no direct write.
+                if (!close_sent_) {
+                    close_sent_     = true;
+                    const auto& err = parse_result.error();
+                    if (err.code() == aevox::WebSocketErrorCode::FrameTooLarge) {
+                        enqueue_priority_frame(emit_close_frame(1009, "Message too large"));
+                    }
+                    else {
+                        enqueue_priority_frame(emit_close_frame(1002, "Protocol error"));
+                    }
                 }
-                else {
-                    // Send Close 1002 (Protocol Error).
-                    auto close_frame = emit_close_frame(1002, "Protocol error");
-                    (void)(co_await stream_.write(std::span{close_frame}));
-                }
-                close_session(1002, "Protocol error");
+                close_session();
                 session_ended = true;
                 break;
             }
@@ -386,13 +430,14 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                     handler_.on_message(ws_handle, payload_sv);
                     break;
                 }
-                case Opcode::Ping: {
+                case Opcode::Ping:
                     // RFC 6455 §5.5.2: respond with Pong carrying the same payload.
-                    auto pong = emit_frame(Opcode::Pong, true,
-                                           std::span<const std::byte>{result.frame.payload});
-                    (void)(co_await stream_.write(std::span{pong}));
+                    // M-1 fix: route through strand via enqueue_priority_frame, not direct write.
+                    enqueue_priority_frame(
+                        emit_frame(Opcode::Pong, true,
+                                   std::span<const std::byte>{result.frame.payload}));
                     break;
-                }
+
                 case Opcode::Pong:
                     // Silently discard unsolicited Pong (RFC 6455 §5.5.3).
                     break;
@@ -409,15 +454,15 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                     }
 
                     // Echo the Close frame (RFC 6455 §5.5.1).
+                    // M-1 fix: route through strand, not direct write.
                     if (!close_sent_) {
-                        close_sent_     = true;
-                        auto echo_close = emit_close_frame(close_code);
-                        (void)(co_await stream_.write(std::span{echo_close}));
+                        close_sent_ = true;
+                        enqueue_priority_frame(emit_close_frame(close_code));
                     }
 
                     // Fire on_close callback.
                     auto ws_handle = self->make_handle(self);
-                    close_session(close_code, {});
+                    close_session();
                     handler_.on_close(ws_handle, close_code);
                     session_ended = true;
                     break;
@@ -425,7 +470,12 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
 
                 case Opcode::Continuation:
                     // Already rejected by parse_frame — should not reach here.
-                    close_session(1003, "Continuation frames not supported");
+                    if (!close_sent_) {
+                        close_sent_ = true;
+                        enqueue_priority_frame(
+                            emit_close_frame(1003, "Continuation frames not supported"));
+                    }
+                    close_session();
                     session_ended = true;
                     break;
             }
@@ -442,22 +492,19 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
             break;
     }
 
-    // Drain any remaining queued sends (e.g. the close frame we enqueued).
-    if (!send_queue_.empty()) {
-        for (auto& frame : send_queue_) {
-            (void)(co_await stream_.write(std::span{frame}));
-        }
-        send_queue_.clear();
-    }
-
-    // Mark closed (may already be set).
-    closed_.store(true, std::memory_order_release);
+    // Mark closed (may already be set by close_session() above).
+    closed_.store(true, std::memory_order_seq_cst);
 
     // Resume any coroutine waiting in wait_for_close().
-    if (close_waiter_) {
-        auto waiter   = close_waiter_;
-        close_waiter_ = {};
-        waiter.resume();
+    // M-5 fix: close_waiter_addr_ is atomic. Atomically claim the handle address;
+    // if non-null, the connection coroutine is suspended and we resume it.
+    // Note: any close frames enqueued via enqueue_priority_frame() were posted to the
+    // strand_ BEFORE this point. ff_drain_queue() holds shared_from_this() so the
+    // session (and socket) remains alive until the drain completes — even after the
+    // connection handler exits following this resume.
+    void* addr = close_waiter_addr_.exchange(nullptr, std::memory_order_seq_cst);
+    if (addr) {
+        std::coroutine_handle<>::from_address(addr).resume();
     }
 }
 

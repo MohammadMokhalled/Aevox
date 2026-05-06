@@ -52,7 +52,7 @@ int main()
 
     const auto                       frame_64b = build_64b_unmasked_frame();
     const std::span<const std::byte> frame_span{frame_64b};
-    constexpr std::size_t            kMaxPayload = 10UL * 1024 * 1024; // 10 MiB
+    constexpr std::size_t            kMaxPayload = 10UZ * 1024UZ * 1024UZ;
 
     ankerl::nanobench::Bench().minEpochIterations(1000000).run(
         "WebSocket frame parse - 64B unmasked", [&] {

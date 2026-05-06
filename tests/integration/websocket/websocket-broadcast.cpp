@@ -231,4 +231,15 @@ TEST_CASE("WebSocket broadcast - two clients on same topic receive message",
     // Client B should receive "broadcast".
     const std::string received = read_server_frame_with_timeout(client_b);
     REQUIRE(received == "broadcast");
+
+    // Self-publish suppression: Client A must NOT receive its own message.
+    // Wait briefly so any erroneous self-deliver would have arrived, then do a
+    // non-blocking read. Any error (EAGAIN/EWOULDBLOCK) confirms no data arrived.
+    std::this_thread::sleep_for(50ms);
+    client_a.native_non_blocking(true, ec);
+    REQUIRE_FALSE(ec);
+    std::array<char, 64> self_buf{};
+    asio::error_code     self_ec;
+    client_a.read_some(asio::buffer(self_buf), self_ec);
+    REQUIRE(self_ec); // error expected — no data means self-publish was suppressed
 }
