@@ -115,13 +115,11 @@ aevox::Task<std::expected<void, aevox::WebSocketError>> WebSocketSession::close_
                                                         "WebSocket is already closed"});
     }
 
-    close_sent_    = true;
-    auto frame     = emit_close_frame(code, reason);
-    auto write_res = co_await stream_.write(std::span{frame});
-    if (!write_res) {
-        closed_.store(true, std::memory_order_release);
-        co_return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::SendFailed,
-                                                        "Failed to send Close frame"});
+    bool expected = false;
+    if (close_sent_.compare_exchange_strong(expected, true, std::memory_order_acq_rel,
+                                            std::memory_order_acquire))
+    {
+        enqueue_priority_frame(emit_close_frame(code, reason));
     }
     co_return {};
 }
@@ -300,7 +298,7 @@ aevox::Task<void> WebSocketSession::wait_for_close()
     // suspended and never waking up.
     struct WaitAwaitable
     {
-        WebSocketSession* const session;
+        WebSocketSession* session;
 
         [[nodiscard]] bool await_ready() const noexcept
         {
@@ -321,7 +319,9 @@ aevox::Task<void> WebSocketSession::wait_for_close()
             // takes it. If we win: resume immediately (return false). If the read loop
             // already claimed it (address already null): stay suspended and let the
             // loop resume us via h.resume().
-            void* expected = h.address();
+            const auto handle_addr = h.address();
+            // NOLINTNEXTLINE(misc-const-correctness) compare_exchange_strong may update expected.
+            void* expected = handle_addr;
             return !session->close_waiter_addr_.compare_exchange_strong(expected, nullptr,
                                                                         std::memory_order_seq_cst,
                                                                         std::memory_order_seq_cst);
@@ -389,16 +389,22 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
         bool session_ended = false;
         while (!accumulator.empty()) {
             auto parse_result =
-                parse_frame(std::span<const std::byte>{accumulator}, max_payload_,
-                            true /* expect_masked — client frames must be masked */);
+                parse_frame_detailed(std::span<const std::byte>{accumulator}, max_payload_,
+                                     true /* expect_masked — client frames must be masked */);
 
             if (!parse_result) {
+                if (parse_result.error().kind == ParseFrameErrorKind::Incomplete) {
+                    break;
+                }
+
                 // M-2 fix: set close_sent_ before enqueuing so the Close opcode handler
                 // (if somehow reached after a parse error on the same data) won't send a
                 // second frame. Then enqueue the correct close code — no direct write.
-                if (!close_sent_) {
-                    close_sent_     = true;
-                    const auto& err = parse_result.error();
+                bool expected = false;
+                if (close_sent_.compare_exchange_strong(expected, true, std::memory_order_acq_rel,
+                                                        std::memory_order_acquire))
+                {
+                    const auto& err = parse_result.error().error;
                     if (err.code() == aevox::WebSocketErrorCode::FrameTooLarge) {
                         enqueue_priority_frame(emit_close_frame(1009, "Message too large"));
                     }
@@ -455,8 +461,11 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
 
                     // Echo the Close frame (RFC 6455 §5.5.1).
                     // M-1 fix: route through strand, not direct write.
-                    if (!close_sent_) {
-                        close_sent_ = true;
+                    bool expected = false;
+                    if (close_sent_.compare_exchange_strong(expected, true,
+                                                            std::memory_order_acq_rel,
+                                                            std::memory_order_acquire))
+                    {
                         enqueue_priority_frame(emit_close_frame(close_code));
                     }
 
@@ -470,8 +479,11 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
 
                 case Opcode::Continuation:
                     // Already rejected by parse_frame — should not reach here.
-                    if (!close_sent_) {
-                        close_sent_ = true;
+                    bool expected = false;
+                    if (close_sent_.compare_exchange_strong(expected, true,
+                                                            std::memory_order_acq_rel,
+                                                            std::memory_order_acquire))
+                    {
                         enqueue_priority_frame(
                             emit_close_frame(1003, "Continuation frames not supported"));
                     }

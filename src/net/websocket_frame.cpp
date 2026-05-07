@@ -53,15 +53,16 @@ void push_be64(std::vector<std::byte>& out, std::uint64_t value)
 // parse_frame
 // =============================================================================
 
-std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const std::byte> input,
-                                                              std::size_t max_payload_bytes,
-                                                              bool        expect_masked) noexcept
+std::expected<ParseResult, ParseFrameError> parse_frame_detailed(std::span<const std::byte> input,
+                                                                 std::size_t max_payload_bytes,
+                                                                 bool        expect_masked) noexcept
 {
     // Minimum frame header: 2 bytes.
     if (input.size() < 2) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Incomplete,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Frame too short: need at least 2 header bytes"});
+                                  "Frame too short: need at least 2 header bytes"}});
     }
 
     const auto byte0 = static_cast<std::uint8_t>(input[0]);
@@ -73,38 +74,45 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
 
     // RSV bits (1-3) must be 0 (no extensions negotiated in v0.2).
     if ((byte0 & 0x70U) != 0U) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Protocol,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Non-zero RSV bits without extension negotiation"});
+                                  "Non-zero RSV bits without extension negotiation"}});
     }
 
     // Validate opcode.
     if (!is_known_opcode(raw_opcode)) {
-        return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                                     "Reserved or unknown opcode"});
+        return std::unexpected(
+            ParseFrameError{ParseFrameErrorKind::Protocol,
+                            aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
+                                                  "Reserved or unknown opcode"}});
     }
 
     const auto opcode = static_cast<Opcode>(raw_opcode);
 
     // Continuation frame (fragmentation) is rejected in v0.2.
     if (opcode == Opcode::Continuation) {
-        return std::unexpected(aevox::WebSocketError{
-            aevox::WebSocketErrorCode::ProtocolError,
-            "Fragmented messages (FIN=0, continuation frames) not supported in v0.2"});
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Protocol,
+            aevox::WebSocketError{
+                aevox::WebSocketErrorCode::ProtocolError,
+                "Fragmented messages (FIN=0, continuation frames) not supported in v0.2"}});
     }
 
     // Control frames (Close, Ping, Pong) must have FIN=1 (RFC 6455 §5.5).
     if (!fin && (opcode == Opcode::Close || opcode == Opcode::Ping || opcode == Opcode::Pong)) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Protocol,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Control frame must not be fragmented (FIN must be 1)"});
+                                  "Control frame must not be fragmented (FIN must be 1)"}});
     }
 
     // Fragmented data frames (FIN=0) are also rejected in v0.2.
     if (!fin && (opcode == Opcode::Text || opcode == Opcode::Binary)) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Protocol,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Fragmented messages (FIN=0) not supported in v0.2"});
+                                  "Fragmented messages (FIN=0) not supported in v0.2"}});
     }
 
     // Parse MASK bit and 7-bit payload length from byte 1.
@@ -113,14 +121,16 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
 
     // Enforce mask requirement (RFC 6455 §5.3: client must mask, server must not).
     if (expect_masked && !masked) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Protocol,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Client frame must have MASK bit set (RFC 6455 §5.3)"});
+                                  "Client frame must have MASK bit set (RFC 6455 §5.3)"}});
     }
     if (!expect_masked && masked) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Protocol,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Server frame must not have MASK bit set (RFC 6455 §5.3)"});
+                                  "Server frame must not have MASK bit set (RFC 6455 §5.3)"}});
     }
 
     // Determine header size and actual payload length.
@@ -134,9 +144,10 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
         // 16-bit extended payload length.
         header_size += 2U;
         if (input.size() < header_size - (masked ? 4U : 0U)) {
-            return std::unexpected(
+            return std::unexpected(ParseFrameError{
+                ParseFrameErrorKind::Incomplete,
                 aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                      "Frame too short for 16-bit extended payload length"});
+                                      "Frame too short for 16-bit extended payload length"}});
         }
         payload_len64 = (static_cast<std::uint64_t>(static_cast<std::uint8_t>(input[2])) << 8U) |
                         (static_cast<std::uint64_t>(static_cast<std::uint8_t>(input[3])));
@@ -145,9 +156,10 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
         // len7 == 127: 64-bit extended payload length.
         header_size += 8U;
         if (input.size() < header_size - (masked ? 4U : 0U)) {
-            return std::unexpected(
+            return std::unexpected(ParseFrameError{
+                ParseFrameErrorKind::Incomplete,
                 aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                      "Frame too short for 64-bit extended payload length"});
+                                      "Frame too short for 64-bit extended payload length"}});
         }
         payload_len64 = 0;
         for (std::size_t i = 0; i < 8; ++i) {
@@ -156,9 +168,10 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
         }
         // RFC 6455 §5.2: most-significant bit of 64-bit length must be 0.
         if ((payload_len64 & 0x8000000000000000ULL) != 0U) {
-            return std::unexpected(
+            return std::unexpected(ParseFrameError{
+                ParseFrameErrorKind::Protocol,
                 aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                      "64-bit payload length MSB must be 0 (RFC 6455 §5.2)"});
+                                      "64-bit payload length MSB must be 0 (RFC 6455 §5.2)"}});
         }
     }
 
@@ -179,8 +192,10 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
 
     // Enforce payload size limit.
     if (payload_len64 > static_cast<std::uint64_t>(max_payload_bytes)) {
-        return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::FrameTooLarge,
-                                                     "Payload length exceeds max_body_size limit"});
+        return std::unexpected(
+            ParseFrameError{ParseFrameErrorKind::Protocol,
+                            aevox::WebSocketError{aevox::WebSocketErrorCode::FrameTooLarge,
+                                                  "Payload length exceeds max_body_size limit"}});
     }
 
     const auto        payload_len = static_cast<std::size_t>(payload_len64);
@@ -188,9 +203,10 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
 
     // Ensure the input buffer contains the full frame.
     if (input.size() < total_frame) {
-        return std::unexpected(
+        return std::unexpected(ParseFrameError{
+            ParseFrameErrorKind::Incomplete,
             aevox::WebSocketError{aevox::WebSocketErrorCode::ProtocolError,
-                                  "Input buffer does not contain a complete frame"});
+                                  "Input buffer does not contain a complete frame"}});
     }
 
     // Extract masking key (if present).
@@ -223,6 +239,17 @@ std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const st
     return ParseResult{.frame =
                            ParsedFrame{.opcode = opcode, .fin = fin, .payload = std::move(payload)},
                        .bytes_consumed = total_frame};
+}
+
+std::expected<ParseResult, aevox::WebSocketError> parse_frame(std::span<const std::byte> input,
+                                                              std::size_t max_payload_bytes,
+                                                              bool        expect_masked) noexcept
+{
+    auto result = parse_frame_detailed(input, max_payload_bytes, expect_masked);
+    if (!result) {
+        return std::unexpected(result.error().error);
+    }
+    return std::move(*result);
 }
 
 // =============================================================================

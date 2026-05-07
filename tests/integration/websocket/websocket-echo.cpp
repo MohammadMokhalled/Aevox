@@ -234,6 +234,51 @@ TEST_CASE("WebSocket echo - send and receive text frame over loopback", "[websoc
     }
 }
 
+TEST_CASE("WebSocket echo - split client frame waits for complete payload",
+          "[websocket][integration]")
+{
+    const auto port = free_port();
+
+    const TestServer server{
+        port, [](aevox::App& app) {
+            app.ws("/echo", aevox::WebSocketHandler{
+                                .on_message = [](aevox::WebSocket& ws,
+                                                 std::string_view  msg) { ws.send_nowait(msg); },
+                            });
+        }};
+
+    asio::io_context      ioc;
+    asio::ip::tcp::socket client{ioc};
+    asio::error_code      ec;
+    client.connect(asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port}, ec);
+    REQUIRE_FALSE(ec);
+
+    const std::string upgrade_resp = do_upgrade(client, port, "/echo");
+    REQUIRE(upgrade_resp.find("101") != std::string::npos);
+
+    auto frame = make_masked_text_frame("split-frame");
+    asio::write(client, asio::buffer(frame.data(), 6), ec);
+    REQUIRE_FALSE(ec);
+
+    std::this_thread::sleep_for(50ms);
+    client.non_blocking(true, ec);
+    REQUIRE_FALSE(ec);
+    std::array<char, 16> early_buf{};
+    asio::error_code     early_ec;
+    const auto           early_n = client.read_some(asio::buffer(early_buf), early_ec);
+    REQUIRE(early_n == 0);
+    REQUIRE(early_ec);
+    REQUIRE((early_ec == asio::error::would_block || early_ec == asio::error::try_again));
+
+    client.non_blocking(false, ec);
+    REQUIRE_FALSE(ec);
+    asio::write(client, asio::buffer(frame.data() + 6, frame.size() - 6), ec);
+    REQUIRE_FALSE(ec);
+
+    const std::string echo = read_server_frame(client);
+    REQUIRE(echo == "split-frame");
+}
+
 TEST_CASE("WebSocket echo - close handshake completes cleanly", "[websocket][integration]")
 {
     const auto port = free_port();

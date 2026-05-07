@@ -168,6 +168,20 @@ TEST_CASE("WebSocket frame - parse masked client-to-server text frame", "[websoc
         REQUIRE(result->bytes_consumed == 134);
         REQUIRE(result->frame.payload.size() == 126);
     }
+
+    SECTION("Edge - incomplete masked frame is reported distinctly")
+    {
+        const std::vector<std::byte> frame{std::byte{0x81}, std::byte{0x85}, std::byte{0x00},
+                                           std::byte{0x00}, std::byte{0x00}, std::byte{0x00},
+                                           std::byte{'h'},  std::byte{'e'}};
+
+        auto result = aevox::net::parse_frame_detailed(std::span<const std::byte>{frame},
+                                                       std::size_t{1024U} * 1024U, true);
+
+        REQUIRE_FALSE(result.has_value());
+        REQUIRE(result.error().kind == aevox::net::ParseFrameErrorKind::Incomplete);
+        REQUIRE(result.error().error.code() == aevox::WebSocketErrorCode::ProtocolError);
+    }
 }
 
 // =============================================================================

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <expected>
 #include <span>
+#include <utility>
 #include <vector>
 
 namespace aevox::net {
@@ -51,6 +52,22 @@ struct ParseResult
     std::size_t bytes_consumed{}; ///< Number of bytes consumed from the start of `input`.
 };
 
+enum class ParseFrameErrorKind : std::uint8_t
+{
+    Incomplete,
+    Protocol,
+};
+
+struct ParseFrameError
+{
+    ParseFrameError(ParseFrameErrorKind error_kind, aevox::WebSocketError websocket_error) noexcept
+        : kind{error_kind}, error{std::move(websocket_error)}
+    {}
+
+    ParseFrameErrorKind   kind{};
+    aevox::WebSocketError error;
+};
+
 // =============================================================================
 // parse_frame — parse one RFC 6455 frame from a byte buffer.
 // =============================================================================
@@ -77,6 +94,10 @@ struct ParseResult
  *                          `WebSocketError` on protocol violation.
  */
 [[nodiscard]] std::expected<ParseResult, aevox::WebSocketError> parse_frame(
+    std::span<const std::byte> input, std::size_t max_payload_bytes,
+    bool expect_masked = true) noexcept;
+
+[[nodiscard]] std::expected<ParseResult, ParseFrameError> parse_frame_detailed(
     std::span<const std::byte> input, std::size_t max_payload_bytes,
     bool expect_masked = true) noexcept;
 

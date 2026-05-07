@@ -11,7 +11,7 @@
 //   WebSocket::Impl holds a shared_ptr; TopicBus holds weak_ptrs.
 //
 // Thread-safety:
-//   The read loop runs on the connection strand.
+//   The read loop runs on the raw I/O executor.
 //   send_raw() / send_text() / send_binary() post to the strand — safe from any thread.
 //   close_session() is idempotent and strand-safe.
 //
@@ -202,7 +202,7 @@ private:
 
     // Session state.
     std::atomic<bool> closed_{false};
-    bool              close_sent_{false}; // true after we sent a Close frame
+    std::atomic<bool> close_sent_{false}; // true after we sent a Close frame
 
     // Wait-for-close: atomic handle address registered by wait_for_close().
     // Written by await_suspend (connection coroutine), read by do_read_loop (io_context thread).
