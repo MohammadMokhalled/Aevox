@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <span>
 
 TEST_CASE("WebSocketError - message accessible and non-empty", "[websocket]")

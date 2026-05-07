@@ -196,7 +196,7 @@ void WebSocketSession::send_from_bus(std::string_view message)
             self->sending_ = true;
             // ff_drain_queue is a FireAndForget wrapper — frame self-destructs
             // when drain_send_queue finishes. Return value is void (discarded).
-            self->ff_drain_queue();
+            self->ff_drain_queue(self);
         }
     });
 }
@@ -220,7 +220,7 @@ void WebSocketSession::enqueue_frame(std::vector<std::byte> frame)
             self->sending_ = true;
             // ff_drain_queue is a FireAndForget wrapper — frame self-destructs
             // when drain_send_queue finishes. Return value is void (discarded).
-            self->ff_drain_queue();
+            self->ff_drain_queue(self);
         }
     });
 }
@@ -238,7 +238,7 @@ void WebSocketSession::enqueue_priority_frame(std::vector<std::byte> frame)
         self->send_queue_.push_front(std::move(f));
         if (!self->sending_) {
             self->sending_ = true;
-            self->ff_drain_queue();
+            self->ff_drain_queue(self);
         }
     });
 }
@@ -247,20 +247,20 @@ void WebSocketSession::enqueue_priority_frame(std::vector<std::byte> frame)
 // WebSocketSession::drain_send_queue — runs on the I/O thread (strand-posted)
 // =============================================================================
 
-aevox::Task<void> WebSocketSession::drain_send_queue()
+aevox::Task<void> WebSocketSession::drain_send_queue(std::shared_ptr<WebSocketSession> self)
 {
-    while (!send_queue_.empty()) {
-        auto frame = std::move(send_queue_.front());
-        send_queue_.pop_front();
-        auto res = co_await stream_.write(std::span{frame});
+    while (!self->send_queue_.empty()) {
+        auto frame = std::move(self->send_queue_.front());
+        self->send_queue_.pop_front();
+        auto res = co_await self->stream_.write(std::span{frame});
         if (!res) {
             // Write error — mark closed and stop draining.
-            closed_.store(true, std::memory_order_release);
-            send_queue_.clear();
+            self->closed_.store(true, std::memory_order_release);
+            self->send_queue_.clear();
             break;
         }
     }
-    sending_ = false;
+    self->sending_ = false;
 }
 
 // =============================================================================
@@ -533,9 +533,10 @@ aevox::detail::FireAndForget WebSocketSession::ff_read_loop(std::shared_ptr<WebS
     co_await do_read_loop(std::move(self));
 }
 
-aevox::detail::FireAndForget WebSocketSession::ff_drain_queue()
+aevox::detail::FireAndForget WebSocketSession::ff_drain_queue(
+    std::shared_ptr<WebSocketSession> self)
 {
-    co_await drain_send_queue();
+    co_await drain_send_queue(std::move(self));
 }
 
 } // namespace aevox::net

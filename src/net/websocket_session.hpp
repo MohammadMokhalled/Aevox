@@ -163,7 +163,7 @@ private:
     void enqueue_priority_frame(std::vector<std::byte> frame);
 
     /// Drain the send queue — runs on the strand.
-    [[nodiscard]] aevox::Task<void> drain_send_queue();
+    [[nodiscard]] aevox::Task<void> drain_send_queue(std::shared_ptr<WebSocketSession> self);
 
     // -------------------------------------------------------------------------
     // Read loop
@@ -176,7 +176,7 @@ private:
     // coroutine. FireAndForget uses suspend_never for final_suspend, so the frame
     // self-destructs when done — safe to start and discard the return value.
     aevox::detail::FireAndForget ff_read_loop(std::shared_ptr<WebSocketSession> self);
-    aevox::detail::FireAndForget ff_drain_queue();
+    aevox::detail::FireAndForget ff_drain_queue(std::shared_ptr<WebSocketSession> self);
 
     // -------------------------------------------------------------------------
     // Member state
