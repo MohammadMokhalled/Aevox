@@ -15,7 +15,7 @@ namespace aevox::test {
 namespace {
 
 constexpr std::string_view kDefaultWebSocketKey{"dGhlIHNhbXBsZSBub25jZQ=="};
-constexpr std::size_t      kMaxHttpHeaderBytes{16U * 1024U};
+constexpr std::size_t      kMaxHttpHeaderBytes{static_cast<std::size_t>(16U) * 1024U};
 
 std::string error_message(std::string_view operation, const asio::error_code& ec)
 {
@@ -81,6 +81,8 @@ WebSocketTestClient::WebSocketTestClient(WebSocketTestClient&&) noexcept = defau
 WebSocketTestClient& WebSocketTestClient::operator=(WebSocketTestClient&&) noexcept = default;
 
 WebSocketTestClient::~WebSocketTestClient() = default;
+
+namespace {
 
 std::expected<void, std::string> write_exact(asio::ip::tcp::socket& socket, asio::io_context& io,
                                              std::span<const std::byte>          data,
@@ -308,6 +310,8 @@ std::expected<std::string, std::string> read_frame_payload(
     }
     return payload;
 }
+
+} // anonymous namespace
 
 std::expected<WebSocketTestClient, std::string> WebSocketTestClient::connect(
     std::uint16_t port, std::string_view path, std::chrono::steady_clock::duration timeout)

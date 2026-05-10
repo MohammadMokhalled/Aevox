@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <chrono>
 #include <latch>
 #include <string>
@@ -72,7 +73,7 @@ TEST_CASE("WebSocket echo - send and receive text frame over loopback", "[websoc
     auto client = aevox::test::WebSocketTestClient::connect(port, "/echo", 2s);
     REQUIRE(client);
 
-    const std::string messages[]{"frame1", "frame2", "frame3"};
+    const std::array<std::string, 3> messages{"frame1", "frame2", "frame3"};
     for (const auto& msg : messages) {
         auto send_result = client->send_text(msg, 2s);
         REQUIRE(send_result);
