@@ -25,6 +25,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Default JSON backend: glaze, selectable via `AEVOX_JSON_BACKEND` CMake option (AEV-009)
 
 ### Changed
+- WebSocket integration test architecture now requires Aevox-owned deadline-bounded test transport wrappers instead of raw Asio usage in test cases, preserving the no-public-Asio project goal and covering split-frame, close, upgrade, and broadcast scenarios without exposing backend networking details.
 - CI upgraded to GCC 15 on Ubuntu 26.04; CMake and vcpkg baseline updated to latest stable
 - CI split into PR pipeline (`pr.yml`) with clang-format-21 check and clang-tidy-21 check-only gate, and main pipeline (`main.yml`) with build and test only; old `ci.yml` deleted
 - CI build matrix reduced to four entries (macOS removed): GCC 15 × {debug, release} on Linux, clang 21 × {debug, release} on Linux; codebase now verified against two independent compilers on every push
