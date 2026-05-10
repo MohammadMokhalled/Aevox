@@ -26,6 +26,7 @@
 #include <aevox/response.hpp>
 #include <aevox/router.hpp>
 #include <aevox/task.hpp>
+#include <aevox/websocket_handler.hpp>
 
 #include <chrono>
 #include <cstddef>
@@ -285,6 +286,35 @@ public:
      * @note   Not thread-safe. Must be called before `listen()`.
      */
     template <typename Handler> void options(std::string_view pattern, Handler&& handler);
+
+    /**
+     * @brief Registers a WebSocket handler on the given path pattern.
+     *
+     * When an HTTP request matching `path_pattern` carries the WebSocket
+     * upgrade headers, Aevox performs the RFC 6455 handshake automatically,
+     * constructs a `WebSocket` handle, and invokes `handler.on_open`.
+     * Subsequent frames are delivered to `handler.on_message`. When the
+     * connection closes, `handler.on_close` is invoked.
+     *
+     * The path pattern follows the same typed-segment syntax as HTTP routes:
+     * - `/chat/{room}` — single named segment; extracted via `ws.topic()`
+     *   (the first segment value is stored as the topic automatically).
+     * - `/ws` — static path.
+     * - `/stream/{id}` — named segment.
+     *
+     * If the request reaches the `ws()` handler but is not a valid WebSocket
+     * upgrade (i.e. `req.is_websocket_upgrade()` is `false`), the framework
+     * responds with HTTP 400 automatically — the `WebSocketHandler` callbacks
+     * are never called.
+     *
+     * @param path_pattern  Route pattern (same syntax as `get()`, `post()`, etc.).
+     * @param handler       Callback aggregate. Stored by move — the App owns it.
+     *
+     * @note Not thread-safe. Must be called before `listen()`.
+     * @note Path parameters are accessible via `ws.topic()` for the first
+     *       segment, and via the `WebSocket&` in `on_open`.
+     */
+    void ws(std::string_view path_pattern, WebSocketHandler handler);
 
     /**
      * @brief Registers a global middleware that wraps every route handler.

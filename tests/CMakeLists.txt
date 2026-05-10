@@ -23,6 +23,7 @@ add_custom_target(aevox_tests_bench)
 
 # ── Subdirectories ────────────────────────────────────────────────────────────
 add_subdirectory(smoke)
+add_subdirectory(support)
 add_subdirectory(unit)
 add_subdirectory(integration)
 add_subdirectory(bench)

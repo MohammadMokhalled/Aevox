@@ -21,6 +21,8 @@
 // Design: Tasks/architecture/AEV-005-arch.md §4.1, §4.4
 
 #include <aevox/request.hpp>
+#include <aevox/websocket.hpp>
+#include <aevox/websocket_error.hpp>
 
 #include <algorithm>
 #include <any>
@@ -31,6 +33,9 @@
 #include <vector>
 
 #include "http/http_parser.hpp"
+#include "net/topic_bus.hpp"
+#include "net/websocket_handshake.hpp"
+#include "net/websocket_session.hpp"
 
 #if defined(AEVOX_JSON_BACKEND_GLAZE)
     #include "json/glaze_backend.hpp"
@@ -65,6 +70,24 @@ struct Request::Impl
     /// Per-request middleware context bag. Keys are application-defined strings
     /// (e.g. "auth.user"). Values are type-erased via std::any.
     std::unordered_map<std::string, std::any> context;
+
+    // -------------------------------------------------------------------------
+    // WebSocket upgrade support — set by the connection handler before dispatch.
+    // -------------------------------------------------------------------------
+
+    /// Non-owning pointer to the connection's TcpStream.
+    /// Set by the connection handler so that upgrade_websocket() can consume it.
+    /// Null for requests that were not set up for WebSocket upgrade.
+    aevox::TcpStream* stream{nullptr};
+
+    /// Non-owning pointer to the App-owned TopicBus (null if not a WS route).
+    aevox::net::TopicBus* topic_bus{nullptr};
+
+    /// Maximum payload bytes (from AppConfig::max_body_size).
+    std::size_t max_payload{10UZ * 1024UZ * 1024UZ}; // 10 MiB default
+
+    /// WebSocket lifecycle callbacks — set by App::ws() dispatch before upgrade_websocket().
+    aevox::WebSocketHandler ws_handler;
 
     /// Constructs Impl, taking ownership of buffer and the parsed request.
     /// Computes path_view and query_view from parsed.target by splitting at '?'.
@@ -169,6 +192,163 @@ template <typename T> [[nodiscard]] std::optional<T> Request::get(std::string_vi
         return std::nullopt;
     }
     return *ptr;
+}
+
+// =============================================================================
+// Header lookup helpers (case-insensitive scan over ParsedRequest::headers)
+// =============================================================================
+
+namespace {
+
+/// Case-insensitive equality check for ASCII strings.
+[[nodiscard]] inline bool ws_iequal(std::string_view a, std::string_view b) noexcept
+{
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        if (std::tolower(static_cast<unsigned char>(a[i])) !=
+            std::tolower(static_cast<unsigned char>(b[i])))
+            return false;
+    }
+    return true;
+}
+
+/// Returns true if haystack case-insensitively contains needle.
+[[nodiscard]] inline bool ws_icontains(std::string_view haystack, std::string_view needle) noexcept
+{
+    if (needle.empty())
+        return true;
+    if (haystack.size() < needle.size())
+        return false;
+    for (std::size_t i = 0; i <= haystack.size() - needle.size(); ++i) {
+        if (ws_iequal(haystack.substr(i, needle.size()), needle))
+            return true;
+    }
+    return false;
+}
+
+/// Finds the first header with a case-insensitive name match.
+/// Returns the value, or empty string_view if not found.
+[[nodiscard]] inline std::string_view ws_find_header(
+    const std::vector<std::pair<std::string_view, std::string_view>>& headers,
+    std::string_view                                                  name) noexcept
+{
+    for (const auto& [hname, hval] : headers) {
+        if (ws_iequal(hname, name))
+            return hval;
+    }
+    return {};
+}
+
+} // anonymous namespace
+
+// =============================================================================
+// Request::is_websocket_upgrade()
+// =============================================================================
+
+inline bool Request::is_websocket_upgrade() const noexcept
+{
+    if (!impl_)
+        return false;
+
+    const auto& headers = impl_->parsed.headers;
+
+    // Check Upgrade: websocket (case-insensitive value).
+    const std::string_view upgrade_val = ws_find_header(headers, "Upgrade");
+    if (!ws_iequal(upgrade_val, "websocket"))
+        return false;
+
+    // Check Connection: contains "upgrade" (case-insensitive).
+    const std::string_view conn_val = ws_find_header(headers, "Connection");
+    if (!ws_icontains(conn_val, "upgrade"))
+        return false;
+
+    // Check Sec-WebSocket-Key is present and non-empty.
+    const std::string_view key_val = ws_find_header(headers, "Sec-WebSocket-Key");
+    if (key_val.empty())
+        return false;
+
+    return true;
+}
+
+// =============================================================================
+// Request::upgrade_websocket()
+// =============================================================================
+
+inline aevox::Task<std::expected<aevox::WebSocket, aevox::WebSocketError>>
+Request::upgrade_websocket()
+{
+    if (!impl_ || !impl_->stream) {
+        co_return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::InvalidHandshake,
+                                                        "No TcpStream available for upgrade"});
+    }
+
+    // Build HandshakeHeaders from the parsed request.
+    aevox::net::HandshakeHeaders hs_headers;
+    {
+        const auto& headers          = impl_->parsed.headers;
+        hs_headers.upgrade           = ws_find_header(headers, "Upgrade");
+        hs_headers.connection        = ws_find_header(headers, "Connection");
+        hs_headers.sec_websocket_key = ws_find_header(headers, "Sec-WebSocket-Key");
+    }
+
+    // Validate upgrade headers.
+    auto validate_result = aevox::net::validate(hs_headers);
+    if (!validate_result) {
+        co_return std::unexpected(std::move(validate_result.error()));
+    }
+
+    // Compute Sec-WebSocket-Accept.
+    const std::string accept_key = aevox::net::compute_accept_key(hs_headers.sec_websocket_key);
+
+    // Build HTTP 101 response.
+    const std::string response_str = "HTTP/1.1 101 Switching Protocols\r\n"
+                                     "Upgrade: websocket\r\n"
+                                     "Connection: Upgrade\r\n"
+                                     "Sec-WebSocket-Accept: " +
+                                     accept_key + "\r\n\r\n";
+
+    // Write the 101 response.
+    const std::span<const std::byte> resp_bytes{reinterpret_cast<const std::byte*>(
+                                                    response_str.data()),
+                                                response_str.size()};
+    auto                             write_res = co_await impl_->stream->write(resp_bytes);
+    if (!write_res) {
+        co_return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::SendFailed,
+                                                        "Failed to write HTTP 101 response"});
+    }
+
+    // Extract remote address from the TcpStream (not available directly —
+    // store empty string for now; address is retrieved before upgrade in app_impl).
+    // The actual remote address is stored in impl_->parsed or passed separately.
+    // For v0.2, we use an empty string fallback; app_impl.cpp sets the proper address
+    // via a separate mechanism when WebSocket routes are used.
+    std::string remote_addr;
+    auto        remote_it = impl_->params.find("__remote_addr__");
+    if (remote_it != impl_->params.end())
+        remote_addr = remote_it->second;
+
+    // Extract the first path parameter as the initial topic.
+    std::string initial_topic;
+    // The first non-internal parameter is the initial topic.
+    for (const auto& [k, v] : impl_->params) {
+        if (!k.empty() && k[0] != '_') {
+            initial_topic = v;
+            break;
+        }
+    }
+
+    // Create the WebSocketSession (takes ownership of the TcpStream).
+    auto session = aevox::net::WebSocketSession::create(
+        std::move(*impl_->stream), impl_->topic_bus,
+        std::move(impl_->ws_handler), // set by App::ws() dispatch before this call
+        impl_->max_payload, std::move(remote_addr), std::move(initial_topic));
+
+    // Null out the stream pointer (it was moved).
+    impl_->stream = nullptr;
+
+    // Build and return the WebSocket handle.
+    co_return session->make_handle(session);
 }
 
 // =============================================================================

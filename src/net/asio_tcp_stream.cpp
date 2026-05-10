@@ -243,3 +243,31 @@ aevox::TcpStream AsioTcpStream::make(asio::ip::tcp::socket socket, asio::io_cont
 }
 
 } // namespace aevox::net
+
+// =============================================================================
+// get_tcp_stream_impl — internal accessor (friend of TcpStream, see tcp_stream.hpp)
+// =============================================================================
+
+namespace aevox {
+
+/// Returns mutable Impl pointer for internal net/ code (WebSocketSession).
+/// Defined here because TcpStream::Impl is complete in this TU.
+/// Friend declared in tcp_stream.hpp.
+TcpStream::Impl* get_tcp_stream_impl(TcpStream& stream) noexcept
+{
+    return stream.impl_.get();
+}
+
+} // namespace aevox
+
+namespace aevox::net {
+
+/// Returns the io_context executor from a TcpStream.
+/// Defined here where TcpStream::Impl is complete.
+/// Declared in asio_tcp_stream.hpp.
+asio::io_context::executor_type get_tcp_stream_executor(aevox::TcpStream& stream) noexcept
+{
+    return get_tcp_stream_impl(stream)->io_ctx->get_executor();
+}
+
+} // namespace aevox::net

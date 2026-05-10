@@ -151,4 +151,13 @@ Response Response::stream(std::string_view content_type)
     return Response{200, {}, std::string{content_type}};
 }
 
+Response Response::switching_protocols()
+{
+    // Status 101 signals to the connection handler that the HTTP connection was
+    // already upgraded to WebSocket; the connection handler suppresses writing
+    // this response to the socket. The real HTTP 101 was already sent by
+    // Request::upgrade_websocket().
+    return Response{101, {}, {}};
+}
+
 } // namespace aevox

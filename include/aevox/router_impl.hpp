@@ -75,9 +75,18 @@ template <typename Handler> void aevox::Router::del(std::string_view pattern, Ha
     auto segs  = aevox::detail::parse_pattern(pattern);
     auto names = aevox::detail::extract_param_names(segs);
     auto types = aevox::detail::extract_param_types(segs);
+#ifdef DELETE
+    #pragma push_macro("DELETE")
+    #undef DELETE
+    #define AEVOX_WIN32_DELETE_PUSHED_ROUTER
+#endif
     register_route(aevox::HttpMethod::DELETE, std::span{segs},
                    aevox::detail::normalise_handler(std::forward<Handler>(handler),
                                                     std::span{names}, std::span{types}));
+#ifdef AEVOX_WIN32_DELETE_PUSHED_ROUTER
+    #pragma pop_macro("DELETE")
+    #undef AEVOX_WIN32_DELETE_PUSHED_ROUTER
+#endif
 }
 
 template <typename Handler> void aevox::Router::options(std::string_view pattern, Handler&& handler)

@@ -36,6 +36,7 @@ nav:
       - Configuration: guide/configuration.md
       - Middleware: guide/middleware.md
       - JSON: guide/json.md
+      - WebSocket: guide/websocket.md
   - Architecture:
       - Overview: architecture/index.md
       - Executor: architecture/executor.md
@@ -54,6 +55,7 @@ nav:
       - Middleware: api/middleware.md
       - Configuration: api/config.md
       - JSON: api/json.md
+      - WebSocket: api/websocket.md
   - Examples:
       - Overview: examples/index.md
       - Hello World: examples/hello-world.md

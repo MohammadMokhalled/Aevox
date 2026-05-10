@@ -45,6 +45,14 @@ if(MSVC)
         /permissive-  # strict conformance mode
         /utf-8      # treat source as UTF-8 (matches Linux/macOS default)
     )
+    # _WIN32_WINNT=0x0A00: target Windows 10+ APIs; suppresses the SDK's own
+    # "please define _WIN32_WINNT" diagnostic that otherwise spills into builds.
+    # NOMINMAX: prevent <windows.h> from defining min/max macros, which break
+    # std::numeric_limits<T>::max() and similar STL expressions under MSVC.
+    add_compile_definitions(
+        _WIN32_WINNT=0x0A00
+        NOMINMAX
+    )
 else()
     set(AEVOX_COMPILE_OPTIONS
         -Wall

@@ -285,6 +285,20 @@ public:
      */
     [[nodiscard]] static Response stream(std::string_view content_type);
 
+    /**
+     * @brief Creates a 101 Switching Protocols sentinel response.
+     *
+     * Used internally by the WebSocket upgrade path to signal that the HTTP
+     * connection has been handed off to a WebSocket session. The connection
+     * handler checks for status 101 and suppresses writing this response to
+     * the socket (the real HTTP 101 was already sent by `upgrade_websocket()`).
+     *
+     * @return Response with status 101 and no body.
+     * @note   Application code should never need to call this method directly.
+     *         Use `co_await req.upgrade_websocket()` instead.
+     */
+    [[nodiscard]] static Response switching_protocols();
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

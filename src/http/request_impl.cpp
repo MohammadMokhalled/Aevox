@@ -19,6 +19,13 @@
 #include <ranges>
 #include <string_view>
 
+// <winnt.h> (via Asio on Windows) defines DELETE as a numeric macro which
+// collides with HttpMethod::DELETE. This TU is the only consumer, so a plain
+// undef is sufficient — no restore needed in a .cpp file.
+#ifdef DELETE
+    #undef DELETE
+#endif
+
 namespace aevox {
 
 // =============================================================================

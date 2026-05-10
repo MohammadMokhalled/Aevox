@@ -40,12 +40,17 @@ add_subdirectory(http)    # aevox_http OBJECT library (HttpParser + llhttp)
 add_subdirectory(router)  # aevox_router OBJECT library (Router + App)
 
 add_library(aevox_core STATIC
-    net/asio_executor.cpp      # Asio-backed executor + accept loop
-    net/executor_context.cpp   # thread_local executor bridge definitions
-    net/asio_tcp_stream.cpp    # TcpStream pimpl implementation
-    config/toml_loader.cpp     # TOML config file loading (toml++ confined here)
-    config/config_impl.cpp     # to_string(ConfigError) implementation
-    json/json_error.cpp        # JsonError::message() — out-of-line to prevent false-positive analyser hits
+    net/asio_executor.cpp          # Asio-backed executor + accept loop
+    net/executor_context.cpp       # thread_local executor bridge definitions
+    net/asio_tcp_stream.cpp        # TcpStream pimpl implementation
+    net/websocket_handshake.cpp    # RFC 6455 handshake validation and accept-key
+    net/websocket_frame.cpp        # RFC 6455 frame parser and emitter
+    net/websocket_session.cpp      # Asio-backed WebSocket session (read loop, strand)
+    net/topic_bus.cpp              # In-process pub/sub topic registry
+    net/websocket.cpp              # WebSocket public handle out-of-line members
+    config/toml_loader.cpp         # TOML config file loading (toml++ confined here)
+    config/config_impl.cpp         # to_string(ConfigError) implementation
+    json/json_error.cpp            # JsonError::message() — out-of-line to prevent false-positive analyser hits
     $<TARGET_OBJECTS:aevox_http>
     $<TARGET_OBJECTS:aevox_router>
 )

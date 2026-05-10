@@ -8,7 +8,24 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `aevox::WebSocket` — async WebSocket connection handle; `send()`, `send_nowait()`, `close()`, `subscribe()`, `publish()`, `topic()`, `remote_address()` (AEV-010)
+- `WebSocket::send_nowait(std::string_view)` — synchronous fire-and-forget text send for use from non-coroutine `WebSocketHandler` callbacks (`on_message`, `on_close`); use `co_await ws.send(msg)` from coroutine contexts for error feedback (AEV-010)
+- `aevox::WebSocketHandler` — callback aggregate: `on_open`, `on_message`, `on_close` (AEV-010)
+- `aevox::WebSocketError` and `aevox::WebSocketErrorCode` — structured error type for WebSocket failures (AEV-010)
+- `App::ws(path, handler)` — register a WebSocket route with automatic RFC 6455 handshake (AEV-010)
+- `Request::is_websocket_upgrade()` — fast synchronous predicate for upgrade detection (AEV-010)
+- `Request::upgrade_websocket()` — perform HTTP/1.1 to WebSocket upgrade; returns `WebSocket` handle (AEV-010)
+- In-process topic bus supporting room-based broadcast via `WebSocket::subscribe()` / `publish()` (AEV-010)
+- `Response::switching_protocols()` — internal 101 sentinel used by the WebSocket upgrade path (AEV-010)
+- `aevox::JsonBackend` concept — compile-time contract for JSON backend implementations (AEV-009)
+- `aevox::JsonError` — structured error type for JSON parse and serialization failures (AEV-009)
+- `Request::json<T>()` — async JSON body deserialization returning `std::expected<T, JsonError>` (AEV-009)
+- `Response::json(T)` — JSON serialization factory with automatic `Content-Type: application/json` (AEV-009)
+- Default JSON backend: glaze, selectable via `AEVOX_JSON_BACKEND` CMake option (AEV-009)
+
 ### Changed
+- WebSocket integration test architecture now requires Aevox-owned deadline-bounded test transport wrappers instead of raw Asio usage in test cases, preserving the no-public-Asio project goal and covering split-frame, close, upgrade, and broadcast scenarios without exposing backend networking details.
 - CI upgraded to GCC 15 on Ubuntu 26.04; CMake and vcpkg baseline updated to latest stable
 - CI split into PR pipeline (`pr.yml`) with clang-format-21 check and clang-tidy-21 check-only gate, and main pipeline (`main.yml`) with build and test only; old `ci.yml` deleted
 - CI build matrix reduced to four entries (macOS removed): GCC 15 × {debug, release} on Linux, clang 21 × {debug, release} on Linux; codebase now verified against two independent compilers on every push
