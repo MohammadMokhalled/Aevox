@@ -137,6 +137,5 @@ app.use([](aevox::Request& req,
 ## See Also
 
 - [Middleware Usage Guide](../guide/middleware.md) — practical patterns and examples
-- [App API Reference](app.md) — top-level `App` class
-- [Request API Reference](request.md) — request inspection and context
-- [Response API Reference](response.md) — response construction and headers
+- [Router and App API Reference](router.md) — top-level `App` class
+- [Request and Response API Reference](request-response.md) — request inspection, context, response construction and headers

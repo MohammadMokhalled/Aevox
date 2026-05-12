@@ -198,5 +198,4 @@ A: after
 ## See Also
 
 - [Middleware API Reference](../api/middleware.md) — complete API documentation
-- [Request Guide](request.md) — request inspection and context
-- [Response Guide](response.md) — response construction
+- [Request and Response Guide](request-response.md) — request inspection, context, and response construction
