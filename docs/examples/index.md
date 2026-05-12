@@ -8,6 +8,9 @@ self-contained binary under `examples/` in the repository.
 | Example | What it shows |
 |---|---|
 | [Hello World](hello-world.md) | Static routes, named path parameters, clean shutdown — the complete v0.1 API in one file |
+| [Configured Server](configured-server.md) | `App::create()` with an optional TOML config file — partial overrides and graceful error handling |
+| [Middleware Plugin](middleware-plugin.md) | Global and scoped middleware composition — logging, auth guards, and short-circuiting |
+| [WebSocket Chat](websocket-chat.md) | Room-based WebSocket pub/sub broadcast with lifecycle callbacks |
 
 ## Building examples
 

@@ -9,9 +9,12 @@ Aevox is built as a strict layered system. Each layer depends only on the layer 
 ```mermaid
 graph TD
     subgraph Public["Public API — <code>include/aevox/</code>"]
-        APP["<code>aevox::App</code><br/><em>planned</em>"]
-        ROUTER["<code>aevox::Router</code><br/><em>planned</em>"]
-        RR["<code>aevox::Request / Response</code><br/><em>planned</em>"]
+        APP["<code>aevox::App</code><br/><strong>implemented</strong>"]
+        ROUTER["<code>aevox::Router</code><br/><strong>implemented</strong>"]
+        RR["<code>aevox::Request / Response</code><br/><strong>implemented</strong>"]
+        JSON["<code>aevox::JsonError / JsonBackend</code><br/><strong>implemented</strong>"]
+        WS["<code>aevox::WebSocket / WebSocketHandler</code><br/><strong>implemented</strong>"]
+        MW["<code>aevox::Middleware</code><br/><strong>implemented</strong>"]
         EXEC["<code>aevox::Executor</code><br/><code>aevox::TcpStream</code><br/><strong>implemented</strong>"]
         TASK["<code>aevox::Task&lt;T&gt;</code><br/><code>aevox::pool / sleep / when_all</code><br/><strong>implemented</strong>"]
     end
@@ -27,7 +30,9 @@ graph TD
         PROXY["Reverse Proxy<br/>Nginx / Caddy<br/>TLS · HTTP/2 · HTTP/3"]
     end
 
-    APP --> ROUTER --> RR --> EXEC
+    APP --> MW --> ROUTER --> RR --> EXEC
+    APP --> WS
+    RR --> JSON
     EXEC --> HTTP_PARSER
     EXEC --> NET
     NET --> ASIO --> OSIO --> PROXY
@@ -209,26 +214,43 @@ flowchart TD
 ```
 aevox/
 ├── include/aevox/          # PUBLIC API — no Asio, no third-party types
-│   ├── executor.hpp        # Executor, ExecutorConfig, ExecutorError, ConnectionHandler
-│   ├── task.hpp            # Task<T>, Task<void>
+│   ├── app.hpp             # App, AppConfig — high-level server entry point
 │   ├── async.hpp           # pool(), sleep(), when_all()
-│   └── tcp_stream.hpp      # TcpStream, IoError
+│   ├── config.hpp          # Named defaults, ConfigError, ConfigErrorDetail
+│   ├── executor.hpp        # Executor, ExecutorConfig, ExecutorError, ConnectionHandler
+│   ├── json_backend.hpp    # JsonBackend concept (pluggable JSON backend)
+│   ├── json_error.hpp      # JsonError — structured JSON error type
+│   ├── middleware.hpp      # MiddlewareFn, MiddlewareNext — composable pipeline
+│   ├── request.hpp         # Request — method, path, headers, body, param<T>()
+│   ├── response.hpp        # Response — factory methods, fluent header builder
+│   ├── router.hpp          # Router — trie-based path matching, route groups
+│   ├── task.hpp            # Task<T>, Task<void>
+│   ├── tcp_stream.hpp      # TcpStream, IoError
+│   ├── websocket.hpp       # WebSocket, WebSocketError, WebSocketErrorCode
+│   └── websocket_handler.hpp # WebSocketHandler — lifecycle callbacks
 │
 ├── src/
 │   ├── net/                # ALL Asio code lives here only
 │   │   ├── asio_executor.hpp/.cpp      # AsioExecutor implements Executor
 │   │   └── asio_tcp_stream.hpp/.cpp    # TcpStream::Impl + ReadAwaitable/WriteAwaitable
-│   └── http/               # HTTP parsing — llhttp confined here
-│       ├── http_parser.hpp             # HttpParser, ParsedRequest, ParseError (internal)
-│       └── http_parser.cpp             # llhttp callbacks and feed() logic
+│   ├── http/               # HTTP parsing — llhttp confined here
+│   │   ├── http_parser.hpp             # HttpParser, ParsedRequest, ParseError (internal)
+│   │   └── http_parser.cpp             # llhttp callbacks and feed() logic
+│   ├── router/             # Router implementation
+│   ├── json/               # JSON backend implementation (glaze)
+│   └── log/                # Logging backend implementation (spdlog)
 │
 └── tests/
     ├── unit/
     │   ├── net/    # executor + async helpers unit tests
-    │   └── http/   # HTTP parser unit tests
+    │   ├── http/   # HTTP parser unit tests
+    │   ├── router/ # router unit tests
+    │   ├── json/   # JSON unit tests
+    │   └── websocket/ # WebSocket unit tests
     └── integration/
         ├── net/    # executor + async helpers integration tests (real loopback)
-        └── http/   # HTTP parser integration tests (real loopback + parser)
+        ├── http/   # HTTP parser integration tests (real loopback + parser)
+        └── router/ # router integration tests
 ```
 
 ---
@@ -255,6 +277,9 @@ In-depth pages covering the design rationale, diagrams, and trade-offs for each 
 | `TcpStream`, HTTP/1.1 parser (llhttp), `ConnectionHandler` | Done |
 | CPU thread pool, `pool()`, `sleep()`, `when_all()` | Done |
 | Router, App, Request, Response | Done |
+| JSON backend (`JsonError`, `JsonBackend`, `Request::json<T>()`, `Response::json`) | Done |
+| Middleware pipeline (`MiddlewareFn`, `MiddlewareNext`) | Done |
+| WebSocket upgrade, messaging, pub/sub (`WebSocket`, `WebSocketHandler`) | Done |
 
 ---
 

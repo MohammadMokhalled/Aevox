@@ -15,14 +15,10 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [Request and Response](request-response.md) | `<aevox/request.hpp>` / `<aevox/response.hpp>` | Incoming HTTP request and outgoing HTTP response — typed parameter extraction, factory methods, fluent header builder |
 | [Router and App](router.md) | `<aevox/router.hpp>` / `<aevox/app.hpp>` | URL routing and top-level server entry point — static, parameter, wildcard segments |
 | [Configuration](config.md) | `<aevox/config.hpp>` | Named defaults, `AppConfig`, `ExecutorConfig`, `ConfigError`, TOML key reference |
-
----
-
-## Coming in v0.2
-
-| Module | Header | Description |
-|---|---|---|
-| Middleware | `<aevox/middleware.hpp>` | Composable middleware pipeline |
+| [Middleware](middleware.md) | `<aevox/middleware.hpp>` | Composable middleware pipeline — logging, auth, CORS, request/response interceptors |
+| [JSON](json.md) | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` | Automatic request/response JSON serialization via a pluggable backend |
+| [WebSocket](websocket.md) | `<aevox/websocket.hpp>` / `<aevox/websocket_handler.hpp>` / `<aevox/websocket_error.hpp>` | RFC 6455 upgrade, bidirectional messaging, and in-process pub/sub |
+| [Concepts](concepts.md) | `<aevox/concepts.hpp>` | `ParamConvertible`, `Serializable`, `Deserializable` — C++23 concept constraints for parameters and JSON |
 
 ---
 

@@ -9,6 +9,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Planned human-gated DevEx work for Claude, Codex, and Windsurf assistant support, documentation refresh, and pipeline stabilization; validation baseline is required as the first implementation step.
 - `aevox::WebSocket` — async WebSocket connection handle; `send()`, `send_nowait()`, `close()`, `subscribe()`, `publish()`, `topic()`, `remote_address()` (AEV-010)
 - `WebSocket::send_nowait(std::string_view)` — synchronous fire-and-forget text send for use from non-coroutine `WebSocketHandler` callbacks (`on_message`, `on_close`); use `co_await ws.send(msg)` from coroutine contexts for error feedback (AEV-010)
 - `aevox::WebSocketHandler` — callback aggregate: `on_open`, `on_message`, `on_close` (AEV-010)

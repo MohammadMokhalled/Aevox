@@ -13,6 +13,9 @@ This guide walks you through every feature of Aevox step by step, assuming you k
 | [Async Patterns](async-patterns.md) | Writing coroutine handlers, offloading CPU work, non-blocking timers, concurrent fan-out, and graceful shutdown |
 | [Error Handling](error-handling.md) | The `std::expected` error model, Aevox error types, propagating errors in coroutines, and diagnostics |
 | [Configuration](configuration.md) | Runtime configuration via `AppConfig` and an optional TOML file — ports, limits, thread counts, and error handling |
+| [JSON](json.md) | Parsing request bodies and building JSON responses with automatic serialization |
+| [Middleware](middleware.md) | Composing interceptors for logging, auth, CORS, and request/response transformation |
+| [WebSocket](websocket.md) | Registering WebSocket routes, handling lifecycle events, and in-process pub/sub broadcast |
 
 ## How to Use This Guide
 
