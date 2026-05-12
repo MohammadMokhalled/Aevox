@@ -265,6 +265,28 @@ jobs:
         run: ctest --preset asan
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # Docs build — validates that MkDocs builds without warnings or errors
+  # Uses --strict to fail on any mkdocs warning (missing nav entries, broken
+  # links, malformed YAML, etc.).  Does NOT deploy — build-only validation gate.
+  # ─────────────────────────────────────────────────────────────────────────────
+  docs-build:
+    name: Docs Build (mkdocs --strict)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Python dependencies
+        run: |
+          pip install mkdocs mkdocs-material pymdown-extensions
+
+      - name: Build documentation
+        run: mkdocs build --strict
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # Windows — MSVC 2022 (windows-latest), windows-msvc preset (multi-config, debug)
   # Retained in pr.yml only (not main.yml) because the PR gate catches Windows
   # regressions before merge; re-running on main is redundant (ADD §4.2).
