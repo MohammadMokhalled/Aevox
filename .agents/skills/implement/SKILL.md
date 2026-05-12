@@ -10,28 +10,18 @@ You are executing the **implementation phase** of a task for the Aevox C++23 web
 
 ---
 
-## Pre-Flight Checks (Do These Before Writing a Single Line)
+## Pre-Flight Checks
 
-1. **Locate the ADD.** Read `Tasks/architecture/{TASK-ID}-arch.md`.
-   - If it does not exist: **stop**. Report the missing ADD and tell the user to run `/architect` first.
-   - If Section 10 (Open Issues) contains unresolved items: **stop**. List them and ask for architect sign-off before continuing.
-
-2. **Locate the TPO task.** Read `Tasks/tasks/{TASK-ID}-*.md`.
-   - Extract all acceptance criteria and the Definition of Done checklist.
-
-3. **Check the current branch.**
-   - If on `main` or a shared branch: create `feature/<feature-name-in-kebab-case>` and switch to it.
-   - If already on the correct feature branch: proceed.
-
-4. **Update or create the Developer Log** at `Tasks/progress/{TASK-ID}-devlog.md`.
-   - Set status to `Implementing`.
-   - Record which inputs were read.
+1. Read the ADD (`Tasks/architecture/{TASK-ID}-arch.md`). Stop if missing or Section 10 has open issues.
+2. Read the TPO task (`Tasks/tasks/{TASK-ID}-*.md`).
+3. Ensure a feature branch is checked out.
+4. Update the Developer Log (`Tasks/progress/{TASK-ID}-devlog.md`).
 
 ---
 
-## Code Standards (Zero Tolerance)
+## Code Standards
 
-All CLAUDE.md §3–4 rules apply. If you write a prohibited pattern, fix it immediately.
+> See AGENTS.md §3–5.
 
 ---
 
@@ -46,7 +36,7 @@ Follow the ADD File Map (§5) exactly. Create in dependency order:
 5. Integration tests (`tests/integration/`) — only if ADD §8 requires them
 6. Benchmarks (`tests/bench/`) — only if the task is tagged `#networking` or `#performance`
 
-Every public symbol needs a complete Doxygen block (CLAUDE.md §8) before moving to the next file. Use the ADD §3 comment as your starting point.
+Every public symbol needs a complete Doxygen block (AGENTS.md §8) before moving to the next file. Use the ADD §3 comment as your starting point.
 
 ---
 

@@ -12,25 +12,9 @@ You are applying a targeted fix to a known issue in the Aevox C++23 web framewor
 
 ## Before Touching Any File
 
-1. **Read the issue description carefully.** Understand exactly what is wrong before acting.
-
-2. **Read every file involved in the fix.** Never edit code you haven't read. Understand the surrounding context — what the code is trying to do, why it was written this way.
-
-3. **Identify the fix source and priority:**
-
-   | Source | Priority |
-   |---|---|
-   | User request | Highest — treat as Critical |
-   | Architect review — Critical | Fix immediately; nothing else first |
-   | Architect review — Major | Fix before any new work |
-   | Architect review — Minor | Fix before marking Done |
-   | Architect review — Advisory | Use judgment |
-   | TPO change | High — check if ADD revision needed first |
-   | Failing test | High — root-cause before patching |
-
-4. **Update the Developer Log** at `Tasks/progress/{TASK-ID}-devlog.md`:
-   - Add a `Fix:{source}` entry with today's date and a description of the issue.
-   - Set status to `Fix:User`, `Fix:Architect`, or `Fix:TPO`.
+1. Read the issue description and every file involved.
+2. Determine priority from the source (see Developer agent).
+3. Update the Developer Log (`Tasks/progress/{TASK-ID}-devlog.md`) with a `Fix:{source}` entry.
 
 ---
 
@@ -40,9 +24,9 @@ You are applying a targeted fix to a known issue in the Aevox C++23 web framewor
 
 Change only what is necessary to resolve the issue. Do not refactor surrounding code, add features, or clean up unrelated style. A fix touches only the bug.
 
-### Code standards still apply
+### Code standards
 
-All CLAUDE.md §3–4 rules are non-negotiable in a fix — minimal scope, not relaxed rules.
+> See AGENTS.md §3–5.
 
 ### If the fix requires a public API change
 
@@ -77,11 +61,7 @@ If fixing a failing test: it must now pass. If you cannot make it pass without b
 
 ## Updating Documentation
 
-If the fix changes documented behaviour, update docs as part of the fix:
-
-- Doxygen: update the affected `@brief`, `@return`, `@note` as needed.
-- mkdocs: update `docs/api/{module}.md` if the public-facing description changed or any other related documentation.
-- `CHANGELOG.md`: add an entry under `[Unreleased]` if a public header was modified.
+Update docs and `CHANGELOG.md` as needed per AGENTS.md §8 and §11.
 
 ---
 

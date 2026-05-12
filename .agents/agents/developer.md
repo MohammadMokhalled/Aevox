@@ -147,9 +147,9 @@ Do not begin Phase 2 until the plan is written.
 
 Follow the ADD's **File Map** (Section 5) exactly. Create files in dependency order — headers before implementations, implementations before tests.
 
-### Code Standards (enforced — no exceptions)
+### Code Standards
 
-All AGENTS.md §3–5 rules apply — zero tolerance. If you write a prohibited pattern, fix it immediately.
+> See AGENTS.md §3–5 for all architectural invariants and C++23 patterns.
 
 ### In-Code Documentation
 
@@ -169,7 +169,7 @@ If you discover the ADD is wrong, incomplete, or impossible to implement as writ
 
 Write tests as specified in the ADD Section 8. The ADD gives you named test cases — use those exact names as your `TEST_CASE` strings.
 
-Follow AGENTS.md §9 for required test types, coverage minimums, and framework choices.
+> See AGENTS.md §9 for test types, coverage minimums, and framework choices.
 
 ### Test file header
 
@@ -195,86 +195,17 @@ Do not move to Phase 4 until all tests pass.
 
 ## Phase 4 — Documentation (mkdocs)
 
-Every task that adds or modifies public API must produce mkdocs documentation. Save pages to `docs/` at the project root.
-Use `/document` skill for documentat generation.
+Use the `/document` skill to produce or update mkdocs pages.
 
 ## Phase 5 — Self-Review
 
-Before declaring the task done, conduct a structured self-review against four checklists. Record every finding in the Developer Log, then fix each one before proceeding.
-
-### Checklist A — Correctness
-
-- [ ] Every acceptance criterion in the TPO task is met
-- [ ] Every test case named in the ADD Section 8 is implemented
-- [ ] All tests pass (unit, integration, bench)
-- [ ] No test is skipped, commented out, or marked `PENDING`
-- [ ] Error paths are exercised — not just happy paths
-- [ ] `std::expected` errors are always checked at call sites (never silently discarded)
-
-### Checklist B — Code Quality
-
-- [ ] Zero violations of AGENTS.md §4 prohibition list
-- [ ] All public symbols have complete Doxygen blocks (AGENTS.md §8)
-- [ ] All internal non-obvious logic has explanatory comments
-- [ ] No Asio types in any file under `include/aevox/`
-- [ ] Clang-Format would produce no diff
-
-### Checklist C — Architecture Compliance
-
-- [ ] Exactly the files in ADD Section 5 were created (no extras without log entry)
-- [ ] No dependency not shown in ADD Section 6 was introduced
-- [ ] Layer boundaries respected — public headers have no internal type exposure
-- [ ] Every deviation from the ADD is recorded in the Developer Log
-
-### Checklist D — Definition of Done (from TPO task)
-
-- [ ] Implementation compiles on Linux/macOS/Windows (C++23)
-- [ ] All public symbols documented per TPO Documentation Standards
-- [ ] Unit tests written and passing
-- [ ] Integration tests written and passing (if required)
-- [ ] Performance baseline established or regression check passing (if required)
-- [ ] `CHANGELOG.md` updated (if public API changed)
-- [ ] mkdocs page written and added to `mkdocs.yml`
-- [ ] Developer Log updated with final status `Done`
-
-Fix every failing item. Do not mark the task Done until all four checklists pass.
+Before declaring the task done, run the `/review` skill checklist. Record every finding in the Developer Log, then fix each one before marking Done.
 
 ---
 
 ## Phase 6 — Fix Loop
 
-When fixes are requested by the **User**, **TPO**, or **Architect**, handle them as follows:
-
-### Receiving a fix request
-
-1. Update Developer Log: add a `Fix:{source}` entry with the date and description of the issue
-2. Set status to `Fix:User` / `Fix:TPO` / `Fix:Architect`
-3. Identify all files affected
-4. Apply the fix
-5. Re-run the relevant tests (at minimum; re-run all if the fix touches shared code)
-6. Update any affected documentation (in-code Doxygen + mkdocs page)
-7. Re-run the Self-Review checklists A and B for the affected code
-8. Update the Developer Log with what was fixed and that tests were re-run
-9. Report back: what was changed, which tests now pass, any follow-on risk
-
-### Architect fix requests
-
-Architect findings use severity tiers (Critical / Major / Minor / Advisory). Handle them in order:
-
-- **Critical:** Fix immediately, do not touch any other code first. Re-run full test suite after.
-- **Major:** Fix before any new work begins.
-- **Minor:** Fix in the current task cycle before marking Done.
-- **Advisory:** Use judgment — implement if it fits in the current cycle, log it otherwise.
-
-### TPO fix requests
-
-TPO changes often affect acceptance criteria. When a TPO change arrives:
-1. Check whether the ADD needs a revision (scope change → yes; wording clarification → maybe not)
-2. If ADD revision is needed, flag it to the user before implementing
-
-### User fix requests
-
-Treat user requests as highest priority. Implement them. If a request contradicts the ADD or PRD, implement it and flag the contradiction so the user can decide whether to update the ADD.
+When fixes are requested, use the `/fix` skill. Record every fix in the Developer Log and re-run the `/review` skill checklist before marking Done.
 
 ---
 

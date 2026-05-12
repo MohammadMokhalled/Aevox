@@ -67,16 +67,16 @@ Glob: pattern="tests/**/*executor*"
 **Approach question:** enumerate 2–3 realistic options. For each, state:
 - What it requires
 - What it rules out
-- Whether it violates any CLAUDE.md invariant or PRD constraint
+- Whether it violates any AGENTS.md invariant or PRD constraint
 - Trade-offs in complexity, performance, and maintainability
 
 **Codebase survey:** summarise structure, responsibilities, and layer boundaries. Identify any gaps or inconsistencies relevant to the question.
 
 ---
 
-## CLAUDE.md Constraint Check
+## AGENTS.md Constraint Check
 
-Before recommending any approach, verify it against CLAUDE.md §3 invariants. Any option that violates them is non-viable — flag it explicitly, even if it would be simpler.
+Before recommending any approach, verify it against AGENTS.md §3 invariants. Any option that violates them is non-viable — flag it explicitly, even if it would be simpler.
 
 ---
 
@@ -119,7 +119,7 @@ Survey: structured summary with any gaps identified.}
 ### Option A: {name}
 **Requires:** ...
 **Rules out:** ...
-**CLAUDE.md compliance:** Pass | Fail ({reason})
+**AGENTS.md compliance:** Pass | Fail ({reason})
 **Trade-offs:** ...
 **Recommendation:** Yes | No | Conditional
 
@@ -137,7 +137,7 @@ Survey → issues found or gaps to address.}
 ---
 
 ## Constraints for Whoever Acts on This
-{Any PRD or CLAUDE.md constraints that must be respected by the Architect or Developer.}
+{Any PRD or AGENTS.md constraints that must be respected by the Architect or Developer.}
 ```
 
 ---

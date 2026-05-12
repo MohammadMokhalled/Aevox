@@ -43,57 +43,13 @@ Before writing a single finding:
 
 ---
 
-## Task Review Checklist
+## Checklists
 
-- [ ] Task ID follows `AEV-NNN` format (zero-padded, sequential)
-- [ ] Summary is precise enough to work from without a meeting
-- [ ] All acceptance criteria are written in Given/When/Then form
-- [ ] Acceptance criteria include documentation and test requirements explicitly
-- [ ] Documentation Standards section is present and complete
-- [ ] Test Requirements section is present (unit + integration + bench as applicable)
-- [ ] Definition of Done checklist includes all non-negotiable gates
-- [ ] Dependencies are listed (blocked-by / blocks)
-- [ ] Technical Notes reference relevant PRD sections and ADRs
-
----
-
-## Design Review Checklist (ADD)
-
-- [ ] §3 Public API: all signatures are exact (not sketches), fully Doxygen-annotated
-- [ ] §3 Public API: no Asio types in any `include/aevox/` declaration
-- [ ] §3 Public API: no third-party library types in public signatures
-- [ ] §4 Internal Design: concurrency model documented
-- [ ] §5 File Map: every file listed exists or will be created — no phantom files
-- [ ] §6 Dependency Graph: no upward layer dependencies, executor.hpp boundary marked
-- [ ] §8 Test Architecture: named test cases cover happy, error, edge, thread-safety
-- [ ] §10 Open Issues: all resolved or explicitly deferred with rationale
-- [ ] §11 Handoff Checklist: complete and unambiguous for the Developer
-
----
-
-## Code Review Checklist
-
-### Correctness
-- [ ] Every acceptance criterion in the TPO task is met by the implementation
-- [ ] Every test case named in ADD §8 exists and passes
-- [ ] `std::expected` errors are checked at every call site — none silently discarded
-- [ ] Error paths are exercised in tests, not just happy paths
-- [ ] No test is skipped, commented out, or marked `PENDING`
-
-### C++23 Compliance (AGENTS.md §4)
-- [ ] No violations of AGENTS.md §4 prohibition list (all items apply)
-
-### Public API (`include/aevox/`)
-- [ ] No Asio headers or types
-- [ ] No third-party library types
-- [ ] All `[[nodiscard]]` annotations present on `std::expected` / `std::optional` returns
-- [ ] Every public symbol has a complete Doxygen block
-
-### Architecture
-- [ ] File layout matches ADD §5 exactly
-- [ ] No dependency introduced that is not in ADD §6
-- [ ] Layer boundaries respected — nothing flows upward
-- [ ] All deviations from the ADD are in the Developer Log
+| Review type | What to verify | Rule source |
+|---|---|---|
+| **Task** | Task ID format, acceptance criteria, docs/tests in acceptance criteria, DoD gates | TPO task template |
+| **Design (ADD)** | §3 Public API exactness, no Asio/third-party types in `include/aevox/`, §4 concurrency model, §5 file map, §6 dependency graph, §8 test architecture, §10 open issues resolved, §11 handoff checklist | AGENTS.md §3–4, ADD |
+| **Code** | Every acceptance criterion met, every ADD §8 test case exists and passes, `std::expected` checked at call sites, error paths exercised, AGENTS.md §4 compliance, no Asio in public headers, Doxygen complete, file layout matches ADD §5, no extra dependencies, layer boundaries respected, deviations logged | AGENTS.md §3–5, §8–9, ADD |
 
 ---
 

@@ -61,49 +61,16 @@ Context and motivation. Link to PRD section if applicable.
 
 ## Documentation Standards
 
-This section is mandatory. A task cannot move to "Review" unless all are satisfied.
-
-**Public API:** Every public symbol must have a full Doxygen block (CLAUDE.md §8). All tags required: `@brief`, `@tparam`/`@param`, `@return`, `@note`, `@throws`.
-
-**Internal files:** Block comments for non-obvious logic only. No over-commenting.
-
-**Changelog:** Every task modifying a public header must add an entry to `CHANGELOG.md` under `[Unreleased]`.
+> See AGENTS.md §8 for full Doxygen rules and changelog requirements.
 
 ## Test Requirements
 
-This section is mandatory. A task cannot move to "Done" unless all test requirements are met and CI is green.
+> See AGENTS.md §9 for test types, coverage minimums, and framework choices.
 
-**Unit tests** (required for all tasks):
-- Framework: Catch2 (preferred) or GoogleTest
-- Location: `tests/unit/{module}/` mirroring the source tree
-- Naming: `TEST_CASE("{TASK-ID}: {what is being tested}", "[{module}]")`
-- Coverage target: every public function must have at minimum:
-  - A happy-path test
-  - At least one error/edge-path test (invalid input, boundary, `std::expected` error branch)
-  - A test for any documented thread-safety guarantee (use `std::jthread` + barriers)
-
-**Integration tests** (required when the task touches I/O, network, or middleware):
-- Location: `tests/integration/{module}/`
-- Must spin up a real `asio::io_context` — no mocks of Asio internals
-- HTTP-level tests must send real bytes over a loopback socket
-
-**Performance tests** (required for any task tagged `#networking` or `#performance`):
-- Framework: nanobench
-- Location: `tests/bench/{module}/`
-- Must establish a named baseline and assert no regression > 5% vs. previous run
-- Example: `ankerl::nanobench::Bench().minEpochIterations(10000).run("accept_loop throughput", [&]{ … });`
-
-**Test file template:**
-```cpp
-// tests/unit/{module}/{TASK-ID}-{slug}.cpp
-#include <catch2/catch_test_macros.hpp>
-#include "aevox/{module}/{header}.hpp"
-
-TEST_CASE("AEV-NNN: <description of what is tested>", "[{module}]") {
-    SECTION("happy path") { … }
-    SECTION("error path — <condition>") { … }
-}
-```
+Quick reference:
+- `TEST_CASE("{TASK-ID}: <description>", "[{module}]")`
+- Happy path + error/edge path per public function
+- Integration tests use real `asio::io_context` — no mocks
 
 ## Technical Notes
 Implementation hints, API sketches, constraints, C++ specifics.
@@ -278,6 +245,6 @@ Non-negotiable gates on every output. No task is too small to document or test.
 
 - Reference C++23 features by name when relevant (`std::expected`, `std::generator`, etc.)
 - Flag public API surface changes — higher risk, may need ADD revision
-- Link to relevant ADRs (CLAUDE.md §13) when a task implements a decided architecture
+- Link to relevant ADRs (AGENTS.md §13) when a task implements a decided architecture
 - Performance-sensitive tasks must include a nanobench acceptance criterion
 - Document thread-safety on every class that crosses executor boundaries
