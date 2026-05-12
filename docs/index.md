@@ -63,8 +63,11 @@ graph TD
 | Async TCP stream | **Done** | `<aevox/tcp_stream.hpp>` |
 | HTTP/1.1 parser | **Done** | internal (`src/http/`) |
 | Router + path matching | **Done** | `<aevox/router.hpp>` |
-| Request / Response model | **Done** | `<aevox/request.hpp>` |
+| Request / Response model | **Done** | `<aevox/request.hpp>` / `<aevox/response.hpp>` |
 | App high-level API | **Done** | `<aevox/app.hpp>` |
+| JSON serialization / deserialization | **Done** | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` |
+| Middleware pipeline | **Done** | `<aevox/middleware.hpp>` |
+| WebSocket upgrade + messaging | **Done** | `<aevox/websocket.hpp>` / `<aevox/websocket_handler.hpp>` |
 
 ---
 

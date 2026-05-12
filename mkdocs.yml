@@ -56,9 +56,13 @@ nav:
       - Configuration: api/config.md
       - JSON: api/json.md
       - WebSocket: api/websocket.md
+      - Concepts: api/concepts.md
   - Examples:
       - Overview: examples/index.md
       - Hello World: examples/hello-world.md
+      - Configured Server: examples/configured-server.md
+      - Middleware Plugin: examples/middleware-plugin.md
+      - WebSocket Chat: examples/websocket-chat.md
   - Changelog: changelog.md
 
 markdown_extensions:
