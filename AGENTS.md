@@ -24,6 +24,7 @@ Work in this project flows through three distinct roles. Each has a dedicated sk
 | **Architect** | `/architect` | Module design, ADD creation, architectural review, layer decisions |
 | **Developer** | `/developer` | Implementation, tests, documentation, bug fixes, self-review |
 | **Documentarian** — Technical Writer | `/document` | User Guide creation, Architecture and Concepts pages, consistency refactor pass — called after /developer marks a task Done |
+| **Contributor** | `/pr` | Create or update pull requests: diff analysis, structured title, description, GitHub CLI |
 
 ### Skill invocation order
 
@@ -34,6 +35,7 @@ A task must exist before it is architected. An ADD must exist before it is imple
 /architect → creates Tasks/architecture/AEV-NNN-arch.md
 /developer → implements following the ADD
 /document → produces or updates docs/ pages for the completed task
+/pr → creates or updates the pull request for review and merge
 ```
 
 If asked to implement a task that has no ADD: **stop**. Report the missing ADD and prompt the user to run `/architect` first.
