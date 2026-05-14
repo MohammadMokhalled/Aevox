@@ -95,6 +95,10 @@ All heap allocation goes through `std::make_unique` or `std::make_shared`. Raw o
 
 Nothing flows upward through this diagram. A layer may only depend on layers below it.
 
+### 3.6 Use std data structures
+
+It is encoureged to use the standard library data structures like `std::vector`, `std::unordered_map`, `std::unordered_set`, etc. instead of custom implementations. Also, for the arrays it is better to use `std::array` instead of raw c style array. 
+
 ---
 
 ## 4. C++23 Mandatory Patterns (PRD §6.9)
@@ -379,7 +383,7 @@ When a user request conflicts with the PRD, implement the request and explicitly
 
 ### Run clang-format after every code change
 
-Run `bash scripts/format.sh` after editing any `.cpp`/`.hpp` file and before any build.
+- Run `bash scripts/format.sh` after editing any `.cpp`/`.hpp` file and before any build.
 
-Run `bash scripts/tidy.sh` after implementing the solution and fix the errors there. Using NOLINT comments is not acceptable and you must fix everything functionally. For example, if it needs to use the return value, use the return value in a functional way.
+- Run `bash scripts/tidy.sh` after implementing the solution and fix the errors there. - IMPORTANT: Using NOLINT comments is not acceptable and you must fix everything functionally. For example, if it needs to use the return value, use the return value in a functional way.
 

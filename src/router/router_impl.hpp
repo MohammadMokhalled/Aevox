@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "log/async_writer.hpp"
 #include "net/topic_bus.hpp"
 #include "router/handler_wrap.hpp"
 
@@ -141,6 +142,9 @@ struct App::Impl
     // In-process pub/sub topic bus — one instance per App.
     // Initialized at construction; its lifetime is tied to App::Impl.
     aevox::net::TopicBus topic_bus;
+
+    // Async log writer — initialised in App::listen() from config.logging.
+    std::unique_ptr<AsyncLogWriter> log_writer;
 };
 
 } // namespace aevox

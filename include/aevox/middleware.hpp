@@ -132,9 +132,6 @@ public:
 
     ~Middleware() = default;
 
-private:
-    friend class App;
-
     /**
      * @brief Constructs a Middleware from an arbitrary callable.
      *
@@ -152,6 +149,9 @@ private:
               Task<Response>(Request&, std::move_only_function<Task<Response>(Request&)>)>(
               std::forward<F>(fn)))
     {}
+
+private:
+    friend class App;
 
     std::move_only_function<Task<Response>(Request&,
                                            std::move_only_function<Task<Response>(Request&)>)>
