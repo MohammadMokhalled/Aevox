@@ -15,7 +15,6 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <latch>
 #include <string>
 #include <thread>
 
@@ -28,6 +27,31 @@ std::uint16_t free_port()
     asio::io_context              ioc;
     asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
     return a.local_endpoint().port();
+}
+bool can_connect(std::uint16_t port)
+{
+    asio::io_context      ioc;
+    asio::ip::tcp::socket socket{ioc};
+    asio::error_code      ec;
+    const auto            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = socket.connect(ep, ec);
+    return !ec;
+}
+
+void wait_until_listening(std::uint16_t port)
+{
+    constexpr auto kDeadline = 5s;
+    constexpr auto kInterval = 5ms;
+    const auto     deadline  = std::chrono::steady_clock::now() + kDeadline;
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (can_connect(port)) {
+            return;
+        }
+        std::this_thread::sleep_for(kInterval);
+    }
+
+    FAIL(std::format("server did not start listening on port {}", port));
 }
 
 std::string http_roundtrip(std::uint16_t port, std::string_view request_str)
@@ -63,12 +87,8 @@ struct TestServer
         : app{std::move(cfg)}, port{p}
     {
         configure_fn(app);
-        thread = std::jthread{[this] {
-            ready.count_down();
-            app.listen(port);
-        }};
-        ready.wait();
-        std::this_thread::sleep_for(20ms);
+        thread = std::jthread{[this] { app.listen(port); }};
+        wait_until_listening(port);
     }
 
     ~TestServer()
@@ -83,7 +103,6 @@ struct TestServer
 
     aevox::App    app;
     std::uint16_t port;
-    std::latch    ready{1};
     std::jthread  thread;
 };
 
