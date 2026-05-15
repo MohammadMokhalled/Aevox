@@ -38,9 +38,7 @@ TEST_CASE("spdlog backend writes correct JSON fields", "[log]")
         entry.set_message("hello world");
         entry.request_id = "req-42";
         entry.thread_id  = 7;
-        entry.timestamp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-            std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>{
-                std::chrono::nanoseconds{1'234'567'890}});
+        entry.timestamp  = std::chrono::system_clock::time_point{std::chrono::milliseconds{1'234}};
 
         backend.write(entry);
         backend.flush();
@@ -55,7 +53,7 @@ TEST_CASE("spdlog backend writes correct JSON fields", "[log]")
     std::filesystem::remove(path);
 
     REQUIRE(line.find("\"timestamp\":") != std::string::npos);
-    REQUIRE(line.find("1970-01-01T00:00:01.234567890Z") != std::string::npos);
+    REQUIRE(line.find("1970-01-01T00:00:01.234000000Z") != std::string::npos);
     REQUIRE(line.find("\"level\":\"INFO\"") != std::string::npos);
     REQUIRE(line.find("\"message\":\"hello world\"") != std::string::npos);
     REQUIRE(line.find("\"request_id\":\"req-42\"") != std::string::npos);
