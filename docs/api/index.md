@@ -17,6 +17,7 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [Configuration](config.md) | `<aevox/config.hpp>` | Named defaults, `AppConfig`, `ExecutorConfig`, `ConfigError`, TOML key reference |
 | [Middleware](middleware.md) | `<aevox/middleware.hpp>` | Composable middleware pipeline — logging, auth, CORS, request/response interceptors |
 | [JSON](json.md) | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` | Automatic request/response JSON serialization via a pluggable backend |
+| [Logging](log.md) | `<aevox/log.hpp>` | Structured async logging — severity levels, per-request correlation, compile-time elision, JSON/pretty sinks |
 | [WebSocket](websocket.md) | `<aevox/websocket.hpp>` / `<aevox/websocket_handler.hpp>` / `<aevox/websocket_error.hpp>` | RFC 6455 upgrade, bidirectional messaging, and in-process pub/sub |
 | [Concepts](concepts.md) | `<aevox/concepts.hpp>` | `ParamConvertible`, `Serializable`, `Deserializable` — C++23 concept constraints for parameters and JSON |
 

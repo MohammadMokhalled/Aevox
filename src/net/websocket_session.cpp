@@ -319,12 +319,14 @@ aevox::Task<void> WebSocketSession::wait_for_close()
             // takes it. If we win: resume immediately (return false). If the read loop
             // already claimed it (address already null): stay suspended and let the
             // loop resume us via h.resume().
-            const auto handle_addr = h.address();
-            // NOLINTNEXTLINE(misc-const-correctness) compare_exchange_strong may update expected.
-            void* expected = handle_addr;
-            return !session->close_waiter_addr_.compare_exchange_strong(expected, nullptr,
-                                                                        std::memory_order_seq_cst,
-                                                                        std::memory_order_seq_cst);
+            return try_claim_waiter(session->close_waiter_addr_, h.address());
+        }
+
+        [[nodiscard]] static bool try_claim_waiter(std::atomic<void*>& slot,
+                                                   void*               expected) noexcept
+        {
+            return !slot.compare_exchange_strong(expected, nullptr, std::memory_order_seq_cst,
+                                                 std::memory_order_seq_cst);
         }
 
         void await_resume() noexcept {}

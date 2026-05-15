@@ -19,6 +19,7 @@
 
 #include <aevox/concepts.hpp>
 #include <aevox/json_error.hpp>
+#include <aevox/log.hpp>
 #include <aevox/task.hpp>
 #include <aevox/websocket_error.hpp>
 
@@ -157,6 +158,26 @@ public:
      * @return `true` when the underlying Impl is present and the request is usable.
      */
     [[nodiscard]] bool valid() const noexcept;
+
+    // -------------------------------------------------------------------------
+    // Request-correlated logger
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Request-correlated logger.
+     *
+     * Every log line emitted through `req.log` automatically carries:
+     * - `request_id` — assigned at acceptor level, unique per request.
+     * - `thread_id` — ID of the worker thread handling this request.
+     * - `timestamp` — nanosecond precision, captured at log call time.
+     * - `correlation_id` — optional, populated when AEV-012 tracing hooks land.
+     *
+     * @note Safe to use across `co_await` suspension points because the
+     *       context is owned by `Request::Impl` and lives for the full
+     *       request lifetime.
+     * @note The global logger (`aevox::log::info(...)`) omits request fields.
+     */
+    Logger log;
 
     // -------------------------------------------------------------------------
     // Request line accessors

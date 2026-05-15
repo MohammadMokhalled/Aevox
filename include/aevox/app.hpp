@@ -21,6 +21,7 @@
 
 #include <aevox/config.hpp>
 #include <aevox/executor.hpp>
+#include <aevox/log.hpp>
 #include <aevox/middleware.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
@@ -122,6 +123,12 @@ struct AppConfig
      * @note Valid range: 512 bytes to 16 MiB.
      */
     std::size_t max_read_bytes{kDefaultMaxReadBytes};
+
+    /**
+     * @brief Logging subsystem configuration.
+     * Default: INFO level, one ConsoleSink with Pretty format and colour.
+     */
+    LogConfig logging{};
 };
 
 // =============================================================================

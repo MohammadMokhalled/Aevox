@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "http/http_parser.hpp"
+#include "log/request_context.hpp"
 #include "net/topic_bus.hpp"
 #include "net/websocket_handshake.hpp"
 #include "net/websocket_session.hpp"
@@ -88,6 +89,9 @@ struct Request::Impl
 
     /// WebSocket lifecycle callbacks — set by App::ws() dispatch before upgrade_websocket().
     aevox::WebSocketHandler ws_handler;
+
+    /// Per-request logging context.
+    RequestContext log_context;
 
     /// Constructs Impl, taking ownership of buffer and the parsed request.
     /// Computes path_view and query_view from parsed.target by splitting at '?'.

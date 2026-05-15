@@ -23,9 +23,9 @@ namespace aevox::config {
 namespace {
 
 // Known top-level TOML key names. Used to detect unrecognised keys.
-constexpr std::array<std::string_view, 8> kKnownTopLevelKeys{
+constexpr std::array<std::string_view, 9> kKnownTopLevelKeys{
     "port",           "host",     "backlog", "max_body_size", "request_timeout", "max_header_count",
-    "max_read_bytes", "executor",
+    "max_read_bytes", "executor", "logging",
 };
 
 // Known executor-section key names.
@@ -33,6 +33,13 @@ constexpr std::array<std::string_view, 3> kKnownExecutorKeys{
     "thread_count",
     "cpu_pool_threads",
     "drain_timeout",
+};
+
+// Known logging-section key names.
+constexpr std::array<std::string_view, 3> kKnownLoggingKeys{
+    "level",
+    "ring_buffer_entries",
+    "sinks",
 };
 
 bool is_known_key(std::string_view key, std::span<const std::string_view> known) noexcept
@@ -203,6 +210,123 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
                 return std::unexpected(make_invalid("executor.drain_timeout",
                                                     "must be an integer in 1..3600 (seconds)"));
             base.executor.drain_timeout = std::chrono::seconds{*raw};
+        }
+    }
+
+    // ── [logging] section ─────────────────────────────────────────────────────
+    if (const auto* log_node = tbl.get("logging")) {
+        const auto* log_tbl = log_node->as_table();
+        if (!log_tbl)
+            return std::unexpected(ConfigErrorDetail{
+                .code    = ConfigError::InvalidValue,
+                .message = "'logging' must be a TOML table section",
+                .key     = "logging",
+            });
+
+        // Warn about unrecognised logging keys.
+        for (const auto& [key, val] : *log_tbl) {
+            if (!is_known_key(std::string_view{key}, kKnownLoggingKeys)) {
+                std::clog << std::format(
+                    "[aevox] config warning: unrecognised key 'logging.{}' — ignored\n",
+                    std::string_view{key});
+            }
+            (void)val;
+        }
+
+        // logging.level
+        if (const auto* v = log_tbl->get("level")) {
+            const auto raw = v->value<std::string>();
+            if (!raw)
+                return std::unexpected(make_invalid("logging.level", "must be a string"));
+            const std::string& s = *raw;
+            if (s == "trace")
+                base.logging.level = LogLevel::Trace;
+            else if (s == "debug")
+                base.logging.level = LogLevel::Debug;
+            else if (s == "info")
+                base.logging.level = LogLevel::Info;
+            else if (s == "warn")
+                base.logging.level = LogLevel::Warn;
+            else if (s == "error")
+                base.logging.level = LogLevel::Error;
+            else if (s == "fatal")
+                base.logging.level = LogLevel::Fatal;
+            else
+                return std::unexpected(
+                    make_invalid("logging.level",
+                                 "must be one of: trace, debug, info, warn, error, fatal"));
+        }
+
+        // logging.ring_buffer_entries
+        if (const auto* v = log_tbl->get("ring_buffer_entries")) {
+            const auto        raw      = v->value<int64_t>();
+            constexpr int64_t kMaxRing = 1024LL * 1024LL; // 1M entries
+            if (!raw || *raw < 64 || *raw > kMaxRing)
+                return std::unexpected(make_invalid("logging.ring_buffer_entries",
+                                                    "must be an integer in 64..1048576"));
+            base.logging.ring_buffer_entries = static_cast<std::size_t>(*raw);
+        }
+
+        // logging.sinks
+        if (const auto* sinks_node = log_tbl->get("sinks")) {
+            const auto* arr = sinks_node->as_array();
+            if (!arr)
+                return std::unexpected(make_invalid("logging.sinks", "must be an array of tables"));
+
+            base.logging.sinks.clear();
+            for (const auto& elem : *arr) {
+                const auto* sink_tbl = elem.as_table();
+                if (!sink_tbl)
+                    continue; // skip non-table entries silently
+
+                const auto type_raw = sink_tbl->get("type");
+                if (!type_raw)
+                    continue;
+                const auto type_str = type_raw->value<std::string>();
+                if (!type_str)
+                    continue;
+
+                if (*type_str == "console") {
+                    ConsoleSinkConfig cfg;
+                    if (const auto* fmt = sink_tbl->get("format")) {
+                        const auto f = fmt->value<std::string>();
+                        if (f && *f == "json")
+                            cfg.format = LogFormat::JSON;
+                    }
+                    if (const auto* c = sink_tbl->get("color")) {
+                        const auto col = c->value<bool>();
+                        if (col)
+                            cfg.color = *col;
+                    }
+                    base.logging.sinks.emplace_back(cfg);
+                }
+                else if (*type_str == "file") {
+                    FileSinkConfig cfg;
+                    if (const auto* p = sink_tbl->get("path")) {
+                        const auto sink_path = p->value<std::string>();
+                        if (sink_path)
+                            cfg.path = *sink_path;
+                    }
+                    if (const auto* r = sink_tbl->get("rotate_mb")) {
+                        const auto raw = r->value<int64_t>();
+                        if (raw && *raw >= 1 && *raw <= 4096)
+                            cfg.rotate_mb = static_cast<std::size_t>(*raw);
+                    }
+                    if (const auto* k = sink_tbl->get("keep_files")) {
+                        const auto raw = k->value<int64_t>();
+                        if (raw && *raw >= 1 && *raw <= 100)
+                            cfg.keep_files = static_cast<std::size_t>(*raw);
+                    }
+                    if (const auto* fmt = sink_tbl->get("format")) {
+                        const auto f = fmt->value<std::string>();
+                        if (f && *f == "json")
+                            cfg.format = LogFormat::JSON;
+                        else if (f && *f == "pretty")
+                            cfg.format = LogFormat::Pretty;
+                    }
+                    base.logging.sinks.emplace_back(cfg);
+                }
+            }
         }
     }
 

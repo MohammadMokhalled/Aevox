@@ -25,6 +25,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "config/toml_loader.hpp"
@@ -277,9 +278,15 @@ void App::listen(std::uint16_t port)
     // Capture topic_bus pointer (stable pointer — App::Impl owns it).
     aevox::net::TopicBus* topic_bus = &impl_->topic_bus;
 
+    // Initialise async logging subsystem from config.
+    impl_->log_writer = std::make_unique<AsyncLogWriter>(impl_->config.logging);
+    impl_->log_writer->install_as_global();
+
+    auto* log_writer = impl_->log_writer.get();
+
     auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw, &scoped_mw,
-                               topic_bus](std::uint64_t /*conn_id*/,
-                                          TcpStream stream) -> Task<void> {
+                               topic_bus, log_writer](std::uint64_t /*conn_id*/,
+                                                      TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
@@ -317,6 +324,15 @@ void App::listen(std::uint16_t port)
                 req_impl->stream      = &stream;
                 req_impl->topic_bus   = topic_bus;
                 req_impl->max_payload = max_body;
+
+                // Set up per-request logging context.
+                static std::atomic<std::uint64_t> request_counter{0};
+                req_impl->log_context.request_id =
+                    std::format("req-{}", request_counter.fetch_add(1, std::memory_order_relaxed));
+                req_impl->log_context.thread_id =
+                    std::hash<std::thread::id>{}(std::this_thread::get_id());
+                req_impl->log_context.accept_time = std::chrono::steady_clock::now();
+                req.log                           = log_writer->make_logger(&req_impl->log_context);
             }
 
             // Dispatch through the pipeline (fast path handled inside the function).

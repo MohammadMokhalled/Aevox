@@ -14,6 +14,7 @@
 
 find_package(asio CONFIG REQUIRED)
 find_package(llhttp CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 find_package(tomlplusplus CONFIG REQUIRED)
 
 # ── JSON backend selection ────────────────────────────────────────────────────
@@ -51,6 +52,12 @@ add_library(aevox_core STATIC
     config/toml_loader.cpp         # TOML config file loading (toml++ confined here)
     config/config_impl.cpp         # to_string(ConfigError) implementation
     json/json_error.cpp            # JsonError::message() — out-of-line to prevent false-positive analyser hits
+    log/ring_buffer.cpp            # LockFreeQueue MPMC lock-free ring buffer
+    log/async_writer.cpp           # AsyncLogWriter drain thread and push
+    log/log_backend.cpp            # LogBackend factory (make_log_backend)
+    log/spdlog_backend.cpp         # SpdlogBackend — ONLY file with <spdlog/spdlog.h>
+    log/logger_impl.cpp            # Logger method implementations + global()
+    log/middleware_logger.cpp      # aevox::middleware::logger() factory
     $<TARGET_OBJECTS:aevox_http>
     $<TARGET_OBJECTS:aevox_router>
 )
@@ -100,6 +107,7 @@ target_link_libraries(aevox_core
     PRIVATE
         asio::asio
         llhttp::llhttp_static
+        spdlog::spdlog
         tomlplusplus::tomlplusplus
 )
 

@@ -41,6 +41,7 @@ jobs:
   format-check:
     name: Format Check (clang-format-21)
     runs-on: self-ubuntu26.04
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -72,6 +73,7 @@ jobs:
   tidy:
     name: Tidy Check (clang-tidy-21)
     runs-on: self-ubuntu26.04
+    timeout-minutes: 20
 
     steps:
       - name: Check out merge commit
@@ -118,6 +120,7 @@ jobs:
   build:
     name: Build (${{ matrix.preset }}) — ${{ matrix.compiler.id }}
     runs-on: self-ubuntu26.04
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -178,6 +181,7 @@ jobs:
   asan-test:
     name: ASan + UBSan — Linux GCC 15
     runs-on: self-ubuntu26.04
+    timeout-minutes: 10
 
     steps:
       - name: Check out merge commit
@@ -227,6 +231,7 @@ jobs:
   asan-test-clang:
     name: ASan + UBSan — Linux clang 21
     runs-on: self-ubuntu26.04
+    timeout-minutes: 10
 
     steps:
       - name: Check out merge commit
@@ -272,6 +277,7 @@ jobs:
   docs-build:
     name: Docs Build (mkdocs --strict)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Check out repository
@@ -294,6 +300,7 @@ jobs:
   build-windows:
     name: Build — Windows (MSVC 2022)
     runs-on: windows-latest
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
