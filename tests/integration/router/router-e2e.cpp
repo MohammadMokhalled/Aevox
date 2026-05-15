@@ -54,6 +54,8 @@ void wait_until_listening(std::uint16_t port)
         }
         std::this_thread::sleep_for(kInterval);
     }
+
+    FAIL(std::format("server did not start listening on port {}", port));
 }
 
 /// Sends `request_str` to localhost:port and returns the full response as string.
