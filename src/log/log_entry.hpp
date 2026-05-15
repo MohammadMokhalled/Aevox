@@ -10,6 +10,7 @@
 #include <array>
 #include <chrono>
 #include <cstddef>
+#include <ranges>
 #include <string>
 #include <string_view>
 
@@ -51,7 +52,7 @@ struct LogEntry
         }
         else {
             message_len = static_cast<std::uint16_t>(msg.size());
-            std::ranges::copy_n(msg.begin(), message_len, inline_message.begin());
+            std::ranges::copy(msg, inline_message.begin());
             overflow_message.clear();
         }
     }
