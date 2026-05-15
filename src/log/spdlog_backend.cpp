@@ -234,14 +234,4 @@ void SpdlogBackend::flush()
         impl_->logger->flush();
 }
 
-// =============================================================================
-// LogBackend factory
-// =============================================================================
-
-// NOLINTNEXTLINE(misc-use-internal-linkage) — declared in log_backend.hpp; used by async_writer.cpp
-std::unique_ptr<SpdlogBackend> make_log_backend(const LogConfig& config)
-{
-    return std::make_unique<SpdlogBackend>(config);
-}
-
 } // namespace aevox

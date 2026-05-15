@@ -16,16 +16,14 @@ TEST_CASE("ring buffer overflow - excess push returns false and increments drop 
         aevox::LogEntry entry;
         entry.level = aevox::LogLevel::Info;
         entry.set_message(std::to_string(i));
-        REQUIRE( // NOLINT(bugprone-use-after-move) — loop creates a fresh instance
-            queue.try_push(std::move(entry)));
+        REQUIRE(queue.try_push(entry));
     }
 
     // 5th push should fail.
     aevox::LogEntry overflow;
     overflow.level = aevox::LogLevel::Warn;
     overflow.set_message("overflow");
-    // NOLINTNEXTLINE(bugprone-use-after-move) — variable is not reused after this point.
-    REQUIRE_FALSE(queue.try_push(std::move(overflow)));
+    REQUIRE_FALSE(queue.try_push(overflow));
     REQUIRE(queue.dropped_count() == 1);
 
     // Existing entries remain readable.

@@ -51,9 +51,7 @@ struct LogEntry
         }
         else {
             message_len = static_cast<std::uint16_t>(msg.size());
-            std::copy_n(
-                msg.data(), // NOLINT(bugprone-suspicious-stringview-data-usage) — explicit count
-                message_len, inline_message.data());
+            std::ranges::copy_n(msg.begin(), message_len, inline_message.begin());
             overflow_message.clear();
         }
     }

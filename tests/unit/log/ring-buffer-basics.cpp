@@ -17,8 +17,7 @@ TEST_CASE("ring buffer basics - push and pop preserves order", "[log]")
         aevox::LogEntry entry;
         entry.level = aevox::LogLevel::Info;
         entry.set_message(std::to_string(i));
-        // NOLINTNEXTLINE(bugprone-use-after-move) — loop creates a fresh instance each iteration.
-        REQUIRE(queue.try_push(std::move(entry)));
+        REQUIRE(queue.try_push(entry));
     }
 
     for (std::size_t i = 0; i < kCount; ++i) {

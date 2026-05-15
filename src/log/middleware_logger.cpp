@@ -22,8 +22,7 @@ namespace {
                                                     LogFormat                 format)
 {
     if (format == LogFormat::JSON) {
-        // NOLINTNEXTLINE(modernize-raw-string-literal)
-        return std::format("{{\"method\":\"{}\",\"path\":\"{}\",\"status\":{},\"duration_ms\":{}}}",
+        return std::format(R"({{"method":"{}","path":"{}","status":{},"duration_ms":{}}}")",
                            json_escape(to_string(req.method())), json_escape(req.path()),
                            resp.status_code(), duration_ms.count());
     }

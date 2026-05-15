@@ -42,7 +42,7 @@ public:
      *
      * @return `true` if the entry was enqueued, `false` if the queue is full.
      */
-    [[nodiscard]] bool try_push(LogEntry&& entry) noexcept;
+    [[nodiscard]] bool try_push(LogEntry entry) noexcept;
 
     /**
      * @brief Attempts to pop an entry from the queue.

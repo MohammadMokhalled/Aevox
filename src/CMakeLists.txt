@@ -54,6 +54,7 @@ add_library(aevox_core STATIC
     json/json_error.cpp            # JsonError::message() — out-of-line to prevent false-positive analyser hits
     log/ring_buffer.cpp            # LockFreeQueue MPMC lock-free ring buffer
     log/async_writer.cpp           # AsyncLogWriter drain thread and push
+    log/log_backend.cpp            # LogBackend factory (make_log_backend)
     log/spdlog_backend.cpp         # SpdlogBackend — ONLY file with <spdlog/spdlog.h>
     log/logger_impl.cpp            # Logger method implementations + global()
     log/middleware_logger.cpp      # aevox::middleware::logger() factory

@@ -94,9 +94,10 @@ void AsyncLogWriter::push(LogLevel level, std::string_view message,
         }
         entry.timestamp = std::chrono::system_clock::now();
 
-        (void)queue_->try_push(std::move(entry));
+        (void)queue_->try_push(entry);
     }
-    catch (...) { // NOLINT(bugprone-empty-catch) — hot path must never throw
+    catch (...) {
+        std::clog << "[aevox] log push failed — entry dropped\n";
     }
 }
 
@@ -106,7 +107,8 @@ void AsyncLogWriter::flush() noexcept
         if (backend_)
             backend_->flush();
     }
-    catch (...) { // NOLINT(bugprone-empty-catch) — flush must never throw
+    catch (...) {
+        std::clog << "[aevox] backend flush failed\n";
     }
 }
 

@@ -34,7 +34,7 @@ LockFreeQueue::LockFreeQueue(std::size_t capacity) : capacity_mask_{next_power_o
 
 LockFreeQueue::~LockFreeQueue() = default;
 
-bool LockFreeQueue::try_push(LogEntry&& entry) noexcept
+bool LockFreeQueue::try_push(LogEntry entry) noexcept
 {
     std::size_t pos = enqueue_pos_.load(std::memory_order_relaxed);
     while (true) {
