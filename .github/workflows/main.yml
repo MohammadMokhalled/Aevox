@@ -39,6 +39,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.preset }}) — ${{ matrix.compiler.id }}
+    if: ${{ always() }}
     runs-on: self-ubuntu26.04
     timeout-minutes: 10
     strategy:
@@ -99,6 +100,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   asan-test:
     name: ASan + UBSan — Linux GCC 15
+    if: ${{ always() }}
     runs-on: self-ubuntu26.04
     timeout-minutes: 10
 
@@ -148,6 +150,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   asan-test-clang:
     name: ASan + UBSan — Linux clang 21
+    if: ${{ always() }}
     runs-on: self-ubuntu26.04
     timeout-minutes: 10
 
