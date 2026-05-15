@@ -10,7 +10,6 @@ Key features:
 
 - **No blocking on I/O** — `Logger::info()` returns immediately; a background thread handles disk or console output.
 - **Per-request correlation** — every `Request` carries a `Logger` that automatically tags entries with `request_id` and `thread_id`.
-- **Compile-time elision** — `AEVOX_LOG_TRACE` and `AEVOX_LOG_DEBUG` compile to `((void)0)` in release builds.
 - **Structured JSON or pretty output** — sink-level control over formatting.
 - **Thread-safe** — multiple request handlers can log concurrently without contention.
 
@@ -43,7 +42,7 @@ enum class LogLevel : std::uint8_t
 };
 ```
 
-Severity levels in ascending order. `Trace` and `Debug` are compile-elided in release builds.
+Severity levels in ascending order. Runtime filtering is controlled by `LogConfig::level`.
 
 ### `aevox::log::LogFormat`
 
@@ -154,14 +153,14 @@ All methods are `noexcept` and return immediately. If the ring buffer is full, t
 
 Returns the global application logger. Use this for framework-level logging outside of request handlers. Automatically initialised when `App::listen()` is called.
 
-### `AEVOX_LOG_TRACE` / `AEVOX_LOG_DEBUG`
+### Global level functions
 
 ```cpp
-AEVOX_LOG_TRACE("expensive debug {}", value); // no-op in release
-AEVOX_LOG_DEBUG("state = {}", state);          // no-op in release
+aevox::log::trace("state = {}", state);
+aevox::log::debug("value = {}", value);
 ```
 
-Compile-time macros that expand to `((void)0)` in release builds (`NDEBUG` defined). Use these for high-frequency debug logging that must not affect production performance.
+These functions log through the global application logger. Runtime level filtering is configured with `LogConfig::level`.
 
 ---
 

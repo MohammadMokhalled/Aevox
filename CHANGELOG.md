@@ -9,7 +9,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
-- Structured asynchronous logging subsystem (AEV-011): `aevox::log::Logger`, `LogLevel`, `LogConfig`, console and file sinks with JSON/Pretty formatting, compile-time `AEVOX_LOG_TRACE`/`AEVOX_LOG_DEBUG` elision, per-request correlation via `Request::log`, and automatic request/response logging via `aevox::middleware::logger()`
+- Structured asynchronous logging subsystem (AEV-011): `aevox::log::Logger`, `LogLevel`, `LogConfig`, console and file sinks with JSON/Pretty formatting, runtime level filtering, per-request correlation via `Request::log`, and automatic request/response logging via `aevox::middleware::logger()`
 - `aevox::log::global()` — global application logger, auto-initialised on `App::listen()`
 - `aevox::middleware::logger()` — middleware factory for automatic HTTP access logging with configurable fields, excluded paths, and slow-request warnings
 - TOML config parsing for `[logging]` section including `level`, `ring_buffer_entries`, and `[[logging.sinks]]` arrays

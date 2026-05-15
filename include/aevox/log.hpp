@@ -11,9 +11,6 @@
 // writer uses a lock-free ring buffer; formatting and sink I/O happen on a
 // dedicated background thread.
 //
-// Compile-time elision: TRACE and DEBUG are compiled to zero instructions in
-// release builds via the AEVOX_LOG_TRACE / AEVOX_LOG_DEBUG macros.
-//
 // Invariants:
 //   - No Asio types appear in this header.
 //   - No spdlog types appear in this header.
@@ -169,10 +166,6 @@ public:
 
     /**
      * @brief Logs a TRACE-level message.
-     *
-     * In release builds (NDEBUG defined) this compiles to zero instructions
-     * via the AEVOX_LOG_TRACE macro. Do not call directly in hot paths — use
-     * the macro instead.
      */
     template <typename... Args> void trace(std::format_string<Args...> fmt, Args&&... args) noexcept
     {
@@ -186,9 +179,6 @@ public:
 
     /**
      * @brief Logs a DEBUG-level message.
-     *
-     * In release builds (NDEBUG defined) this compiles to zero instructions
-     * via the AEVOX_LOG_DEBUG macro.
      */
     template <typename... Args> void debug(std::format_string<Args...> fmt, Args&&... args) noexcept
     {
@@ -347,15 +337,3 @@ inline void fatal(std::format_string<Args...> fmt, Args&&... args) noexcept
 } // namespace log
 
 } // namespace aevox
-
-// =============================================================================
-// Compile-time level elision macros
-// =============================================================================
-
-#ifdef NDEBUG
-    #define AEVOX_LOG_TRACE(...) ((void)0)
-    #define AEVOX_LOG_DEBUG(...) ((void)0)
-#else
-    #define AEVOX_LOG_TRACE(...) aevox::log::trace(__VA_ARGS__)
-    #define AEVOX_LOG_DEBUG(...) aevox::log::debug(__VA_ARGS__)
-#endif

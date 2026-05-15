@@ -54,15 +54,9 @@ TEST_CASE("log level filter - trace and debug are dropped when level is info", "
     REQUIRE(content.find("warn msg") != std::string::npos);
 }
 
-TEST_CASE("log level filter - AEVOX_LOG_TRACE macro is no-op in release builds", "[log]")
+TEST_CASE("log level filter - global trace and debug functions compile", "[log]")
 {
-#ifdef NDEBUG
-    // In release, the macro expands to ((void)0) — it must compile and do nothing.
-    AEVOX_LOG_TRACE("this should compile away");
-    SUCCEED("AEVOX_LOG_TRACE compiled to no-op in release");
-#else
-    // In debug, the macro expands to a real call.
-    AEVOX_LOG_TRACE("this is a real call in debug");
-    SUCCEED("AEVOX_LOG_TRACE compiled to real call in debug");
-#endif
+    aevox::log::trace("trace {}", "message");
+    aevox::log::debug("debug {}", "message");
+    SUCCEED("global trace and debug functions compiled");
 }

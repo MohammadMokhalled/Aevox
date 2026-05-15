@@ -45,15 +45,16 @@ aevox::log::global().info("Server starting on port {}", port);
 
 The global logger is automatically created and installed when `App::listen()` is called. Before that, it is a no-op.
 
-## Compile-Time Elision
+## Runtime Level Filtering
 
-`AEVOX_LOG_TRACE` and `AEVOX_LOG_DEBUG` compile to nothing in release builds:
+Set `LogConfig::level` to drop entries below the configured severity:
 
 ```cpp
-AEVOX_LOG_TRACE("entering function with args {}", args); // erased in release
+aevox::AppConfig cfg;
+cfg.logging.level = aevox::LogLevel::Info;
 ```
 
-Use these for high-frequency diagnostics that would be too expensive in production.
+With this configuration, `Trace` and `Debug` entries are ignored before they reach the sinks.
 
 ## Automatic Request/Response Logging
 
