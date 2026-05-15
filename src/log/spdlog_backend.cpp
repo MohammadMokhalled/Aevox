@@ -82,6 +82,17 @@ struct SinkBuildResult
 // ISO 8601 timestamp formatting
 // ---------------------------------------------------------------------------
 
+[[nodiscard]] std::tm utc_time(std::time_t value) noexcept
+{
+    std::tm result{};
+#ifdef _WIN32
+    gmtime_s(&result, &value);
+#else
+    gmtime_r(&value, &result);
+#endif
+    return result;
+}
+
 [[nodiscard]] std::string format_iso8601(std::chrono::system_clock::time_point tp)
 {
     const auto time_t = std::chrono::system_clock::to_time_t(tp);
@@ -89,8 +100,7 @@ struct SinkBuildResult
         std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count() %
         1'000'000'000;
 
-    std::tm utc{};
-    gmtime_r(&time_t, &utc); // POSIX — thread-safe unlike std::gmtime
+    const std::tm utc = utc_time(time_t);
 
     return std::format("{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:09d}Z", utc.tm_year + 1900,
                        utc.tm_mon + 1, utc.tm_mday, utc.tm_hour, utc.tm_min, utc.tm_sec, ns);

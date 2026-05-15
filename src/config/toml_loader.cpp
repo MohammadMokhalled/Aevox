@@ -303,9 +303,9 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
                 else if (*type_str == "file") {
                     FileSinkConfig cfg;
                     if (const auto* p = sink_tbl->get("path")) {
-                        const auto path = p->value<std::string>();
-                        if (path)
-                            cfg.path = *path;
+                        const auto sink_path = p->value<std::string>();
+                        if (sink_path)
+                            cfg.path = *sink_path;
                     }
                     if (const auto* r = sink_tbl->get("rotate_mb")) {
                         const auto raw = r->value<int64_t>();
