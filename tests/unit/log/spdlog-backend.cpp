@@ -30,19 +30,21 @@ TEST_CASE("spdlog backend writes correct JSON fields", "[log]")
     config.sinks = {aevox::FileSinkConfig{
         .path = path.string(), .rotate_mb = 1, .keep_files = 1, .format = aevox::LogFormat::JSON}};
 
-    aevox::SpdlogBackend backend(config);
+    {
+        aevox::SpdlogBackend backend(config);
 
-    aevox::LogEntry entry;
-    entry.level = aevox::LogLevel::Info;
-    entry.set_message("hello world");
-    entry.request_id = "req-42";
-    entry.thread_id  = 7;
-    entry.timestamp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-        std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>{
-            std::chrono::nanoseconds{1'234'567'890}});
+        aevox::LogEntry entry;
+        entry.level = aevox::LogLevel::Info;
+        entry.set_message("hello world");
+        entry.request_id = "req-42";
+        entry.thread_id  = 7;
+        entry.timestamp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+            std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>{
+                std::chrono::nanoseconds{1'234'567'890}});
 
-    backend.write(entry);
-    backend.flush();
+        backend.write(entry);
+        backend.flush();
+    }
 
     std::ifstream file(path);
     REQUIRE(file.is_open());
