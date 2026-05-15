@@ -37,8 +37,9 @@ TEST_CASE("spdlog backend writes correct JSON fields", "[log]")
     entry.set_message("hello world");
     entry.request_id = "req-42";
     entry.thread_id  = 7;
-    entry.timestamp =
-        std::chrono::system_clock::time_point{std::chrono::nanoseconds{1'234'567'890}};
+    entry.timestamp  = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+        std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>{
+            std::chrono::nanoseconds{1'234'567'890}});
 
     backend.write(entry);
     backend.flush();
