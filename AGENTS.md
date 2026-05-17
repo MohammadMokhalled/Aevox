@@ -387,3 +387,13 @@ When a user request conflicts with the PRD, implement the request and explicitly
 
 - Run `bash scripts/tidy.sh` after implementing the solution and fix the errors there. - IMPORTANT: Using NOLINT comments is not acceptable and you must fix everything functionally. For example, if it needs to use the return value, use the return value in a functional way.
 
+### Filter command output
+
+Always pipe noisy command output through `grep`, `head`, `tail`, `awk`, or `sed` to extract only what is needed. Never dump full build logs or verbose tool output.
+
+**Examples:**
+- `grep "error:"` to isolate compiler errors.
+- `grep -n "class\|struct" file.hpp` for declarations.
+- `ls -la src/ | grep "\.cpp$"` for specific files.
+- `head -n 20` or `tail -n 20` for partial output.
+
