@@ -128,8 +128,8 @@ Binds to a TCP port and registers a connection handler. Must be called before `r
 
 | Error | Condition |
 |---|---|
-| `ExecutorError::bind_failed` | Port in use, insufficient permissions, or invalid address |
-| `ExecutorError::listen_failed` | `listen()` syscall failed after successful bind |
+| `ExecutorError::BindFailed` | Port in use, insufficient permissions, or invalid address |
+| `ExecutorError::ListenFailed` | `listen()` syscall failed after successful bind |
 
 **Example:**
 ```cpp
@@ -155,7 +155,7 @@ Starts all worker threads and runs the event loop. **Blocks** the calling thread
 
 | Error | Condition |
 |---|---|
-| `ExecutorError::already_running` | `run()` called while already running |
+| `ExecutorError::AlreadyRunning` | `run()` called while already running |
 
 ---
 
@@ -193,23 +193,26 @@ Returns the number of worker threads as resolved at construction (after `hardwar
 
 ```cpp
 enum class ExecutorError {
-    bind_failed,
-    listen_failed,
-    accept_failed,
-    already_running,
-    not_running,
+    BindFailed,
+    ListenFailed,
+    AcceptFailed,
+    AlreadyRunning,
+    NotRunning,
 };
 
 [[nodiscard]] std::string_view to_string(ExecutorError e) noexcept;
+[[nodiscard]] ErrorCategory category(ExecutorError e) noexcept;
 ```
 
 | Value | Meaning | How to handle |
 |---|---|---|
-| `bind_failed` | Port in use or no permission | Check port, try a different one, or run with elevated privileges |
-| `listen_failed` | OS rejected the `listen()` call | System resource issue — log and exit |
-| `accept_failed` | A single accept() failed | Logged internally, loop continues — not fatal to the server |
-| `already_running` | `run()` called twice | Application logic error — fix the call site |
-| `not_running` | Operation on stopped executor | Application logic error — fix the call site |
+| `ExecutorError::BindFailed` | Port in use or no permission | Check port, try a different one, or run with elevated privileges |
+| `ExecutorError::ListenFailed` | OS rejected the `listen()` call | System resource issue — log and exit |
+| `ExecutorError::AcceptFailed` | A single accept() failed | Logged internally, loop continues — not fatal to the server |
+| `ExecutorError::AlreadyRunning` | `run()` called twice | Application logic error — fix the call site |
+| `ExecutorError::NotRunning` | Operation on stopped executor | Application logic error — fix the call site |
+
+Use `to_string(ExecutorError)` for diagnostics and `category(ExecutorError)` for broad handling.
 
 ---
 

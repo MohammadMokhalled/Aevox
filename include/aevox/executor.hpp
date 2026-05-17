@@ -5,13 +5,14 @@
 // Defines the ExecutorConfig, ExecutorError enum, Executor abstract interface,
 // and the make_executor() factory function.
 //
-// No Asio types appear in this file. The concrete implementation (AsioExecutor)
+// No backend networking types appear in this file. The concrete implementation
 // lives entirely in src/net/ and is never visible to application code.
 //
 // Design: Tasks/architecture/AEV-001-arch.md Rev.2 §3, §7
 // PRD §5.5, §5.6 — Executor abstraction, future-proof networking
 
 #include <aevox/config.hpp>
+#include <aevox/error.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
 
@@ -29,7 +30,7 @@ namespace aevox {
 // =============================================================================
 
 /**
- * @brief Configuration for the Asio-backed executor.
+ * @brief Configuration for the default executor.
  *
  * Pass to `make_executor()`. All fields have sensible defaults for production.
  * Tests should override `thread_count` (to 2) and `drain_timeout` (to 1–2 s)
@@ -117,6 +118,15 @@ enum class ExecutorError : std::uint8_t
  */
 [[nodiscard]] std::string_view to_string(ExecutorError e) noexcept;
 
+/**
+ * @brief Maps an ExecutorError value to a broad Aevox error category.
+ *
+ * @param e  The executor error to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(ExecutorError e) noexcept;
+
 // =============================================================================
 // ConnectionHandler concept
 // =============================================================================
@@ -154,9 +164,8 @@ concept ConnectionHandler = requires(F f, std::uint64_t conn_id, aevox::TcpStrea
  * @brief Abstract interface for the Aevox I/O execution layer.
  *
  * `Executor` decouples all higher-level Aevox code from the underlying async
- * I/O library (currently Asio; future: `std::net` in C++29 per ADR-1). No code
- * above this interface knows about `asio::io_context` or any OS-specific
- * primitive. The concrete implementation (`AsioExecutor`) lives in `src/net/`
+ * I/O library. No code above this interface knows about backend context types
+ * or any OS-specific primitive. The concrete implementation lives in `src/net/`
  * and is never visible to callers.
  *
  * **Typical usage:**
@@ -258,9 +267,9 @@ protected:
 // =============================================================================
 
 /**
- * @brief Creates the default Asio-backed Executor.
+ * @brief Creates the default Executor.
  *
- * The concrete type (`AsioExecutor`) is hidden in `src/net/` and never named
+ * The concrete type is hidden in `src/net/` and never named
  * by callers. Passing `ExecutorConfig{}` gives production defaults:
  * - `thread_count = hardware_concurrency()`
  * - `drain_timeout = 30s`

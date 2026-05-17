@@ -247,11 +247,11 @@ config is immutable after construction — no fields can be changed while the se
 
 | Code | When |
 |---|---|
-| `ConfigError::file_not_found` | The path supplied does not exist on the filesystem |
-| `ConfigError::parse_error` | The file exists but is not valid TOML |
-| `ConfigError::invalid_value` | A TOML key is present but its value fails a range or type check |
+| `ConfigError::FileNotFound` | The path supplied does not exist on the filesystem |
+| `ConfigError::ParseError` | The file exists but is not valid TOML |
+| `ConfigError::InvalidValue` | A TOML key is present but its value fails a range or type check |
 
-`aevox::to_string(ConfigError)` returns a short static description. For `invalid_value`,
+`aevox::to_string(ConfigError)` returns a short static description. For `InvalidValue`,
 `ConfigErrorDetail::key` names the offending TOML key:
 
 ```cpp
@@ -269,16 +269,16 @@ int main()
         const aevox::ConfigErrorDetail& err = result.error();
 
         switch (err.code) {
-        case aevox::ConfigError::file_not_found:
+        case aevox::ConfigError::FileNotFound:
             std::cerr << "config file not found — using compiled defaults\n";
             // Fall through to construct without a file
             break;
 
-        case aevox::ConfigError::parse_error:
+        case aevox::ConfigError::ParseError:
             std::cerr << std::format("TOML parse error: {}\n", err.message);
             return 1;
 
-        case aevox::ConfigError::invalid_value:
+        case aevox::ConfigError::InvalidValue:
             std::cerr << std::format("invalid value for key '{}': {}\n",
                                      err.key, err.message);
             return 1;

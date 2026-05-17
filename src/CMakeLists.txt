@@ -41,6 +41,7 @@ add_subdirectory(http)    # aevox_http OBJECT library (HttpParser + llhttp)
 add_subdirectory(router)  # aevox_router OBJECT library (Router + App)
 
 add_library(aevox_core STATIC
+    error.cpp                       # Shared public error taxonomy helpers
     net/asio_executor.cpp          # Asio-backed executor + accept loop
     net/executor_context.cpp       # thread_local executor bridge definitions
     net/asio_tcp_stream.cpp        # TcpStream pimpl implementation

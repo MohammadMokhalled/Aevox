@@ -2,9 +2,9 @@
 // include/aevox/task.hpp
 //
 // Public coroutine return type for all async Aevox operations.
-// No Asio types appear in this file — Task<T> is defined entirely in terms of
-// the C++ standard library. The Asio integration happens inside src/net/ via a
-// thin wrapper lambda that co_awaits Task<void> inside an asio::awaitable<void>.
+// No backend networking types appear in this file — Task<T> is defined entirely
+// in terms of the C++ standard library. Backend coroutine integration happens
+// inside src/net/.
 //
 // Design: Tasks/architecture/AEV-001-arch.md Rev.2 §3, §7
 
@@ -69,7 +69,7 @@ struct FinalAwaitable
  *
  * `aevox::Task<T>` is the public coroutine type used throughout the framework
  * and exposed to application handlers. It is defined entirely in terms of the
- * C++ standard library — no Asio types appear in this header.
+ * C++ standard library — no backend networking types appear in this header.
  *
  * @code
  * aevox::Task<int> compute() {
@@ -105,7 +105,7 @@ public:
     // promise_type
     // Fully defined in this header — the compiler requires the complete
     // definition at every co_return / co_await call site. Contains only
-    // standard library types; Asio never appears here.
+    // standard library types; backend networking never appears here.
     // =========================================================================
 
     /**

@@ -2,7 +2,7 @@
 // include/aevox/json_backend.hpp
 //
 // Concept defining the compile-time contract for JSON backend implementations.
-// Standard C++ only. No glaze, no Asio, no third-party includes.
+// Standard C++ only. No default-backend or third-party includes.
 
 #include <aevox/json_error.hpp>
 

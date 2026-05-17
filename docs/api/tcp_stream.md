@@ -275,7 +275,7 @@ A single `TcpStream` is designed for use by **one coroutine**. If your design re
 
 ## Implementation Notes
 
-The Asio socket is stored behind a pimpl (`std::unique_ptr<Impl>`) in `src/net/asio_tcp_stream.cpp`. This keeps `asio::ip::tcp::socket` out of the public header entirely. The factory `aevox::net::AsioTcpStream::make()` is the only place the concrete type is constructed.
+The backend socket is stored behind a pimpl (`std::unique_ptr<Impl>`) in `src/net/`. This keeps concrete socket types out of the public header entirely. The internal `aevox::net::TcpStreamFactory` is the only place the concrete type is constructed.
 
 ---
 

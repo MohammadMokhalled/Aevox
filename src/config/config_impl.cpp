@@ -21,4 +21,37 @@ std::string_view to_string(ConfigError e) noexcept
     return "unknown config error";
 }
 
+ConfigError ConfigErrorDetail::error_code() const noexcept
+{
+    return code;
+}
+
+std::string_view ConfigErrorDetail::error_message() const noexcept
+{
+    return message;
+}
+
+std::string_view ConfigErrorDetail::error_key() const noexcept
+{
+    return key;
+}
+
+ErrorCategory category(ConfigError e) noexcept
+{
+    switch (e) {
+        case ConfigError::FileNotFound:
+            return ErrorCategory::NotFound;
+        case ConfigError::ParseError:
+            return ErrorCategory::Parse;
+        case ConfigError::InvalidValue:
+            return ErrorCategory::Validation;
+    }
+    return ErrorCategory::Unknown;
+}
+
+ErrorCategory category(const ConfigErrorDetail& detail) noexcept
+{
+    return category(detail.error_code());
+}
+
 } // namespace aevox

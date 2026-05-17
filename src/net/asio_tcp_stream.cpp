@@ -3,7 +3,7 @@
 // Defines TcpStream::Impl (containing asio::ip::tcp::socket),
 // ReadAwaitable, WriteAwaitable, all TcpStream out-of-line special members,
 // TcpStream::read(), TcpStream::write(), to_string(IoError), and
-// AsioTcpStream::make().
+// TcpStreamFactory::make().
 //
 // Asio types are confined to this translation unit and asio_tcp_stream.hpp.
 // Nothing in include/aevox/ ever includes this file or sees these types.
@@ -229,15 +229,30 @@ Task<std::expected<void, IoError>> TcpStream::write(std::span<const std::byte> d
     return "IoError: unrecognised value";
 }
 
+ErrorCategory category(IoError e) noexcept
+{
+    switch (e) {
+        case IoError::Eof:
+        case IoError::Reset:
+        case IoError::Timeout:
+            return ErrorCategory::Io;
+        case IoError::Cancelled:
+            return ErrorCategory::State;
+        case IoError::Unknown:
+            return ErrorCategory::Unknown;
+    }
+    return ErrorCategory::Unknown;
+}
+
 } // namespace aevox
 
 // =============================================================================
-// AsioTcpStream::make() — factory
+// TcpStreamFactory::make() — factory
 // =============================================================================
 
 namespace aevox::net {
 
-aevox::TcpStream AsioTcpStream::make(asio::ip::tcp::socket socket, asio::io_context& io_ctx)
+aevox::TcpStream TcpStreamFactory::make(asio::ip::tcp::socket socket, asio::io_context& io_ctx)
 {
     return aevox::TcpStream{std::make_unique<aevox::TcpStream::Impl>(std::move(socket), io_ctx)};
 }

@@ -47,6 +47,7 @@ nav:
       - Layer Diagram: architecture/layer-diagram.md
   - API Reference:
       - Overview: api/index.md
+      - Error Categories: api/error.md
       - Executor: api/executor.md
       - TcpStream: api/tcp_stream.md
       - Task: api/task.md

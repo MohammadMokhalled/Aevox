@@ -149,6 +149,39 @@ WebSocketError::WebSocketError(WebSocketErrorCode code, std::string message) noe
     : code_{code}, message_{std::move(message)}
 {}
 
+std::string_view to_string(WebSocketErrorCode code) noexcept
+{
+    switch (code) {
+        case WebSocketErrorCode::InvalidHandshake:
+            return "invalid WebSocket handshake";
+        case WebSocketErrorCode::ProtocolError:
+            return "WebSocket protocol error";
+        case WebSocketErrorCode::Closed:
+            return "WebSocket is closed";
+        case WebSocketErrorCode::SendFailed:
+            return "WebSocket send failed";
+        case WebSocketErrorCode::FrameTooLarge:
+            return "WebSocket frame too large";
+    }
+    return "unknown WebSocket error";
+}
+
+ErrorCategory category(WebSocketErrorCode code) noexcept
+{
+    switch (code) {
+        case WebSocketErrorCode::InvalidHandshake:
+        case WebSocketErrorCode::ProtocolError:
+            return ErrorCategory::Protocol;
+        case WebSocketErrorCode::Closed:
+            return ErrorCategory::State;
+        case WebSocketErrorCode::SendFailed:
+            return ErrorCategory::Io;
+        case WebSocketErrorCode::FrameTooLarge:
+            return ErrorCategory::Validation;
+    }
+    return ErrorCategory::Unknown;
+}
+
 WebSocketErrorCode WebSocketError::code() const noexcept
 {
     return code_;
@@ -157,6 +190,11 @@ WebSocketErrorCode WebSocketError::code() const noexcept
 std::string_view WebSocketError::message() const noexcept
 {
     return message_;
+}
+
+ErrorCategory category(const WebSocketError& error) noexcept
+{
+    return category(error.code());
 }
 
 } // namespace aevox

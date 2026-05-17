@@ -131,9 +131,9 @@ the I/O context is force-stopped. TOML range: `1..3600` seconds.
 ```cpp
 // include/aevox/config.hpp
 enum class ConfigError : std::uint8_t {
-    file_not_found,   // path does not exist on the filesystem
-    parse_error,      // file exists but contains invalid TOML
-    invalid_value,    // a field value fails a range or type constraint
+    FileNotFound,   // path does not exist on the filesystem
+    ParseError,     // file exists but contains invalid TOML
+    InvalidValue,   // a field value fails a range or type constraint
 };
 ```
 
@@ -147,18 +147,25 @@ All three enumerators are non-overlapping. A `switch` with all three cases needs
 ```cpp
 // include/aevox/config.hpp
 struct ConfigErrorDetail {
-    ConfigError  code{ConfigError::file_not_found};
+    ConfigError  code{ConfigError::FileNotFound};
     std::string  message;   // human-readable description
-    std::string  key;       // offending TOML key (populated for invalid_value only)
+    std::string  key;       // offending TOML key (populated for InvalidValue only)
+
+    [[nodiscard]] ConfigError      error_code() const noexcept;
+    [[nodiscard]] std::string_view error_message() const noexcept;
+    [[nodiscard]] std::string_view error_key() const noexcept;
 };
 ```
 
 `code` is the machine-readable discriminant. `message` is always populated with a
-human-readable description. `key` is only populated when `code == ConfigError::invalid_value`
+human-readable description. `key` is only populated when `code == ConfigError::InvalidValue`
 and names the TOML key whose value failed validation.
 
 `ConfigErrorDetail` is a value type — safe to copy or move across threads. A moved-from
 instance has empty `message` and `key`.
+
+The public fields remain available for compatibility. Prefer the accessor methods in new
+code because they match the other structured Aevox error detail types.
 
 ---
 
@@ -167,6 +174,8 @@ instance has empty `message` and `key`.
 ```cpp
 // include/aevox/config.hpp
 [[nodiscard]] std::string_view to_string(ConfigError e) noexcept;
+[[nodiscard]] ErrorCategory category(ConfigError e) noexcept;
+[[nodiscard]] ErrorCategory category(const ConfigErrorDetail& detail) noexcept;
 ```
 
 Returns a short static description of the error code. The returned `string_view` points
@@ -174,9 +183,9 @@ to a string literal — it never dangles and requires no heap allocation.
 
 | Input | Returns |
 |---|---|
-| `ConfigError::file_not_found` | `"file not found"` |
-| `ConfigError::parse_error` | `"TOML parse error"` |
-| `ConfigError::invalid_value` | `"invalid field value"` |
+| `ConfigError::FileNotFound` | `"file not found"` |
+| `ConfigError::ParseError` | `"TOML parse error"` |
+| `ConfigError::InvalidValue` | `"invalid field value"` |
 
 ```cpp
 #include <aevox/config.hpp>
@@ -188,7 +197,7 @@ void report(const aevox::ConfigErrorDetail& err)
     std::cerr << std::format("config error [{}]: {}\n",
                              aevox::to_string(err.code),
                              err.message);
-    if (err.code == aevox::ConfigError::invalid_value)
+    if (err.code == aevox::ConfigError::InvalidValue)
         std::cerr << std::format("  offending key: {}\n", err.key);
 }
 ```
@@ -224,9 +233,9 @@ merges present keys over `base_config` fields. Fields absent from the file retai
 
 | Error code | Condition |
 |---|---|
-| `file_not_found` | Path does not exist |
-| `parse_error` | File exists but is not valid TOML |
-| `invalid_value` | A TOML key is present with an out-of-range or wrong-type value |
+| `FileNotFound` | Path does not exist |
+| `ParseError` | File exists but is not valid TOML |
+| `InvalidValue` | A TOML key is present with an out-of-range or wrong-type value |
 
 Unrecognised TOML keys are silently ignored with a warning written to `std::clog` — they
 do not produce errors.
@@ -306,6 +315,7 @@ std::cout << std::format("port={} io_threads={}\n",
 
 ## See Also
 
+- [Error Categories](error.md) — shared `ErrorCategory` classifier
 - [Configuration User Guide](../guide/configuration.md) — practical walkthrough with annotated examples
 - [Router and App](router.md) — full `App` class reference including route registration and lifecycle
 - [Executor](executor.md) — `ExecutorConfig` and the `Executor` interface

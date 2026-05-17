@@ -6,14 +6,20 @@ Exceptions for control flow make error paths invisible at the call site. When a 
 
 ## std::expected as the Error Type
 
-Every fallible Aevox operation returns `std::expected<T, E>`. The error type `E` is always a specific enum — never a string, never a generic error code. Every such return is marked `[[nodiscard]]`: the compiler emits a warning if the caller discards the result without checking it.
+Every fallible Aevox operation returns `std::expected<T, E>` or, for coroutine operations, `aevox::Task<std::expected<T, E>>`. The error type `E` remains module-specific, such as `IoError`, `ConfigErrorDetail`, `JsonError`, or `WebSocketError`. Every such return is marked `[[nodiscard]]`: the compiler emits a warning if the caller discards the result without checking it.
 
 No Aevox function throws a recoverable error. The only exceptions that can propagate through Aevox code are:
 
 - `std::bad_alloc` — a system-level unrecoverable condition
 - Exceptions thrown by user-supplied lambdas passed to `aevox::pool()` — caught by the pool machinery and re-thrown at the `co_await` site
 
-## Error Type Hierarchy
+## Module Errors and Shared Categories
+
+Module errors preserve precise recovery information. For example, `ConfigErrorDetail` carries `ConfigError` plus a message and optional key, while `JsonError` carries `JsonErrorCode` plus a backend-sanitized message. Generic code can call `aevox::category(error)` to map these values to `aevox::ErrorCategory` values such as `Io`, `Parse`, `Validation`, `NotFound`, or `State`.
+
+`ErrorCategory` is intentionally not an umbrella error type. It is a classifier for logging, metrics, and broad response decisions. Precise branching should still use the module-specific code.
+
+## Error Type Flow
 
 ```mermaid
 flowchart TD
@@ -89,6 +95,8 @@ aevox::Task<void> handler(std::uint64_t, aevox::TcpStream stream) {
 
 Aevox itself never introduces this pattern — it is a consequence of user lambdas that `throw`. Prefer `std::expected` returns in pool lambdas to avoid the exception path entirely.
 
+Third-party library exceptions are contained at implementation boundaries where recovery is possible. Aevox converts those recoverable failures into the relevant module error detail and exposes only standard-library value types in public headers.
+
 ## Consequences
 
 - **Error paths are visible at every call site** — there are no silent failures. The `[[nodiscard]]` annotation on `std::expected` returns makes it a compile error to ignore an error without an explicit discard.
@@ -101,4 +109,5 @@ Aevox itself never introduces this pattern — it is a consequence of user lambd
 - [Coroutines and Task<T>](coroutines.md) — how `co_await` interacts with `std::expected` returns
 - [Executor — Async I/O Abstraction](executor.md) — `ExecutorError` propagation from `listen()` and `run()`
 - [API Reference — Executor](../api/executor.md) — `ExecutorError` reference and `to_string()`
+- [API Reference — Error Categories](../api/error.md) — `ErrorCategory` and category helpers
 - [User Guide — Error Handling](../guide/error-handling.md) — practical error handling patterns

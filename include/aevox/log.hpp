@@ -12,7 +12,7 @@
 // dedicated background thread.
 //
 // Invariants:
-//   - No Asio types appear in this header.
+//   - No backend networking types appear in this header.
 //   - No spdlog types appear in this header.
 //   - All heap allocation goes through std::make_unique / std::make_shared.
 //

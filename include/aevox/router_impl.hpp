@@ -15,7 +15,7 @@
 // All in-tree consumers (src/, tests/) satisfy this requirement.
 //
 // Constraint: src/router/handler_wrap.hpp must contain ONLY standard-library
-// headers, aevox public headers, and no Asio/third-party types. See OI-1 in
+// headers, aevox public headers, and no backend/third-party networking types. See OI-1 in
 // Tasks/architecture/AEV-004-arch.md §10.
 //
 // Design: Tasks/architecture/AEV-004-arch.md §4.3

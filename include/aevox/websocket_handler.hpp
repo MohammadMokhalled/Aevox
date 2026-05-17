@@ -2,7 +2,7 @@
 // include/aevox/websocket_handler.hpp
 //
 // WebSocketHandler aggregate — callback container for WebSocket lifecycle events.
-// No Asio types. Standard C++ only.
+// No backend networking types. Standard C++ only.
 //
 // Thread-safety: read-only after construction; concurrent reads from worker
 //   threads are safe.

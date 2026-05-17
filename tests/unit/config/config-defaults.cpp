@@ -95,6 +95,9 @@ TEST_CASE("Config - missing file returns ConfigError::file_not_found", "[config]
 
     REQUIRE_FALSE(result.has_value());
     CHECK(result.error().code == aevox::ConfigError::FileNotFound);
+    CHECK(result.error().error_code() == aevox::ConfigError::FileNotFound);
+    CHECK_FALSE(result.error().error_message().empty());
+    CHECK(aevox::category(result.error()) == aevox::ErrorCategory::NotFound);
     // Must not throw.
 }
 
@@ -125,6 +128,8 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         REQUIRE_FALSE(result.has_value());
         CHECK(result.error().code == aevox::ConfigError::InvalidValue);
         CHECK(result.error().key == "port");
+        CHECK(result.error().error_key() == "port");
+        CHECK(aevox::category(result.error()) == aevox::ErrorCategory::Validation);
     }
 
     SECTION("executor.drain_timeout = 0 is below valid range")
@@ -159,6 +164,9 @@ TEST_CASE("Config - to_string returns exact implementation strings", "[config]")
     CHECK(aevox::to_string(aevox::ConfigError::FileNotFound) == "file not found");
     CHECK(aevox::to_string(aevox::ConfigError::ParseError) == "TOML parse error");
     CHECK(aevox::to_string(aevox::ConfigError::InvalidValue) == "invalid field value");
+    CHECK(aevox::category(aevox::ConfigError::FileNotFound) == aevox::ErrorCategory::NotFound);
+    CHECK(aevox::category(aevox::ConfigError::ParseError) == aevox::ErrorCategory::Parse);
+    CHECK(aevox::category(aevox::ConfigError::InvalidValue) == aevox::ErrorCategory::Validation);
 }
 
 TEST_CASE("Config - constexpr defaults match AppConfig field initialisers", "[config]")

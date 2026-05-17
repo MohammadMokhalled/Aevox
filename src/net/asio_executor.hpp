@@ -17,7 +17,7 @@
 
 #include <aevox/executor.hpp> // public interface we implement
 
-#include "asio_tcp_stream.hpp" // AsioTcpStream::make() — used by run_accept_loop()
+#include "asio_tcp_stream.hpp" // TcpStreamFactory::make() — used by run_accept_loop()
 
 // Standalone Asio — ASIO_STANDALONE and ASIO_NO_DEPRECATED defined via CMake.
 // These macros are set PRIVATELY on aevox_core, so they never reach consumers.

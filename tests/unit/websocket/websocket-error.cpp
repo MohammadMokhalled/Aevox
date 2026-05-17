@@ -16,6 +16,7 @@ TEST_CASE("WebSocketError - message accessible and non-empty", "[websocket]")
     REQUIRE_FALSE(err.message().empty());
     REQUIRE(err.message() == "Missing Sec-WebSocket-Key header");
     REQUIRE(err.code() == aevox::WebSocketErrorCode::InvalidHandshake);
+    REQUIRE(aevox::category(err) == aevox::ErrorCategory::Protocol);
 }
 
 TEST_CASE("WebSocketError - code identifiable with all defined enum values", "[websocket]")
@@ -32,6 +33,7 @@ TEST_CASE("WebSocketError - code identifiable with all defined enum values", "[w
     for (auto c : codes) {
         const aevox::WebSocketError err{c, "test"};
         REQUIRE(err.code() == c);
+        REQUIRE_FALSE(aevox::to_string(c).empty());
     }
 
     // Verify all codes are distinct (no two are equal).
@@ -44,4 +46,15 @@ TEST_CASE("WebSocketError - code identifiable with all defined enum values", "[w
             REQUIRE(arr_span[i] != arr_span[j]);
         }
     }
+}
+
+TEST_CASE("WebSocketError - code categories are exhaustive", "[websocket]")
+{
+    using EC = aevox::WebSocketErrorCode;
+
+    CHECK(aevox::category(EC::InvalidHandshake) == aevox::ErrorCategory::Protocol);
+    CHECK(aevox::category(EC::ProtocolError) == aevox::ErrorCategory::Protocol);
+    CHECK(aevox::category(EC::Closed) == aevox::ErrorCategory::State);
+    CHECK(aevox::category(EC::SendFailed) == aevox::ErrorCategory::Io);
+    CHECK(aevox::category(EC::FrameTooLarge) == aevox::ErrorCategory::Validation);
 }

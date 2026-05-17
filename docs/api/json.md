@@ -14,7 +14,9 @@ namespace aevox {
 
 class JsonError {
 public:
+    explicit JsonError(JsonErrorCode code, std::string message) noexcept;
     explicit JsonError(std::string message) noexcept;
+    [[nodiscard]] JsonErrorCode code() const noexcept;
     [[nodiscard]] std::string_view message() const noexcept;
 };
 
@@ -23,13 +25,37 @@ public:
 
 Value type returned via `std::unexpected` from all JSON operations. Never thrown.
 
-### Constructor
+### JsonErrorCode
 
 ```cpp
+enum class JsonErrorCode : std::uint8_t {
+    ParseError,
+    TypeMismatch,
+    MissingField,
+    SerializationFailed,
+    InvalidUtf8,
+    Unknown,
+};
+```
+
+Use `code()` for stable branching and `message()` for diagnostics.
+
+### Constructors
+
+```cpp
+explicit JsonError(JsonErrorCode code, std::string message) noexcept;
 explicit JsonError(std::string message) noexcept;
 ```
 
-Constructs a `JsonError` with a human-readable description. The message is stored by value.
+Constructs a `JsonError` with a stable code and a human-readable description. The message-only constructor is preserved for source compatibility and sets `code()` to `JsonErrorCode::Unknown`.
+
+### code()
+
+```cpp
+[[nodiscard]] JsonErrorCode code() const noexcept;
+```
+
+Returns the stable JSON error discriminator.
 
 ### message()
 
@@ -38,6 +64,14 @@ Constructs a `JsonError` with a human-readable description. The message is store
 ```
 
 Returns a non-owning view into the stored message string, valid for the lifetime of the `JsonError` object. Returns an empty view for a moved-from `JsonError`.
+
+### Helpers
+
+```cpp
+[[nodiscard]] std::string_view to_string(JsonErrorCode code) noexcept;
+[[nodiscard]] ErrorCategory category(JsonErrorCode code) noexcept;
+[[nodiscard]] ErrorCategory category(const JsonError& error) noexcept;
+```
 
 ### Thread-safety and move semantics
 
@@ -87,7 +121,9 @@ struct MyBackend {
         T result{};
         // parse input into result ...
         if (/* parse failed */) {
-            return std::unexpected(aevox::JsonError{"parse failed: ..."});
+            return std::unexpected(aevox::JsonError{
+                aevox::JsonErrorCode::ParseError,
+                "parse failed: ..."});
         }
         return result;
     }

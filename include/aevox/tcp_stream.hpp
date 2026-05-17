@@ -4,7 +4,7 @@
 // Public TCP stream type for Aevox.
 // Provides co_await read() and co_await write() over an accepted TCP connection.
 //
-// No Asio types appear in this file. The concrete implementation (AsioTcpStream)
+// No backend networking types appear in this file. The concrete implementation
 // lives in src/net/ and is held via a pimpl pointer.
 //
 // Buffer ownership contract:
@@ -15,6 +15,7 @@
 // Design: Tasks/architecture/AEV-003-arch.md §3.1
 
 #include <aevox/config.hpp>
+#include <aevox/error.hpp>
 #include <aevox/task.hpp>
 
 #include <cstddef>
@@ -26,9 +27,9 @@
 #include <vector>
 
 // Forward declaration — allows friend class declaration below without
-// including any Asio header. aevox::net::AsioTcpStream is defined in src/net/.
+// including any backend networking header. The factory type is defined in src/net/.
 namespace aevox::net {
-class AsioTcpStream;
+class TcpStreamFactory;
 } // namespace aevox::net
 
 namespace aevox {
@@ -61,6 +62,15 @@ enum class IoError : std::uint8_t
  */
 [[nodiscard]] std::string_view to_string(IoError e) noexcept;
 
+/**
+ * @brief Maps an IoError value to a broad Aevox error category.
+ *
+ * @param e  The I/O error to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(IoError e) noexcept;
+
 // =============================================================================
 // TcpStream
 // =============================================================================
@@ -70,11 +80,10 @@ enum class IoError : std::uint8_t
  *
  * `TcpStream` is the public bridge between the `Executor` accept loop and the
  * HTTP parser layer. Application handlers and the HTTP parser interact
- * only with this type — they never see `asio::ip::tcp::socket` or any OS socket
- * primitive.
+ * only with this type — they never see any OS socket primitive.
  *
- * The underlying socket is hidden via a pimpl pointer. Replacing the Asio backend
- * (ADR-1: `std::net` in C++29) requires only changing `src/net/asio_tcp_stream.cpp`.
+ * The underlying socket is hidden via a pimpl pointer. Replacing the backend
+ * (ADR-1: `std::net` in C++29) requires only changing `src/net/` implementation.
  *
  * **Read ownership contract:**
  * `read()` returns an owned `std::vector<std::byte>`. Any `std::string_view` or
@@ -101,7 +110,7 @@ enum class IoError : std::uint8_t
  * `TcpStream` is destroyed, the socket is closed immediately (the connection
  * coroutine must send any response before destroying the stream).
  *
- * @note Instances are created exclusively by `AsioExecutor::run_accept_loop()`
+ * @note Instances are created exclusively by the executor accept loop
  *       and passed to connection handlers. The constructor is private.
  */
 class TcpStream
@@ -180,21 +189,21 @@ public:
     [[nodiscard]] Task<std::expected<void, IoError>> write(std::span<const std::byte> data);
 
 private:
-    // Pimpl: hides asio::ip::tcp::socket and io_context reference.
-    // Defined only in src/net/asio_tcp_stream.cpp — Asio types never leak here.
+    // Pimpl: hides backend networking socket and context reference.
+    // Defined only in src/net/ implementation files — backend types never leak here.
     struct Impl;
     std::unique_ptr<Impl> impl_;
 
-    // Only AsioTcpStream (in src/net/) may call the private constructor.
-    friend class aevox::net::AsioTcpStream;
+    // Only the concrete stream factory in src/net/ may call the private constructor.
+    friend class aevox::net::TcpStreamFactory;
 
     // Internal accessor for WebSocketSession strand construction.
     // Returns a mutable pointer to TcpStream::Impl for use by internal net/ code.
     // Resolved to aevox::get_tcp_stream_impl by ADL once the definition is visible
-    // (defined in asio_tcp_stream.cpp / websocket_session.cpp).
+    // (defined in src/net/ implementation files).
     friend Impl* get_tcp_stream_impl(TcpStream&) noexcept;
 
-    // Private constructor: called exclusively by AsioTcpStream::make().
+    // Private constructor: called exclusively by the concrete stream factory.
     explicit TcpStream(std::unique_ptr<Impl> impl) noexcept;
 };
 
