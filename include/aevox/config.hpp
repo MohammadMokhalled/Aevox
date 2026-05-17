@@ -6,7 +6,7 @@
 // Defines the named constexpr defaults that back every field in AppConfig and
 // ExecutorConfig, and the ConfigError/ConfigErrorDetail types used by App::create().
 //
-// No Asio, TOML, or other third-party types appear in this file.
+// No backend networking, TOML, or other third-party types appear in this file.
 //
 // Thread-safety: all symbols are constexpr or stateless enum values — inherently
 // thread-safe.

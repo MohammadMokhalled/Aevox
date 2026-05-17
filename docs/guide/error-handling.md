@@ -36,11 +36,11 @@ Each module keeps its precise error type. Generic code can call `aevox::category
 
 | Value | When it occurs |
 |---|---|
-| `bind_failed` | Port in use or insufficient permissions |
-| `listen_failed` | `listen()` syscall failed after a successful bind |
-| `accept_failed` | A single `accept()` call failed (non-fatal — loop continues) |
-| `already_running` | `run()` called while the executor is already running |
-| `not_running` | Operation on a stopped executor |
+| `BindFailed` | Port in use or insufficient permissions |
+| `ListenFailed` | `listen()` syscall failed after a successful bind |
+| `AcceptFailed` | A single `accept()` call failed (non-fatal — loop continues) |
+| `AlreadyRunning` | `run()` called while the executor is already running |
+| `NotRunning` | Operation on a stopped executor |
 
 ### IoError values
 

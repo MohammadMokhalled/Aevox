@@ -3,7 +3,7 @@
 //
 // INTERNAL — never included by public headers or application code.
 //
-// Declares AsioTcpStream, the factory helper that constructs aevox::TcpStream
+// Declares TcpStreamFactory, the factory helper that constructs aevox::TcpStream
 // from an accepted asio::ip::tcp::socket. The friend declaration in
 // include/aevox/tcp_stream.hpp names this class so it can call the private
 // TcpStream(unique_ptr<Impl>) constructor.
@@ -25,11 +25,11 @@ namespace aevox::net {
  *
  * Thread-safety: make() is called only from run_accept_loop() on the I/O
  *   thread — no concurrent calls expected.
- * Move semantics: AsioTcpStream itself is stateless; all state is in the
+ * Move semantics: TcpStreamFactory itself is stateless; all state is in the
  *   returned TcpStream.
  * Ownership: returned TcpStream owns the socket via unique_ptr<Impl>.
  */
-class AsioTcpStream
+class TcpStreamFactory
 {
 public:
     /**

@@ -52,7 +52,7 @@ class WebSocket;
  * Returned by `Request::method()`. The parser maps the raw method string to
  * this enum — unknown verbs yield `HttpMethod::Unknown`.
  */
-// <winnt.h> (pulled in by Asio on Windows) defines DELETE as a numeric macro.
+// <winnt.h> on Windows defines DELETE as a numeric macro.
 // Push and suppress it while the enumerator is declared, then restore.
 #ifdef DELETE
     #pragma push_macro("DELETE")

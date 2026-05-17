@@ -2,7 +2,7 @@
 // include/aevox/websocket.hpp
 //
 // Public WebSocket connection handle exposed to application handlers.
-// No Asio types. Asio-backed implementation lives in src/net/.
+// No backend networking types. Implementation lives in src/net/.
 //
 // Thread-safety: send()/close() safe from any coroutine; strand serializes I/O.
 //   subscribe()/publish() safe from any thread via TopicBus shared_mutex.
@@ -25,7 +25,7 @@
 #include <string_view>
 
 // Forward declaration — allows friend class declaration below without including
-// any Asio header. aevox::net::WebSocketSession is defined in src/net/.
+// any backend networking header. aevox::net::WebSocketSession is defined in src/net/.
 namespace aevox::net {
 class WebSocketSession;
 } // namespace aevox::net
@@ -41,14 +41,14 @@ namespace aevox {
  *
  * `WebSocket` wraps a live RFC 6455 connection that has already completed
  * the HTTP/1.1 upgrade handshake. The application interacts exclusively
- * with this type — it never sees the underlying Asio socket.
+ * with this type — it never sees the underlying backend socket.
  *
  * Construct exclusively via `co_await req.upgrade_websocket()` or via
  * the `App::ws()` callback — never directly.
  *
  * @note Thread-safety: `send()` and `close()` are safe to call from any
  *       coroutine on any executor thread. Concurrent sends are serialized via
- *       an internal Asio strand in `src/net/`. `subscribe()` and `publish()`
+ *       an internal backend strand in `src/net/`. `subscribe()` and `publish()`
  *       are safe to call from any thread — the `TopicBus` uses a `shared_mutex`.
  * @note Move semantics: move-only. A moved-from `WebSocket` is in the
  *       `Closed` state — all operations return
@@ -225,7 +225,7 @@ public:
 
 private:
     /**
-     * @brief Internal implementation type — holds the Asio-backed session.
+     * @brief Internal implementation type — holds the backend session.
      *
      * Defined only in `src/net/websocket_session.hpp`. Never visible to
      * application code. The full type is accessed only by `src/net/`.

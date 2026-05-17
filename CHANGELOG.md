@@ -50,7 +50,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - `aevox::Response::json(const T&)` — factory that serializes `T` to JSON and returns a 200 response with `Content-Type: application/json`; falls back to 500 on serialization failure
 - `aevox::AppConfig` — runtime-configurable fields: `port`, `host`, `backlog`, `max_body_size`, `request_timeout`, `max_header_count`, `max_read_bytes`; all have named `constexpr` defaults in `include/aevox/config.hpp`
 - `aevox::App::create()` — factory that accepts an optional TOML config file path and returns `std::expected<App, ConfigErrorDetail>`; base defaults always apply when no file is provided
-- `aevox::ConfigError` enum and `aevox::ConfigErrorDetail` struct — structured error type for config loading failures (`file_not_found`, `parse_error`, `invalid_value`)
+- `aevox::ConfigError` enum and `aevox::ConfigErrorDetail` struct — structured error type for config loading failures (`FileNotFound`, `ParseError`, `InvalidValue`)
 - `aevox::to_string(ConfigError)` — human-readable error code string
 - `aevox::ExecutorConfig` — `thread_count`, `cpu_pool_threads`, `drain_timeout` now exposed in public header with named `constexpr` defaults
 - TOML config support via toml++ (confined to `src/config/`; no toml++ types in public headers)

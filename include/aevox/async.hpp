@@ -11,8 +11,8 @@
 // aevox::Executor-managed I/O thread. Behaviour is undefined if called
 // from any other context (raw std::thread, main(), etc.).
 //
-// No Asio types appear in this file. The Asio binding is injected via three
-// thread_local std::function bridges in aevox::detail (set by AsioExecutor
+// No backend networking types appear in this file. The backend binding is injected via three
+// thread_local std::function bridges in aevox::detail (set by the executor
 // when each I/O worker thread starts). Implementations live inline here
 // because all public helpers are templates.
 //
@@ -52,17 +52,17 @@ namespace aevox {
 // =============================================================================
 // Thread-local executor bridges — declared here, defined in src/net/executor_context.cpp
 //
-// These are set by AsioExecutor for each I/O worker thread before io_ctx_.run().
+// These are set by the executor for each I/O worker thread before the event loop starts.
 // They must never be called from outside an executor-managed thread.
 // =============================================================================
 
 namespace detail {
 
 /**
- * @brief Returns this thread's CPU-pool post bridge (set by AsioExecutor at thread startup).
+ * @brief Returns this thread's CPU-pool post bridge set by the executor at thread startup.
  *
- * Bound to `asio::post(cpu_pool_executor, fn)`. When cpu_pool_threads == 0, bound to
- * `tl_post_to_io()` instead.
+ * Bound to the backend CPU-pool dispatch operation. When cpu_pool_threads == 0,
+ * bound to `tl_post_to_io()` instead.
  *
  * @note Valid only on executor I/O threads. The returned function is empty on other threads.
  */
@@ -73,10 +73,10 @@ namespace detail {
 }
 
 /**
- * @brief Returns this thread's I/O-pool post bridge (set by AsioExecutor at thread startup).
+ * @brief Returns this thread's I/O-pool post bridge set by the executor at thread startup.
  *
- * Bound to `asio::post(io_context_executor, fn)`. Accepts move-only callables (required for
- * when_all sub-task lambdas that capture move-only Task<T> values).
+ * Bound to the backend I/O-pool dispatch operation. Accepts move-only callables
+ * required for when_all sub-task lambdas that capture move-only Task<T> values.
  *
  * @note Valid only on executor I/O threads. The returned function is empty on other threads.
  */
@@ -87,9 +87,9 @@ namespace detail {
 }
 
 /**
- * @brief Returns this thread's timer-schedule bridge (set by AsioExecutor at thread startup).
+ * @brief Returns this thread's timer-schedule bridge set by the executor at thread startup.
  *
- * Bound to an Asio `steady_timer` launcher by AsioExecutor at thread startup.
+ * Bound to the backend timer launcher at thread startup.
  *
  * @note Valid only on executor I/O threads. The returned function is empty on other threads.
  */
@@ -191,7 +191,7 @@ template <typename Fn> struct PoolAwaitable
                 exception = std::current_exception();
             }
             // Resume caller on the I/O pool, not the CPU pool thread.
-            // asio::post ensures happens-before between writes above and
+            // Backend dispatch ensures happens-before between writes above and
             // the await_resume() read below.
             resume([caller]() mutable { caller.resume(); });
         });
@@ -200,7 +200,7 @@ template <typename Fn> struct PoolAwaitable
     /**
      * Returns the result of fn or rethrows any exception it threw.
      * Called on the resuming I/O thread — after CPU-thread writes are visible
-     * via the asio::post sequencing in await_suspend.
+     * via the backend dispatch sequencing in await_suspend.
      */
     R await_resume()
     {

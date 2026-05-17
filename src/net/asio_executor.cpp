@@ -155,8 +155,9 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
         auto conn_id = next_conn_id_.fetch_add(1, std::memory_order_relaxed);
 
         // Construct TcpStream from the accepted socket.
-        // AsioTcpStream::make() calls TcpStream's private constructor via the friend declaration.
-        auto stream = aevox::net::AsioTcpStream::make(std::move(socket), io_ctx_);
+        // TcpStreamFactory::make() calls TcpStream's private constructor via the friend
+        // declaration.
+        auto stream = aevox::net::TcpStreamFactory::make(std::move(socket), io_ctx_);
 
         // Dispatch the handler to run on the I/O pool.
         // dispatch_handler uses FireAndForget (a plain coroutine without
