@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `aevox::ErrorCategory` and `category(...)` helpers for module-specific error types, preserving precise errors while enabling broad logging and response classification (AEV-013)
+- `aevox::JsonErrorCode`, `JsonError::code()`, and `to_string(JsonErrorCode)` for stable JSON error branching (AEV-013)
+- Planned and architected AEV-013 `std::expected`-based error model task; implementation is approved by `Tasks/architecture/AEV-013-arch.md`.
 - Structured asynchronous logging subsystem (AEV-011): `aevox::log::Logger`, `LogLevel`, `LogConfig`, console and file sinks with JSON/Pretty formatting, runtime level filtering, per-request correlation via `Request::log`, and automatic request/response logging via `aevox::middleware::logger()`
 - `aevox::log::global()` — global application logger, auto-initialised on `App::listen()`
 - `aevox::middleware::logger()` — middleware factory for automatic HTTP access logging with configurable fields, excluded paths, and slow-request warnings
@@ -30,6 +33,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Default JSON backend: glaze, selectable via `AEVOX_JSON_BACKEND` CMake option (AEV-009)
 
 ### Changed
+- `aevox::ConfigErrorDetail` now provides `error_code()`, `error_message()`, and `error_key()` accessors while retaining public fields for compatibility (AEV-013)
 - WebSocket integration test architecture now requires Aevox-owned deadline-bounded test transport wrappers instead of raw Asio usage in test cases, preserving the no-public-Asio project goal and covering split-frame, close, upgrade, and broadcast scenarios without exposing backend networking details.
 - CI upgraded to GCC 15 on Ubuntu 26.04; CMake and vcpkg baseline updated to latest stable
 - CI split into PR pipeline (`pr.yml`) with clang-format-21 check and clang-tidy-21 check-only gate, and main pipeline (`main.yml`) with build and test only; old `ci.yml` deleted

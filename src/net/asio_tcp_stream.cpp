@@ -229,6 +229,21 @@ Task<std::expected<void, IoError>> TcpStream::write(std::span<const std::byte> d
     return "IoError: unrecognised value";
 }
 
+ErrorCategory category(IoError e) noexcept
+{
+    switch (e) {
+        case IoError::Eof:
+        case IoError::Reset:
+        case IoError::Timeout:
+            return ErrorCategory::Io;
+        case IoError::Cancelled:
+            return ErrorCategory::State;
+        case IoError::Unknown:
+            return ErrorCategory::Unknown;
+    }
+    return ErrorCategory::Unknown;
+}
+
 } // namespace aevox
 
 // =============================================================================

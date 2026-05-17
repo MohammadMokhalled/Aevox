@@ -12,6 +12,7 @@
 // PRD §5.5, §5.6 — Executor abstraction, future-proof networking
 
 #include <aevox/config.hpp>
+#include <aevox/error.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
 
@@ -116,6 +117,15 @@ enum class ExecutorError : std::uint8_t
  *           The lifetime of the returned view is static.
  */
 [[nodiscard]] std::string_view to_string(ExecutorError e) noexcept;
+
+/**
+ * @brief Maps an ExecutorError value to a broad Aevox error category.
+ *
+ * @param e  The executor error to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(ExecutorError e) noexcept;
 
 // =============================================================================
 // ConnectionHandler concept

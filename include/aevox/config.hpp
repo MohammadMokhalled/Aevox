@@ -11,6 +11,8 @@
 // Thread-safety: all symbols are constexpr or stateless enum values — inherently
 // thread-safe.
 
+#include <aevox/error.hpp>
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -153,6 +155,31 @@ struct ConfigErrorDetail
     ConfigError code{ConfigError::FileNotFound}; ///< Discriminant error code.
     std::string message;                         ///< Human-readable description.
     std::string key; ///< Offending TOML key (populated for invalid_value only).
+
+    /**
+     * @brief Returns the stable configuration error code.
+     *
+     * @return `ConfigError` discriminator for branching.
+     * @note Thread-safety: safe to call concurrently on immutable instances.
+     */
+    [[nodiscard]] ConfigError error_code() const noexcept;
+
+    /**
+     * @brief Returns the human-readable error description.
+     *
+     * @return Non-owning view into the stored message string.
+     * @note Thread-safety: safe to call concurrently on immutable instances.
+     */
+    [[nodiscard]] std::string_view error_message() const noexcept;
+
+    /**
+     * @brief Returns the offending configuration key, if any.
+     *
+     * @return Non-owning view into the stored key string, or an empty view when
+     *         no specific key caused the failure.
+     * @note Thread-safety: safe to call concurrently on immutable instances.
+     */
+    [[nodiscard]] std::string_view error_key() const noexcept;
 };
 
 /**
@@ -162,5 +189,23 @@ struct ConfigErrorDetail
  * @return   A null-terminated string literal. Lifetime is static — never dangles.
  */
 [[nodiscard]] std::string_view to_string(ConfigError e) noexcept;
+
+/**
+ * @brief Maps a ConfigError code to a broad Aevox error category.
+ *
+ * @param e  The config error code to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(ConfigError e) noexcept;
+
+/**
+ * @brief Maps a ConfigErrorDetail object to a broad Aevox error category.
+ *
+ * @param detail  The config error detail to classify.
+ * @return Broad error category derived from `detail.error_code()`.
+ * @note Thread-safety: safe to call concurrently on immutable instances.
+ */
+[[nodiscard]] ErrorCategory category(const ConfigErrorDetail& detail) noexcept;
 
 } // namespace aevox

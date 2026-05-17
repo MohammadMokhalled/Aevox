@@ -9,7 +9,14 @@
 
 TEST_CASE("JsonError - message is accessible and non-empty on parse failure", "[json]")
 {
-    const aevox::JsonError err{"unexpected end of input at line 1, col 5"};
+    const aevox::JsonError err{aevox::JsonErrorCode::ParseError,
+                               "unexpected end of input at line 1, col 5"};
+
+    SECTION("code returns the stable discriminator")
+    {
+        CHECK(err.code() == aevox::JsonErrorCode::ParseError);
+        CHECK(aevox::category(err) == aevox::ErrorCategory::Parse);
+    }
 
     SECTION("message returns the stored string as string_view")
     {
@@ -49,4 +56,23 @@ TEST_CASE("JsonError - moved-from error has empty message", "[json]")
     {
         CHECK(f.source.message().empty());
     }
+}
+
+TEST_CASE("JsonError - message-only constructor preserves compatibility", "[json]")
+{
+    const aevox::JsonError err{"legacy backend message"};
+
+    CHECK(err.code() == aevox::JsonErrorCode::Unknown);
+    CHECK(err.message() == "legacy backend message");
+    CHECK(aevox::category(err) == aevox::ErrorCategory::Unknown);
+}
+
+TEST_CASE("JsonError - code helpers are deterministic and non-empty", "[json]")
+{
+    CHECK(aevox::to_string(aevox::JsonErrorCode::ParseError) == "JSON parse error");
+    CHECK_FALSE(aevox::to_string(aevox::JsonErrorCode::TypeMismatch).empty());
+    CHECK_FALSE(aevox::to_string(aevox::JsonErrorCode::MissingField).empty());
+    CHECK_FALSE(aevox::to_string(aevox::JsonErrorCode::SerializationFailed).empty());
+    CHECK_FALSE(aevox::to_string(aevox::JsonErrorCode::InvalidUtf8).empty());
+    CHECK_FALSE(aevox::to_string(aevox::JsonErrorCode::Unknown).empty());
 }

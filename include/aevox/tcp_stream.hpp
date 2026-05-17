@@ -15,6 +15,7 @@
 // Design: Tasks/architecture/AEV-003-arch.md §3.1
 
 #include <aevox/config.hpp>
+#include <aevox/error.hpp>
 #include <aevox/task.hpp>
 
 #include <cstddef>
@@ -60,6 +61,15 @@ enum class IoError : std::uint8_t
  *           The returned view's lifetime is static — it never dangles.
  */
 [[nodiscard]] std::string_view to_string(IoError e) noexcept;
+
+/**
+ * @brief Maps an IoError value to a broad Aevox error category.
+ *
+ * @param e  The I/O error to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(IoError e) noexcept;
 
 // =============================================================================
 // TcpStream

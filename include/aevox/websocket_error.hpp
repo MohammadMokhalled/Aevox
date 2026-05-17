@@ -7,6 +7,8 @@
 // Thread-safety: Value type — safe to copy and move across threads.
 // Move semantics: Moved-from WebSocketError has message() returning empty view.
 
+#include <aevox/error.hpp>
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -31,6 +33,24 @@ enum class WebSocketErrorCode : std::uint8_t
     SendFailed,       ///< A frame could not be sent (connection reset, buffer overflow).
     FrameTooLarge,    ///< Payload exceeds AppConfig::max_body_size.
 };
+
+/**
+ * @brief Returns a human-readable description of a WebSocketErrorCode value.
+ *
+ * @param code  The WebSocket error code to describe.
+ * @return Static string literal with process lifetime.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] std::string_view to_string(WebSocketErrorCode code) noexcept;
+
+/**
+ * @brief Maps a WebSocketErrorCode value to a broad Aevox error category.
+ *
+ * @param code  The WebSocket error code to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(WebSocketErrorCode code) noexcept;
 
 // =============================================================================
 // WebSocketError
@@ -78,5 +98,14 @@ private:
     WebSocketErrorCode code_;
     std::string        message_;
 };
+
+/**
+ * @brief Maps a WebSocketError detail object to a broad Aevox error category.
+ *
+ * @param error  The WebSocket error detail object to classify.
+ * @return Broad error category derived from `error.code()`.
+ * @note Thread-safety: safe to call concurrently on immutable instances.
+ */
+[[nodiscard]] ErrorCategory category(const WebSocketError& error) noexcept;
 
 } // namespace aevox

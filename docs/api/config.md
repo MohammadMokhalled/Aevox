@@ -150,6 +150,10 @@ struct ConfigErrorDetail {
     ConfigError  code{ConfigError::file_not_found};
     std::string  message;   // human-readable description
     std::string  key;       // offending TOML key (populated for invalid_value only)
+
+    [[nodiscard]] ConfigError      error_code() const noexcept;
+    [[nodiscard]] std::string_view error_message() const noexcept;
+    [[nodiscard]] std::string_view error_key() const noexcept;
 };
 ```
 
@@ -160,6 +164,9 @@ and names the TOML key whose value failed validation.
 `ConfigErrorDetail` is a value type — safe to copy or move across threads. A moved-from
 instance has empty `message` and `key`.
 
+The public fields remain available for compatibility. Prefer the accessor methods in new
+code because they match the other structured Aevox error detail types.
+
 ---
 
 ## to_string()
@@ -167,6 +174,8 @@ instance has empty `message` and `key`.
 ```cpp
 // include/aevox/config.hpp
 [[nodiscard]] std::string_view to_string(ConfigError e) noexcept;
+[[nodiscard]] ErrorCategory category(ConfigError e) noexcept;
+[[nodiscard]] ErrorCategory category(const ConfigErrorDetail& detail) noexcept;
 ```
 
 Returns a short static description of the error code. The returned `string_view` points
@@ -306,6 +315,7 @@ std::cout << std::format("port={} io_threads={}\n",
 
 ## See Also
 
+- [Error Categories](error.md) — shared `ErrorCategory` classifier
 - [Configuration User Guide](../guide/configuration.md) — practical walkthrough with annotated examples
 - [Router and App](router.md) — full `App` class reference including route registration and lifecycle
 - [Executor](executor.md) — `ExecutorConfig` and the `Executor` interface

@@ -26,6 +26,11 @@ No Aevox function throws for a recoverable error. If something goes wrong, the e
 | `aevox::IoError` | `<aevox/tcp_stream.hpp>` | During `stream.read()` or `stream.write()` |
 | `aevox::RouteError` | `<aevox/router.hpp>` | During router dispatch (accessible in tests) |
 | `aevox::ParamError` | `<aevox/request.hpp>` | During `req.param<T>()` |
+| `aevox::ConfigErrorDetail` | `<aevox/config.hpp>` | During `App::create()` with a config file |
+| `aevox::JsonError` | `<aevox/json_error.hpp>` | During JSON parse or serialization |
+| `aevox::WebSocketError` | `<aevox/websocket_error.hpp>` | During WebSocket upgrade, send, or close |
+
+Each module keeps its precise error type. Generic code can call `aevox::category(error)` to map an error to `aevox::ErrorCategory` for broad handling.
 
 ### ExecutorError values
 
@@ -124,6 +129,43 @@ if (!data) {
     co_return;
 }
 ```
+
+## Mapping Errors to Responses
+
+```cpp
+app.post("/items", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
+    auto body = co_await req.json<CreateItemBody>();
+    if (!body) {
+        const auto category = aevox::category(body.error());
+        if (category == aevox::ErrorCategory::Validation ||
+            category == aevox::ErrorCategory::Parse) {
+            co_return aevox::Response::bad_request(std::string{body.error().message()});
+        }
+        co_return aevox::Response::bad_request("invalid JSON body");
+    }
+
+    co_return aevox::Response::ok("created");
+});
+```
+
+Configuration errors follow the same expected-checking pattern at startup:
+
+```cpp
+auto app_result = aevox::App::create({}, "aevox.toml");
+if (!app_result) {
+    const auto& err = app_result.error();
+    std::println(stderr, "config error [{}]: {}",
+                 aevox::to_string(aevox::category(err)),
+                 err.error_message());
+    return 1;
+}
+```
+
+## Anti-patterns
+
+- **Do not ignore expected results** — `[[nodiscard]]` exists so unchecked errors are caught by the compiler.
+- **Do not branch on message text** — branch on `code()` or the module error enum, then log `message()`.
+- **Do not throw for recoverable application failures** — return or propagate `std::expected` instead.
 
 ## What Happens on Unhandled Exceptions
 

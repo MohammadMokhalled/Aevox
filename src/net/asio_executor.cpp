@@ -376,4 +376,18 @@ namespace aevox {
     return "unknown ExecutorError";
 }
 
+ErrorCategory category(ExecutorError e) noexcept
+{
+    switch (e) {
+        case ExecutorError::BindFailed:
+        case ExecutorError::ListenFailed:
+        case ExecutorError::AcceptFailed:
+            return ErrorCategory::Io;
+        case ExecutorError::AlreadyRunning:
+        case ExecutorError::NotRunning:
+            return ErrorCategory::State;
+    }
+    return ErrorCategory::Unknown;
+}
+
 } // namespace aevox

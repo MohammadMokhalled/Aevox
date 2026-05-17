@@ -154,6 +154,28 @@ std::string_view to_string(HttpMethod m) noexcept
     return "UNKNOWN"; // unreachable; silences -Wreturn-type
 }
 
+std::string_view to_string(ParamError e) noexcept
+{
+    switch (e) {
+        case ParamError::NotFound:
+            return "path parameter not found";
+        case ParamError::BadConversion:
+            return "path parameter conversion failed";
+    }
+    return "unknown path parameter error";
+}
+
+ErrorCategory category(ParamError e) noexcept
+{
+    switch (e) {
+        case ParamError::NotFound:
+            return ErrorCategory::NotFound;
+        case ParamError::BadConversion:
+            return ErrorCategory::Validation;
+    }
+    return ErrorCategory::Unknown;
+}
+
 // =============================================================================
 // Explicit instantiations — ParamConvertible types
 //

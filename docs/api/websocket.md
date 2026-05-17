@@ -188,6 +188,10 @@ public:
     [[nodiscard]] WebSocketErrorCode code()    const noexcept;
     [[nodiscard]] std::string_view   message() const noexcept;
 };
+
+[[nodiscard]] std::string_view to_string(WebSocketErrorCode code) noexcept;
+[[nodiscard]] ErrorCategory category(WebSocketErrorCode code) noexcept;
+[[nodiscard]] ErrorCategory category(const WebSocketError& error) noexcept;
 ```
 
 ---
@@ -267,6 +271,8 @@ Internal factory that returns a 101 sentinel response. The connection handler de
 | `Closed` | Operation on an already-closed connection | No-op; check `result.has_value()` in coroutine contexts |
 | `SendFailed` | Frame could not be written to the socket | Treat as connection loss; do not retry |
 | `FrameTooLarge` | Payload exceeded `AppConfig::max_body_size` | Session closes with code 1009 automatically |
+
+Use `to_string(WebSocketErrorCode)` for diagnostics and `category(...)` for broad handling.
 
 ## Thread Safety
 

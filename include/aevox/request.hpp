@@ -18,6 +18,7 @@
 // Design: Tasks/architecture/AEV-005-arch.md §3.2
 
 #include <aevox/concepts.hpp>
+#include <aevox/error.hpp>
 #include <aevox/json_error.hpp>
 #include <aevox/log.hpp>
 #include <aevox/task.hpp>
@@ -100,6 +101,24 @@ enum class ParamError : std::uint8_t
     NotFound,      ///< No path parameter with the given name was captured by the router.
     BadConversion, ///< The raw string could not be converted to the requested type T.
 };
+
+/**
+ * @brief Returns a human-readable description of a ParamError value.
+ *
+ * @param e  The path-parameter error to describe.
+ * @return Static string literal with process lifetime.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] std::string_view to_string(ParamError e) noexcept;
+
+/**
+ * @brief Maps a ParamError value to a broad Aevox error category.
+ *
+ * @param e  The path-parameter error to classify.
+ * @return Broad error category for generic handling and logging.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(ParamError e) noexcept;
 
 // =============================================================================
 // Request
