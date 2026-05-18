@@ -22,6 +22,7 @@
 #include <expected>
 #include <format>
 #include <optional>
+#include <random>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -32,6 +33,7 @@
 #include "http/http_parser.hpp"
 #include "http/request_impl.hpp"
 #include "http/response_impl.hpp"
+#include "http/traceparent.hpp"
 #include "net/websocket_session.hpp"
 #include "router/router_impl.hpp"
 
@@ -326,9 +328,23 @@ void App::listen(std::uint16_t port)
                 req_impl->max_payload = max_body;
 
                 // Set up per-request logging context.
-                static std::atomic<std::uint64_t> request_counter{0};
-                req_impl->log_context.request_id =
-                    std::format("req-{}", request_counter.fetch_add(1, std::memory_order_relaxed));
+                // request_id: 16 lowercase hex chars from a per-thread PRNG.
+                thread_local std::mt19937_64 rng{std::random_device{}()};
+                req_impl->log_context.request_id = std::format("{:016x}", rng());
+
+                // traceparent: W3C Trace Context extraction (AEV-012).
+                const auto tp_hdr = req.header("traceparent");
+                if (tp_hdr) {
+                    const auto parsed_tp = aevox::detail::parse_traceparent(*tp_hdr);
+                    if (parsed_tp) {
+                        req_impl->log_context.trace_id =
+                            std::string{parsed_tp->trace_id.begin(), parsed_tp->trace_id.end()};
+                        req_impl->log_context.span_id =
+                            std::string{parsed_tp->parent_id.begin(), parsed_tp->parent_id.end()};
+                        req_impl->log_context.traceparent = std::string{*tp_hdr};
+                    }
+                }
+
                 req_impl->log_context.thread_id =
                     std::hash<std::thread::id>{}(std::this_thread::get_id());
                 req_impl->log_context.accept_time = std::chrono::steady_clock::now();

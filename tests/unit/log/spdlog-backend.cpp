@@ -55,7 +55,13 @@ TEST_CASE("spdlog backend writes correct JSON fields", "[log]")
     REQUIRE(line.find("\"timestamp\":") != std::string::npos);
     REQUIRE(line.find("1970-01-01T00:00:01.234000000Z") != std::string::npos);
     REQUIRE(line.find("\"level\":\"INFO\"") != std::string::npos);
-    REQUIRE(line.find("\"message\":\"hello world\"") != std::string::npos);
+    REQUIRE(line.find(",\"message\":\"hello world\"") != std::string::npos);
     REQUIRE(line.find("\"request_id\":\"req-42\"") != std::string::npos);
     REQUIRE(line.find("\"thread_id\":7") != std::string::npos);
+    // Regression: verify JSON is structurally well-formed by checking that the
+    // line starts with '{' and ends with '}' and all known keys have commas.
+    REQUIRE(line.front() == '{');
+    REQUIRE(line.back() == '}');
+    REQUIRE(line.find(",\"level\":") != std::string::npos);
+    REQUIRE(line.find(",\"request_id\":") != std::string::npos);
 }

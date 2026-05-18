@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <ranges>
 #include <string_view>
 
@@ -174,6 +175,18 @@ ErrorCategory category(ParamError e) noexcept
             return ErrorCategory::Validation;
     }
     return ErrorCategory::Unknown;
+}
+
+// =============================================================================
+// trace_context() — W3C Trace Context propagation (AEV-012)
+// =============================================================================
+
+std::optional<std::string_view> Request::trace_context() const noexcept
+{
+    if (!impl_ || impl_->log_context.traceparent.empty()) {
+        return std::nullopt;
+    }
+    return std::string_view{impl_->log_context.traceparent};
 }
 
 // =============================================================================

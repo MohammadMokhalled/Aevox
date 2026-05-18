@@ -56,3 +56,75 @@ target_compile_options(request-response
 
 catch_discover_tests(request-response)
 add_dependencies(aevox_tests_unit request-response)
+
+# ---------------------------------------------------------------------------
+# Traceparent parsing unit tests (AEV-012)
+# ---------------------------------------------------------------------------
+
+add_executable(traceparent-parse-valid
+    traceparent-parse-valid.cpp
+)
+
+target_include_directories(traceparent-parse-valid
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src   # for #include "http/traceparent.hpp"
+)
+
+target_link_libraries(traceparent-parse-valid
+    PRIVATE
+        Catch2::Catch2WithMain
+)
+
+target_compile_options(traceparent-parse-valid
+    PRIVATE ${AEVOX_COMPILE_OPTIONS}
+)
+
+catch_discover_tests(traceparent-parse-valid)
+add_dependencies(aevox_tests_unit traceparent-parse-valid)
+
+add_executable(traceparent-parse-invalid
+    traceparent-parse-invalid.cpp
+)
+
+target_include_directories(traceparent-parse-invalid
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src   # for #include "http/traceparent.hpp"
+)
+
+target_link_libraries(traceparent-parse-invalid
+    PRIVATE
+        Catch2::Catch2WithMain
+)
+
+target_compile_options(traceparent-parse-invalid
+    PRIVATE ${AEVOX_COMPILE_OPTIONS}
+)
+
+catch_discover_tests(traceparent-parse-invalid)
+add_dependencies(aevox_tests_unit traceparent-parse-invalid)
+
+# ---------------------------------------------------------------------------
+# trace_context() unit tests (AEV-012)
+# ---------------------------------------------------------------------------
+
+add_executable(trace-context-return
+    trace-context-return.cpp
+)
+
+target_include_directories(trace-context-return
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src   # for #include "http/request_impl.hpp"
+)
+
+target_link_libraries(trace-context-return
+    PRIVATE
+        aevox_core
+        Catch2::Catch2WithMain
+)
+
+target_compile_options(trace-context-return
+    PRIVATE ${AEVOX_COMPILE_OPTIONS}
+)
+
+catch_discover_tests(trace-context-return)
+add_dependencies(aevox_tests_unit trace-context-return)

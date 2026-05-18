@@ -16,9 +16,11 @@ namespace aevox {
 
 struct RequestContext
 {
-    std::string                           request_id;     // UUID or nanoid, assigned by acceptor.
-    std::string                           correlation_id; // Populated by AEV-012 tracing hooks.
-    std::size_t                           thread_id{0};   // Hashed thread ID.
+    std::string request_id;   // 16 hex chars, random.
+    std::string trace_id;     // 32 hex chars, from traceparent. Empty if absent.
+    std::string span_id;      // 16 hex chars, from traceparent. Empty if absent.
+    std::string traceparent;  // Full "00-<trace_id>-<parent_id>-<flags>" string.
+    std::size_t thread_id{0}; // Hashed thread ID.
     std::chrono::steady_clock::time_point accept_time;
 };
 

@@ -50,12 +50,11 @@ Middleware logger(LoggerMiddlewareConfig config)
 
         const std::string msg =
             format_middleware_message(req, response, duration_ms, config.format);
-        aevox::log::global().log(config.level, msg);
+        req.log.log(config.level, msg);
 
         if (duration_ms > config.slow_request_threshold) {
-            aevox::log::global().warn("Slow request: {} {} took {}ms",
-                                      std::string{to_string(req.method())}, std::string{req.path()},
-                                      duration_ms.count());
+            req.log.warn("Slow request: {} {} took {}ms", std::string{to_string(req.method())},
+                         std::string{req.path()}, duration_ms.count());
         }
 
         co_return response;

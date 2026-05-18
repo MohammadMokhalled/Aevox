@@ -121,6 +121,27 @@ if (ct && ct->starts_with("application/json")) { ... }
 
 ---
 
+#### `trace_context() → std::optional<std::string_view>`
+
+```cpp
+[[nodiscard]] std::optional<std::string_view> trace_context() const noexcept;
+```
+
+Returns the W3C Trace Context `traceparent` header value for propagation to downstream services. When the inbound request carried a syntactically valid `traceparent` header (version `00`), this method returns a `std::string_view` into that value, suitable for forwarding as-is in outbound HTTP calls.
+
+Returns `std::nullopt` when no valid `traceparent` was present. The view is valid for the lifetime of this `Request`.
+
+**Example:**
+```cpp
+if (auto ctx = req.trace_context(); ctx) {
+    outbound.set_header("traceparent", *ctx);
+}
+```
+
+**Note:** The value is never modified by Aevox. Child-span generation (new `parent_id`) is out of scope for v0.2; see the future OpenTelemetry integration task.
+
+---
+
 #### `body() → std::span<const std::byte>`
 
 ```cpp

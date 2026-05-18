@@ -161,3 +161,46 @@ On a typical Linux workstation:
 - Drop rate under load: **<0.1%** with default 64K buffer
 
 See `tests/bench/log/` for reproducible benchmarks.
+
+## Distributed Tracing
+
+Aevox automatically extracts the W3C Trace Context `traceparent` header from every inbound request. When a valid header is present, all log lines emitted through `req.log` carry `trace_id` and `span_id` fields — no manual instrumentation required.
+
+### Automatic Log Enrichment
+
+When a request arrives with the header:
+
+```
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+```
+
+Every `req.log.*()` call automatically includes the trace fields:
+
+```json
+{"timestamp":1234567890123,"level":"INFO","message":"Processing order 42","request_id":"a1b2c3d4e5f6a7b8","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","span_id":"00f067aa0ba902b7","thread_id":7}
+```
+
+When no `traceparent` header is present (or the header is invalid), `trace_id` and `span_id` are omitted from log output entirely.
+
+### Propagating Context to Downstream Services
+
+Use `req.trace_context()` to forward the trace context to outbound HTTP calls:
+
+```cpp
+app.get("/orders/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
+    req.log.info("Processing order {}", req.param<int>("id").value());
+
+    // Forward the traceparent header to downstream services
+    if (auto ctx = req.trace_context(); ctx) {
+        outbound.set_header("traceparent", *ctx);
+    }
+
+    co_return aevox::Response::ok(result);
+});
+```
+
+The returned `std::string_view` is valid for the lifetime of the `Request` and contains the exact incoming `traceparent` value — Aevox does not modify it.
+
+### request_id Format
+
+Each request receives a unique 16-character lowercase hex identifier (e.g. `"a1b2c3d4e5f6a7b8"`), generated from a per-thread PRNG. This replaces the earlier monotonic counter format (`"req-0"`, `"req-1"`, …).

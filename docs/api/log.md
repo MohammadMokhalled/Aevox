@@ -61,18 +61,27 @@ Output format for sinks. `JSON` is recommended for production log aggregation.
 ```cpp
 enum class LogField : std::uint8_t
 {
-    Timestamp,
-    Level,
-    RequestId,
-    Method,
-    Path,
-    Status,
-    DurationMs,
-    BodyBytes,
+    Timestamp,     // Unix nanoseconds since epoch.
+    Level,         // Log severity (TRACE ... FATAL).
+    RequestId,     // Unique request identifier assigned by the acceptor.
+    ThreadId,      // Hashed OS thread ID that handled the request.
+    Method,        // HTTP method (GET, POST, ...).
+    Path,          // Request path without query string.
+    Status,        // HTTP response status code.
+    DurationMs,    // Wall-clock time from request start to response sent.
+    Ip,            // Client remote address.
+    UserAgent,     // Value of the User-Agent header.
+    BodySize,      // Response body length in bytes.
+    Message,       // Free-form log message text.
+    CorrelationId, // Deprecated alias for TraceId. Use TraceId in new code.
+    TraceId,       // W3C trace_id from traceparent header (32 hex chars).
+    SpanId,        // W3C parent_id (span_id) from traceparent header (16 hex chars).
 };
 ```
 
 Fields available for automatic request/response logging via `aevox::middleware::logger()`.
+
+`CorrelationId` is a deprecated alias for `TraceId`. New code should use `TraceId` and `SpanId` directly.
 
 ### `aevox::log::ConsoleSinkConfig`
 
