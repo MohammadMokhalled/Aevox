@@ -79,12 +79,12 @@ struct TraceParent
     // Validate and extract trace-id (indices 3..34, 32 chars)
     TraceParent result;
     bool        trace_id_all_zero = true;
-    const char* src = header.data() + 3;
-    char*       dst = result.trace_id.data();
+    const char* src               = header.data() + 3;
+    char*       dst               = result.trace_id.data();
     for (std::size_t i = 0; i < 32; ++i, ++src, ++dst) {
         const char c = *src;
         if (c >= 'A' && c <= 'F') {
-            *dst = static_cast<char>(c - 'A' + 'a');
+            *dst              = static_cast<char>(c - 'A' + 'a');
             trace_id_all_zero = false;
         }
         else if (is_lower_hex(c)) {
@@ -102,13 +102,13 @@ struct TraceParent
     }
 
     // Validate and extract parent-id (indices 36..51, 16 chars)
-    bool        parent_id_all_zero = true;
-    src = header.data() + 36;
-    dst = result.parent_id.data();
+    bool parent_id_all_zero = true;
+    src                     = header.data() + 36;
+    dst                     = result.parent_id.data();
     for (std::size_t i = 0; i < 16; ++i, ++src, ++dst) {
         const char c = *src;
         if (c >= 'A' && c <= 'F') {
-            *dst = static_cast<char>(c - 'A' + 'a');
+            *dst               = static_cast<char>(c - 'A' + 'a');
             parent_id_all_zero = false;
         }
         else if (is_lower_hex(c)) {

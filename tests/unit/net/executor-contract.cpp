@@ -200,6 +200,19 @@ TEST_CASE("Executor - stop() before run() is a no-op, not a crash", "[net]")
     // No assertion needed — if we reach here, the test passes.
 }
 
+TEST_CASE("Executor - stop() after listen before run terminates run", "[net]")
+{
+    auto ex = aevox::make_executor(test_config());
+    auto listen_result =
+        ex->listen(0, [](std::uint64_t, aevox::TcpStream) -> aevox::Task<void> { co_return; });
+    REQUIRE(listen_result.has_value());
+
+    ex->stop();
+
+    const auto run_result = ex->run();
+    REQUIRE(run_result.has_value());
+}
+
 TEST_CASE("Executor - thread_count() matches construction argument", "[net]")
 {
     aevox::ExecutorConfig const cfg{.thread_count = 3, .drain_timeout = 1s};

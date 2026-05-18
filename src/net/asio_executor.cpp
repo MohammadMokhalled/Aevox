@@ -140,7 +140,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
             co_await loop.acceptor.async_accept(asio::as_tuple(asio::use_awaitable));
 
         if (ec) {
-            if (ec == asio::error::operation_aborted)
+            if (ec == asio::error::operation_aborted || ec == asio::error::bad_descriptor)
                 co_return; // stop() closed the acceptor — clean exit
 
             // Transient error (e.g. EMFILE) — log and continue.
@@ -175,17 +175,28 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
 
 std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 {
+    auto current = state_.load(std::memory_order_acquire);
+    if (current == State::Draining || current == State::Stopped) {
+        state_.store(State::Stopped, std::memory_order_release);
+        return {};
+    }
+
+    if (current != State::Configured && current != State::Idle) {
+        return std::unexpected{aevox::ExecutorError::AlreadyRunning};
+    }
+
+    work_guard_.emplace(asio::make_work_guard(io_ctx_));
+
     // Guard against double-run.
-    State expected = State::Configured;
-    if (!state_.compare_exchange_strong(expected, State::Running, std::memory_order_acq_rel,
+    if (!state_.compare_exchange_strong(current, State::Running, std::memory_order_acq_rel,
                                         std::memory_order_relaxed))
     {
-        State idle = State::Idle;
-        if (!state_.compare_exchange_strong(idle, State::Running, std::memory_order_acq_rel,
-                                            std::memory_order_relaxed))
-        {
-            return std::unexpected{aevox::ExecutorError::AlreadyRunning};
+        work_guard_.reset();
+        if (current == State::Draining || current == State::Stopped) {
+            state_.store(State::Stopped, std::memory_order_release);
+            return {};
         }
+        return std::unexpected{aevox::ExecutorError::AlreadyRunning};
     }
 
     // Create the CPU pool (if requested). Done here (not in constructor) so
@@ -193,10 +204,6 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
     if (config_.cpu_pool_threads > 0) {
         cpu_pool_.emplace(config_.cpu_pool_threads);
     }
-
-    // Work guard: keeps io_ctx_ from returning when there's no posted work.
-    // Reset by stop() → drain begins → io_ctx_.run() eventually returns.
-    work_guard_.emplace(asio::make_work_guard(io_ctx_));
 
     // -------------------------------------------------------------------------
     // Start I/O worker threads.
@@ -287,8 +294,20 @@ void AsioExecutor::stop() noexcept
     if (!state_.compare_exchange_strong(expected, State::Draining, std::memory_order_acq_rel,
                                         std::memory_order_relaxed))
     {
-        // Not running: either idle, configured, already draining, or stopped.
-        // stop() is idempotent in all of these states.
+        expected = State::Configured;
+        if (!state_.compare_exchange_strong(expected, State::Stopped, std::memory_order_acq_rel,
+                                            std::memory_order_relaxed))
+        {
+            // Not running: either idle, already draining, or stopped.
+            // stop() is idempotent in all of these states.
+            return;
+        }
+
+        for (auto& loop : accept_loops_) {
+            asio::error_code ec;
+            loop.acceptor.close(ec);
+        }
+        io_ctx_.stop();
         return;
     }
 

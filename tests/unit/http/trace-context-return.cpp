@@ -82,14 +82,18 @@ TEST_CASE("trace_context - returns view of original header when valid", "[http][
     // Populate traceparent in log_context as app_impl.cpp would do.
     auto*      impl   = aevox::get_mutable_request_impl(req);
     const auto parsed = aevox::detail::parse_traceparent(tp);
-    if (!parsed) { FAIL("parse_traceparent should return a value"); }
-    const auto& pv = *parsed;
+    if (!parsed) {
+        FAIL("parse_traceparent should return a value");
+    }
+    const auto& pv                = *parsed;
     impl->log_context.trace_id    = std::string(pv.trace_id.begin(), pv.trace_id.end());
     impl->log_context.span_id     = std::string(pv.parent_id.begin(), pv.parent_id.end());
     impl->log_context.traceparent = tp;
 
     const auto result = req.trace_context();
-    if (!result) { FAIL("trace_context should return a value"); }
+    if (!result) {
+        FAIL("trace_context should return a value");
+    }
     REQUIRE(*result == tp);
 }
 
@@ -112,8 +116,10 @@ TEST_CASE("trace_context - string_view survives Request move", "[http][tracing]"
     // Populate log_context as app_impl.cpp would.
     auto*      impl   = aevox::get_mutable_request_impl(req);
     const auto parsed = aevox::detail::parse_traceparent(tp);
-    if (!parsed) { FAIL("parse_traceparent should return a value"); }
-    const auto& pv = *parsed;
+    if (!parsed) {
+        FAIL("parse_traceparent should return a value");
+    }
+    const auto& pv                = *parsed;
     impl->log_context.trace_id    = std::string(pv.trace_id.begin(), pv.trace_id.end());
     impl->log_context.span_id     = std::string(pv.parent_id.begin(), pv.parent_id.end());
     impl->log_context.traceparent = tp;
@@ -122,6 +128,8 @@ TEST_CASE("trace_context - string_view survives Request move", "[http][tracing]"
     // address, so the string_view into traceparent remains valid.
     const aevox::Request moved = std::move(req);
     const auto           view  = moved.trace_context();
-    if (!view) { FAIL("trace_context should return a value after move"); }
+    if (!view) {
+        FAIL("trace_context should return a value after move");
+    }
     REQUIRE(*view == tp);
 }
