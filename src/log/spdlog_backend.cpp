@@ -134,15 +134,18 @@ struct SinkBuildResult
     std::string result = "{";
     result += std::format(R"("timestamp":"{}")", format_iso8601(entry.timestamp));
     result += std::format(R"(,"level":"{}")", log_level_to_string(entry.level));
-    result += std::format(R"("message":"{}")", json_escape(entry.message()));
+    result += std::format(R"(,"message":"{}")", json_escape(entry.message()));
     if (!entry.request_id.empty()) {
         result += std::format(R"(,"request_id":"{}")", json_escape(entry.request_id));
     }
     if (entry.thread_id != 0) {
         result += std::format(R"(,"thread_id":{})", entry.thread_id);
     }
-    if (!entry.correlation_id.empty()) {
-        result += std::format(R"(,"correlation_id":"{}")", json_escape(entry.correlation_id));
+    if (!entry.trace_id.empty()) {
+        result += std::format(R"(,"trace_id":"{}")", json_escape(entry.trace_id));
+    }
+    if (!entry.span_id.empty()) {
+        result += std::format(R"(,"span_id":"{}")", json_escape(entry.span_id));
     }
     result += "}";
     return result;
@@ -158,8 +161,11 @@ struct SinkBuildResult
     if (entry.thread_id != 0) {
         result += std::format(" tid={}", entry.thread_id);
     }
-    if (!entry.correlation_id.empty()) {
-        result += std::format(" cid={}", entry.correlation_id);
+    if (!entry.trace_id.empty()) {
+        result += std::format(" trace={}", entry.trace_id);
+    }
+    if (!entry.span_id.empty()) {
+        result += std::format(" span={}", entry.span_id);
     }
     return result;
 }

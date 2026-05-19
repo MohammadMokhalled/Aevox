@@ -244,7 +244,9 @@ public:
      *    coroutines have pending I/O cancelled and frames destroyed.
      * 4. `run()` returns.
      *
-     * Calling `stop()` before `run()` is a no-op. Calling it multiple times is safe.
+     * Calling `stop()` before `listen()` is a no-op. Calling `stop()` after
+     * `listen()` but before `run()` causes the subsequent `run()` call to return
+     * without starting worker threads. Calling it multiple times is safe.
      */
     virtual void stop() noexcept = 0;
 

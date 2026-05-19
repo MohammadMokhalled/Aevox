@@ -186,10 +186,11 @@ public:
      * @brief Request-correlated logger.
      *
      * Every log line emitted through `req.log` automatically carries:
-     * - `request_id` — assigned at acceptor level, unique per request.
-     * - `thread_id` — ID of the worker thread handling this request.
-     * - `timestamp` — nanosecond precision, captured at log call time.
-     * - `correlation_id` — optional, populated when AEV-012 tracing hooks land.
+     * - `request_id` — 16-hex-char random ID assigned per connection.
+     * - `thread_id` — hashed OS thread ID of the worker handling this request.
+     * - `timestamp` — UTC wall-clock, nanosecond precision.
+     * - `trace_id` — W3C trace ID, present when `traceparent` header was valid.
+     * - `span_id` — W3C parent span ID, present alongside `trace_id`.
      *
      * @note Safe to use across `co_await` suspension points because the
      *       context is owned by `Request::Impl` and lives for the full
@@ -257,6 +258,38 @@ public:
      * @note        `[[nodiscard]]` — silently discarding the optional is almost always a bug.
      */
     [[nodiscard]] std::optional<std::string_view> header(std::string_view name) const noexcept;
+
+    // -------------------------------------------------------------------------
+    // Distributed tracing
+    // -------------------------------------------------------------------------
+
+    /**
+     * @brief Returns the W3C Trace Context `traceparent` header value for
+     *        propagation to downstream services.
+     *
+     * When the inbound request carried a syntactically valid
+     * `traceparent` header (W3C Trace Context Level 1, version `00`),
+     * this method returns a `std::string_view` into that value, suitable
+     * for forwarding as-is in outbound HTTP calls:
+     *
+     * @code
+     * if (auto ctx = req.trace_context(); ctx) {
+     *     outbound.set_header("traceparent", *ctx);
+     * }
+     * @endcode
+     *
+     * Returns `std::nullopt` when no valid `traceparent` was present.
+     * The view is valid for the lifetime of this `Request`.
+     *
+     * @return The raw `traceparent` header value, or `std::nullopt`.
+     * @note   noexcept — no allocation, no I/O.
+     * @note   Thread-safety: same as `Request` — not thread-safe.
+     * @note   The value is never modified by Aevox. If the incoming header
+     *         was `00-<trace_id>-<parent_id>-<flags>`, the returned string
+     *         is identical. Child-span generation (new `parent_id`) is out
+     *         of scope; see the future OpenTelemetry integration task.
+     */
+    [[nodiscard]] std::optional<std::string_view> trace_context() const noexcept;
 
     // -------------------------------------------------------------------------
     // Body access

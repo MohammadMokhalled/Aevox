@@ -88,9 +88,10 @@ void AsyncLogWriter::push(LogLevel level, std::string_view message,
         entry.level = level;
         entry.set_message(message);
         if (ctx) {
-            entry.request_id     = ctx->request_id;
-            entry.correlation_id = ctx->correlation_id;
-            entry.thread_id      = ctx->thread_id;
+            entry.request_id = ctx->request_id;
+            entry.trace_id   = ctx->trace_id;
+            entry.span_id    = ctx->span_id;
+            entry.thread_id  = ctx->thread_id;
         }
         entry.timestamp = std::chrono::system_clock::now();
 

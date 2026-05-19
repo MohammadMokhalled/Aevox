@@ -86,7 +86,9 @@ enum class LogField : std::uint8_t
     UserAgent,     ///< Value of the User-Agent header.
     BodySize,      ///< Response body length in bytes.
     Message,       ///< Free-form log message text.
-    CorrelationId, ///< Distributed tracing correlation ID (AEV-012).
+    CorrelationId, ///< Deprecated alias for TraceId. Use TraceId in new code.
+    TraceId,       ///< W3C trace_id from traceparent header (32 hex chars).
+    SpanId,        ///< W3C parent_id (span_id) from traceparent header (16 hex chars).
 };
 
 // =============================================================================

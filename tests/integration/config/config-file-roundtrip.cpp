@@ -7,9 +7,12 @@
 #include <aevox/config.hpp>
 #include <aevox/response.hpp>
 
+#include <asio.hpp>
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -28,6 +31,64 @@ std::string write_temp_toml(const std::string& content)
     std::ofstream f{path};
     f << content;
     return path.string();
+}
+
+std::uint16_t free_port()
+{
+    asio::io_context              ioc;
+    asio::ip::tcp::acceptor const a{ioc, asio::ip::tcp::endpoint{asio::ip::tcp::v4(), 0}};
+    return a.local_endpoint().port();
+}
+
+bool can_connect(std::uint16_t port)
+{
+    asio::io_context      ioc;
+    asio::ip::tcp::socket socket{ioc};
+    asio::error_code      ec;
+    const auto            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = socket.connect(ep, ec);
+    return !ec;
+}
+
+void wait_until_listening(std::uint16_t port)
+{
+    constexpr auto kDeadline = 5s;
+    constexpr auto kInterval = 5ms;
+    const auto     deadline  = std::chrono::steady_clock::now() + kDeadline;
+
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (can_connect(port)) {
+            return;
+        }
+        std::this_thread::sleep_for(kInterval);
+    }
+
+    FAIL(std::format("server did not start listening on port {}", port));
+}
+
+std::string http_get(std::uint16_t port)
+{
+    asio::io_context      ioc;
+    asio::ip::tcp::socket socket{ioc};
+    asio::error_code      ec;
+    const auto            ep = asio::ip::tcp::endpoint{asio::ip::address_v4::loopback(), port};
+    ec                       = socket.connect(ep, ec);
+    if (ec) {
+        return {};
+    }
+
+    const std::string request = "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n";
+    const auto        sent    = asio::write(socket, asio::buffer(request), ec);
+    if (ec || sent != request.size()) {
+        return {};
+    }
+
+    asio::streambuf buf;
+    const auto      received = asio::read(socket, buf, asio::transfer_at_least(1), ec);
+    std::string     response;
+    response.assign(asio::buffers_begin(buf.data()),
+                    asio::buffers_begin(buf.data()) + static_cast<std::ptrdiff_t>(received));
+    return response;
 }
 
 } // namespace
@@ -73,14 +134,18 @@ drain_timeout    = 2
     // Register a trivial handler and perform a listen/stop lifecycle.
     app.get("/", [](aevox::Request&) { return aevox::Response::ok("ok"); });
 
+    const auto   port            = free_port();
     bool         listen_returned = false;
-    std::jthread server{[&app, &listen_returned] {
-        app.listen();
+    std::jthread server{[&app, &listen_returned, port] {
+        app.listen(port);
         listen_returned = true;
     }};
 
-    // Give the server a moment to start, then stop it.
-    std::this_thread::sleep_for(50ms);
+    wait_until_listening(port);
+    const auto response = http_get(port);
+    CHECK(response.find("HTTP/1.1 200") != std::string::npos);
+    CHECK(response.find("ok") != std::string::npos);
+
     app.stop();
 
     server.join();

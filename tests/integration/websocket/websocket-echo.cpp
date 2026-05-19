@@ -26,13 +26,13 @@ namespace {
 
 struct TestServer
 {
-    explicit TestServer(std::uint16_t p, auto configure_fn) : port{p}
+    explicit TestServer(std::uint16_t p, auto configure_fn)
+        : port{p}, thread{[this, configure_fn]() {
+              configure_fn(app);
+              ready.count_down();
+              app.listen(port);
+          }}
     {
-        configure_fn(app);
-        thread = std::jthread{[this] {
-            ready.count_down();
-            app.listen(port);
-        }};
         ready.wait();
     }
 

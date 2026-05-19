@@ -35,7 +35,8 @@ struct LogEntry
     std::uint16_t                     message_len{0};
     std::string                       overflow_message; // Only used when message > kInlineCapacity.
     std::string                       request_id;       // Empty for global logs.
-    std::string                       correlation_id;   // Empty unless tracing is active.
+    std::string                       trace_id;         // Empty unless traceparent was valid.
+    std::string                       span_id;          // Empty unless traceparent was valid.
     std::size_t                       thread_id{0};     // std::hash<std::thread::id>{}(id).
     std::chrono::system_clock::time_point timestamp{};  // UTC wall-clock time.
 
