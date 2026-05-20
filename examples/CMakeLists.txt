@@ -7,4 +7,5 @@
 add_subdirectory(hello-world)
 add_subdirectory(configured-server)
 add_subdirectory(middleware-plugin)
+add_subdirectory(static-files)
 add_subdirectory(websocket-chat)

@@ -67,6 +67,7 @@ nav:
       - Hello World: examples/hello-world.md
       - Configured Server: examples/configured-server.md
       - Middleware Plugin: examples/middleware-plugin.md
+      - Static Files: examples/static-files.md
       - WebSocket Chat: examples/websocket-chat.md
   - Changelog: changelog.md
 

@@ -163,5 +163,6 @@ The public header contains no Asio, llhttp, glaze, spdlog, or fmtlib types.
 ## See Also
 
 - [Static Files Guide](../guide/static-files.md) — deployment layouts and usage patterns
+- [Static Files example](../examples/static-files.md) — runnable asset-serving application
 - [Middleware API Reference](middleware.md) — middleware concepts and registration
 - [Request and Response API Reference](request-response.md) — response factories and headers

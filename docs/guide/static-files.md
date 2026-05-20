@@ -161,5 +161,6 @@ Request-time errors are returned as normal HTTP responses:
 ## See Also
 
 - [Static Files API Reference](../api/static-files.md) — complete symbol and error reference
+- [Static Files example](../examples/static-files.md) — runnable server with bundled assets
 - [Middleware Guide](middleware.md) — composing middleware with route handlers
 - [Request and Response Guide](request-response.md) — response construction and headers
