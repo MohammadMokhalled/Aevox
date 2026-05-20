@@ -18,6 +18,7 @@ add_library(aevox_http OBJECT
     http_parser.cpp      # HttpParser implementation (llhttp callbacks + Impl)
     request_impl.cpp     # Request non-template methods + explicit instantiations
     response_impl.cpp    # Response factory methods + builder methods
+    static_files.cpp     # Static file serving middleware
 )
 
 target_include_directories(aevox_http

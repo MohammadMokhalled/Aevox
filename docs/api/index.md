@@ -16,6 +16,7 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [Router and App](router.md) | `<aevox/router.hpp>` / `<aevox/app.hpp>` | URL routing and top-level server entry point — static, parameter, wildcard segments |
 | [Configuration](config.md) | `<aevox/config.hpp>` | Named defaults, `AppConfig`, `ExecutorConfig`, `ConfigError`, TOML key reference |
 | [Middleware](middleware.md) | `<aevox/middleware.hpp>` | Composable middleware pipeline — logging, auth, CORS, request/response interceptors |
+| [Static Files](static-files.md) | `<aevox/middleware/static_files.hpp>` | Middleware for serving read-only application assets from a configured directory |
 | [JSON](json.md) | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` | Automatic request/response JSON serialization via a pluggable backend |
 | [Logging](log.md) | `<aevox/log.hpp>` | Structured async logging — severity levels, per-request correlation, compile-time elision, JSON/pretty sinks |
 | [WebSocket](websocket.md) | `<aevox/websocket.hpp>` / `<aevox/websocket_handler.hpp>` / `<aevox/websocket_error.hpp>` | RFC 6455 upgrade, bidirectional messaging, and in-process pub/sub |
@@ -35,6 +36,8 @@ graph LR
     EXEC --> CFG
     ROUTER --> RR["request.hpp / response.hpp"]
     RR --> EXEC
+    STATIC["middleware/static_files.hpp<br/>StaticFilesConfig"] --> MW["middleware.hpp<br/>Middleware"]
+    MW --> RR
 ```
 
 `executor.hpp` includes `task.hpp` and `tcp_stream.hpp` transitively — a single `#include <aevox/executor.hpp>` is sufficient for most connection-handler code.

@@ -15,6 +15,7 @@ This guide walks you through every feature of Aevox step by step, assuming you k
 | [Configuration](configuration.md) | Runtime configuration via `AppConfig` and an optional TOML file — ports, limits, thread counts, and error handling |
 | [JSON](json.md) | Parsing request bodies and building JSON responses with automatic serialization |
 | [Middleware](middleware.md) | Composing interceptors for logging, auth, CORS, and request/response transformation |
+| [Static Files](static-files.md) | Serving read-only application assets with a filesystem root and URL prefix |
 | [WebSocket](websocket.md) | Registering WebSocket routes, handling lifecycle events, and in-process pub/sub broadcast |
 
 ## How to Use This Guide

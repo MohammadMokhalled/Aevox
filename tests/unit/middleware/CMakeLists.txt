@@ -76,3 +76,29 @@ target_compile_options(middleware-auth-guard
 
 catch_discover_tests(middleware-auth-guard)
 add_dependencies(aevox_tests_unit middleware-auth-guard)
+
+# ---------------------------------------------------------------------------
+# Static file middleware
+# ---------------------------------------------------------------------------
+
+add_executable(static-files
+    static-files.cpp
+)
+
+target_include_directories(static-files
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+)
+
+target_link_libraries(static-files
+    PRIVATE
+        aevox_core
+        Catch2::Catch2WithMain
+)
+
+target_compile_options(static-files
+    PRIVATE ${AEVOX_COMPILE_OPTIONS}
+)
+
+catch_discover_tests(static-files)
+add_dependencies(aevox_tests_unit static-files)
