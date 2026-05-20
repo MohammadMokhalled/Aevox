@@ -145,6 +145,24 @@ TEST_CASE("global middleware adds response header", "[middleware][integration]")
     REQUIRE(resp.find("X-Global: true") != std::string::npos);
 }
 
+TEST_CASE("explicit content-length header suppresses default regardless of case",
+          "[middleware][integration]")
+{
+    const auto       port = free_port();
+    TestServer const server{port, [](aevox::App& app) {
+                                app.get("/body", [](aevox::Request&) {
+                                    return aevox::Response::ok("body").header("content-length",
+                                                                              "4");
+                                });
+                            }};
+
+    const auto resp = http_get(port, "/body");
+    REQUIRE(resp.find("HTTP/1.1 200") != std::string::npos);
+    REQUIRE(resp.find("content-length: 4") != std::string::npos);
+    REQUIRE(resp.find("Content-Length:") == std::string::npos);
+    REQUIRE(resp.find("\r\ncontent-length: 4\r\n") == resp.rfind("\r\ncontent-length: 4\r\n"));
+}
+
 TEST_CASE("scoped middleware runs on matching prefix, not on non-matching path",
           "[middleware][integration]")
 {

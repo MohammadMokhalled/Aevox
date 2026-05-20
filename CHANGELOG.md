@@ -9,6 +9,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- `aevox::middleware::static_files()` — secure static file serving middleware with MIME type inference and directory traversal protection (AEV-014)
 - `Request::trace_context()` — returns the W3C Trace Context `traceparent` header value for propagation to downstream services (AEV-012)
 - `LogField::TraceId` and `LogField::SpanId` — new enum values for distributed tracing fields in structured log output (AEV-012)
 - W3C `traceparent` header auto-extraction: valid headers populate `trace_id` and `span_id` in all `req.log` entries automatically (AEV-012)

@@ -35,6 +35,7 @@ nav:
       - Error Handling: guide/error-handling.md
       - Configuration: guide/configuration.md
       - Middleware: guide/middleware.md
+      - Static Files: guide/static-files.md
       - Logging: guide/logging.md
       - JSON: guide/json.md
       - WebSocket: guide/websocket.md
@@ -55,6 +56,7 @@ nav:
       - Request and Response: api/request-response.md
       - Router and App: api/router.md
       - Middleware: api/middleware.md
+      - Static Files: api/static-files.md
       - Configuration: api/config.md
       - Logging: api/log.md
       - JSON: api/json.md

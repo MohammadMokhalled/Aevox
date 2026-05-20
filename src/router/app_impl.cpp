@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include "config/toml_loader.hpp"
@@ -94,6 +95,37 @@ constexpr std::string_view status_text(int code) noexcept
     }
 }
 
+[[nodiscard]] bool ascii_equal_ignore_case(std::string_view lhs, std::string_view rhs) noexcept
+{
+    if (lhs.size() != rhs.size()) {
+        return false;
+    }
+
+    for (std::size_t index = 0; index < lhs.size(); ++index) {
+        auto left  = lhs[index];
+        auto right = rhs[index];
+        if (left >= 'A' && left <= 'Z') {
+            left = static_cast<char>(left - 'A' + 'a');
+        }
+        if (right >= 'A' && right <= 'Z') {
+            right = static_cast<char>(right - 'A' + 'a');
+        }
+        if (left != right) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+[[nodiscard]] bool has_header_case_insensitive(
+    const std::unordered_map<std::string, std::string>& headers, std::string_view name) noexcept
+{
+    return std::ranges::any_of(headers, [name](const auto& header) noexcept {
+        return ascii_equal_ignore_case(header.first, name);
+    });
+}
+
 std::vector<std::byte> serialize_response(const Response& resp)
 {
     const auto*            impl = get_response_impl(resp);
@@ -103,15 +135,20 @@ std::vector<std::byte> serialize_response(const Response& resp)
     std::string head;
     head.reserve(kResponseHeadReserveSize);
     head += std::format("HTTP/1.1 {} {}\r\n", resp.status_code(), status_text(resp.status_code()));
-    head += std::format("Content-Length: {}\r\n", body.size());
 
     if (impl) {
+        if (!has_header_case_insensitive(impl->headers, "Content-Length")) {
+            head += std::format("Content-Length: {}\r\n", body.size());
+        }
         for (const auto& [name, value] : impl->headers) {
             head += name;
             head += ": ";
             head += value;
             head += "\r\n";
         }
+    }
+    else {
+        head += std::format("Content-Length: {}\r\n", body.size());
     }
     head += "\r\n";
 
