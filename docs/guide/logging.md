@@ -6,7 +6,7 @@ Structured, asynchronous logging is a first-class subsystem in Aevox. This guide
 
 Aevox logging follows three design principles:
 
-1. **Never block the I/O thread.** `req.log.info(...)` pushes to a lock-free ring buffer and returns instantly. A background thread handles formatting and disk writes.
+1. **Never block the I/O thread.** `req.logger().info(...)` pushes to a lock-free ring buffer and returns instantly. A background thread handles formatting and disk writes.
 2. **Always know which request produced a log line.** Every `Request` carries a `Logger` that automatically includes `request_id` and `thread_id` in every entry.
 3. **Structured by default.** Sinks output JSON so logs can be ingested by Loki, Elasticsearch, or CloudWatch without parsing.
 
@@ -16,15 +16,15 @@ Every `Request` has a `log` member. Use it inside handlers:
 
 ```cpp
 app.get("/users/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.log.info("Fetching user {}", req.param<int>("id").value());
+    req.logger().info("Fetching user {}", req.param<int>("id").value());
 
     auto user = co_await db.find_user(req.param<int>("id").value());
     if (!user) {
-        req.log.warn("User not found");
+        req.logger().warn("User not found");
         co_return aevox::Response::not_found("Unknown user");
     }
 
-    req.log.info("User found: {}", user->name);
+    req.logger().info("User found: {}", user->name);
     co_return aevox::Response::ok(*user);
 });
 ```
@@ -156,7 +156,7 @@ jq -s 'map(select(.level == "ERROR")) | length' /var/log/aevox/app.log
 
 On a typical Linux workstation:
 
-- `req.log.info(...)` median latency: **~80 ns** (ring buffer push only)
+- `req.logger().info(...)` median latency: **~80 ns** (ring buffer push only)
 - Sustained throughput: **>1M entries/sec** across 8 threads
 - Drop rate under load: **<0.1%** with default 64K buffer
 
@@ -164,7 +164,7 @@ See `tests/bench/log/` for reproducible benchmarks.
 
 ## Distributed Tracing
 
-Aevox automatically extracts the W3C Trace Context `traceparent` header from every inbound request. When a valid header is present, all log lines emitted through `req.log` carry `trace_id` and `span_id` fields — no manual instrumentation required.
+Aevox automatically extracts the W3C Trace Context `traceparent` header from every inbound request. When a valid header is present, all log lines emitted through `req.logger()` carry `trace_id` and `span_id` fields — no manual instrumentation required.
 
 ### Automatic Log Enrichment
 
@@ -174,7 +174,7 @@ When a request arrives with the header:
 traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
 ```
 
-Every `req.log.*()` call automatically includes the trace fields:
+Every `req.logger().*()` call automatically includes the trace fields:
 
 ```json
 {"timestamp":1234567890123,"level":"INFO","message":"Processing order 42","request_id":"a1b2c3d4e5f6a7b8","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","span_id":"00f067aa0ba902b7","thread_id":7}
@@ -188,7 +188,7 @@ Use `req.trace_context()` to forward the trace context to outbound HTTP calls:
 
 ```cpp
 app.get("/orders/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.log.info("Processing order {}", req.param<int>("id").value());
+    req.logger().info("Processing order {}", req.param<int>("id").value());
 
     // Forward the traceparent header to downstream services
     if (auto ctx = req.trace_context(); ctx) {

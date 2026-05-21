@@ -68,8 +68,8 @@ int main(int argc, char* argv[])
     if (!result) {
         const auto& err = result.error();
         std::cerr << std::format("config error ({}): {}\n",
-                                 aevox::to_string(err.code),
-                                 err.message);
+                                 aevox::to_string(err.error_code()),
+                                 err.error_message());
         return 1;
     }
 
@@ -178,8 +178,8 @@ int main()
     if (!result) {
         const auto& err = result.error();
         std::cerr << std::format("config error ({}): {}\n",
-                                 aevox::to_string(err.code),
-                                 err.message);
+                                 aevox::to_string(err.error_code()),
+                                 err.error_message());
         return 1;
     }
 
@@ -217,8 +217,8 @@ int main()
     if (!result) {
         const auto& err = result.error();
         std::cerr << std::format("config error ({}): {}\n",
-                                 aevox::to_string(err.code),
-                                 err.message);
+                                 aevox::to_string(err.error_code()),
+                                 err.error_message());
         return 1;
     }
 
@@ -252,7 +252,7 @@ config is immutable after construction — no fields can be changed while the se
 | `ConfigError::InvalidValue` | A TOML key is present but its value fails a range or type check |
 
 `aevox::to_string(ConfigError)` returns a short static description. For `InvalidValue`,
-`ConfigErrorDetail::key` names the offending TOML key:
+`ConfigErrorDetail::error_key()` names the offending TOML key:
 
 ```cpp
 #include <aevox/app.hpp>
@@ -268,19 +268,19 @@ int main()
     if (!result) {
         const aevox::ConfigErrorDetail& err = result.error();
 
-        switch (err.code) {
+        switch (err.error_code()) {
         case aevox::ConfigError::FileNotFound:
             std::cerr << "config file not found — using compiled defaults\n";
             // Fall through to construct without a file
             break;
 
         case aevox::ConfigError::ParseError:
-            std::cerr << std::format("TOML parse error: {}\n", err.message);
+            std::cerr << std::format("TOML parse error: {}\n", err.error_message());
             return 1;
 
         case aevox::ConfigError::InvalidValue:
             std::cerr << std::format("invalid value for key '{}': {}\n",
-                                     err.key, err.message);
+                                     err.error_key(), err.error_message());
             return 1;
         }
 

@@ -13,7 +13,9 @@
 //
 // Design: Tasks/architecture/AEV-010-arch.md §4.5
 
+#include <functional>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <string_view>
@@ -92,9 +94,9 @@ public:
      * Called when a session closes. Performs an exclusive write lock to remove
      * the subscriber's weak_ptr from every topic it was subscribed to.
      *
-     * @param subscriber  Raw pointer used as identity key.
+     * @param subscriber  Subscriber identity.
      */
-    void unsubscribe(const TopicSubscriber* subscriber);
+    void unsubscribe(const TopicSubscriber& subscriber);
 
     /**
      * @brief Publishes `message` to all subscribers of `topic` except `sender`.
@@ -107,12 +109,13 @@ public:
      * @param topic       Topic name.
      * @param message     UTF-8 message to deliver.
      * @param sender      The publishing subscriber; will not receive its own message.
-     *                    Pass `nullptr` to deliver to all subscribers.
+     *                    Pass `std::nullopt` to deliver to all subscribers.
      * @return            Number of live delivery attempts made (excludes pruned
      *                    dead entries and the sender itself).
      */
-    std::size_t publish(std::string_view topic, std::string_view message,
-                        const TopicSubscriber* sender);
+    std::size_t publish(
+        std::string_view topic, std::string_view message,
+        std::optional<std::reference_wrapper<const TopicSubscriber>> sender = std::nullopt);
 
 private:
     mutable std::shared_mutex                                                    mutex_;

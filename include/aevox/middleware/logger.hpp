@@ -18,6 +18,8 @@
 
 namespace aevox::middleware {
 
+inline constexpr std::chrono::milliseconds kDefaultSlowRequestThreshold{500};
+
 /**
  * @brief Configuration for the automatic request/response logger middleware.
  */
@@ -30,7 +32,7 @@ struct LoggerMiddlewareConfig
         LogField::Path,      LogField::Status, LogField::DurationMs,
     };
     std::unordered_set<std::string> exclude_paths{};
-    std::chrono::milliseconds       slow_request_threshold{500};
+    std::chrono::milliseconds       slow_request_threshold{kDefaultSlowRequestThreshold};
 };
 
 /**

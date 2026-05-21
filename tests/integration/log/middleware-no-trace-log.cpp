@@ -148,7 +148,7 @@ TEST_CASE("logger middleware - omits trace fields when traceparent absent",
     file.close();
     std::filesystem::remove(log_path);
 
-    // request_id should be present (from req.log).
+    // request_id should be present (from req.logger()).
     REQUIRE(content.find("\"request_id\"") != std::string::npos);
     // trace_id and span_id should be absent.
     REQUIRE(content.find("\"trace_id\"") == std::string::npos);

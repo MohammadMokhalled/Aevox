@@ -29,6 +29,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -63,8 +64,9 @@ public:
      * @param initial_topic Initial topic (first path param value, or empty).
      */
     [[nodiscard]] static std::shared_ptr<WebSocketSession> create(
-        aevox::TcpStream stream, TopicBus* bus, aevox::WebSocketHandler handler,
-        std::size_t max_payload, std::string remote_addr, std::string initial_topic);
+        aevox::TcpStream stream, std::optional<std::reference_wrapper<TopicBus>> bus,
+        aevox::WebSocketHandler handler, std::size_t max_payload, std::string remote_addr,
+        std::string initial_topic);
 
     // Not copyable or movable — shared_ptr manages lifetime.
     WebSocketSession(const WebSocketSession&)            = delete;
@@ -146,7 +148,8 @@ public:
     // make_shared-compatible constructor — public to satisfy allocator requirements
     // but effectively private via the PrivateTag sentinel (only create() can supply it).
     WebSocketSession(PrivateTag, aevox::TcpStream stream,
-                     asio::strand<asio::io_context::executor_type> strand, TopicBus* bus,
+                     asio::strand<asio::io_context::executor_type>   strand,
+                     std::optional<std::reference_wrapper<TopicBus>> bus,
                      aevox::WebSocketHandler handler, std::size_t max_payload,
                      std::string remote_addr, std::string initial_topic);
 
@@ -182,12 +185,12 @@ private:
     // Member state
     // -------------------------------------------------------------------------
 
-    aevox::TcpStream        stream_;
-    TopicBus*               bus_; // non-owning, App-owned
-    aevox::WebSocketHandler handler_;
-    std::size_t             max_payload_;
-    std::string             remote_addr_;
-    std::string             current_topic_;
+    aevox::TcpStream                                stream_;
+    std::optional<std::reference_wrapper<TopicBus>> bus_; // non-owning, App-owned
+    aevox::WebSocketHandler                         handler_;
+    std::size_t                                     max_payload_;
+    std::string                                     remote_addr_;
+    std::string                                     current_topic_;
 
     // Strand for serializing sends (and ensuring read-loop / send don't interleave).
     // The executor (io_context) is retrieved from the TcpStream socket via a stored pointer.
@@ -222,3 +225,9 @@ struct aevox::WebSocket::Impl
 {
     std::shared_ptr<aevox::net::WebSocketSession> session;
 };
+
+namespace aevox {
+
+std::optional<std::reference_wrapper<WebSocket::Impl>> get_websocket_impl(WebSocket& ws) noexcept;
+
+} // namespace aevox

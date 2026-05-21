@@ -20,7 +20,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -31,6 +33,8 @@ class WebSocketSession;
 } // namespace aevox::net
 
 namespace aevox {
+
+inline constexpr std::uint16_t kWebSocketNormalClosureCode{1000};
 
 // =============================================================================
 // WebSocket
@@ -155,7 +159,7 @@ public:
      * @throws Nothing.
      */
     [[nodiscard]] aevox::Task<std::expected<void, WebSocketError>> close(
-        std::uint16_t code = 1000, std::string_view reason = {});
+        std::uint16_t code = kWebSocketNormalClosureCode, std::string_view reason = {});
 
     // -------------------------------------------------------------------------
     // Publish / Subscribe
@@ -249,7 +253,7 @@ private:
     // Internal Impl accessor — used by App::ws() dispatch in src/router/app_impl.cpp
     // to start the read loop and wait for session close. Resolved to
     // aevox::get_websocket_impl by ADL once the definition is visible (in websocket.cpp).
-    friend Impl* get_websocket_impl(WebSocket&) noexcept;
+    friend std::optional<std::reference_wrapper<Impl>> get_websocket_impl(WebSocket&) noexcept;
 
     // WebSocketSession constructs WebSocket handles via make_handle().
     // It needs access to the private Impl type to populate it.

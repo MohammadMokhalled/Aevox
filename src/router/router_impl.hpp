@@ -24,7 +24,9 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -89,17 +91,45 @@ struct TrieNode
 
 struct Router::Impl
 {
-    /// Owns the root TrieNode for the main Router.
-    /// Null for group sub-Routers (they reference a node in the parent's trie).
-    std::unique_ptr<TrieNode> root;
+    [[nodiscard]] std::optional<std::reference_wrapper<TrieNode>> root() noexcept
+    {
+        if (!root_) {
+            return std::nullopt;
+        }
+        return *root_;
+    }
 
-    /// Registration entry point.
-    /// = root_.get() for the main Router.
-    /// = pointer into a parent's trie for group sub-Routers.
-    TrieNode* insert_root{nullptr};
+    [[nodiscard]] std::optional<std::reference_wrapper<const TrieNode>> root() const noexcept
+    {
+        if (!root_) {
+            return std::nullopt;
+        }
+        return *root_;
+    }
 
-    /// true iff this Impl owns root_ (i.e. not a group sub-Router).
-    bool owns_root{true};
+    [[nodiscard]] std::optional<std::reference_wrapper<TrieNode>> insert_root() noexcept
+    {
+        return insert_root_;
+    }
+
+    void init_as_owner(std::unique_ptr<TrieNode> root) noexcept
+    {
+        root_        = std::move(root);
+        insert_root_ = *root_;
+        owns_root_   = true;
+    }
+
+    void init_as_group(TrieNode& insert_root) noexcept
+    {
+        root_.reset();
+        insert_root_ = insert_root;
+        owns_root_   = false;
+    }
+
+    [[nodiscard]] bool owns_root() const noexcept
+    {
+        return owns_root_;
+    }
 
     // -------------------------------------------------------------------------
     // Registration helpers
@@ -107,12 +137,25 @@ struct Router::Impl
 
     /// Recursively inserts a route at segs.front(), advancing recursively.
     /// Terminal call (segs empty) registers handler at node.
-    void insert(TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
+    void insert(TrieNode& node, std::span<const detail::Segment> segs, HttpMethod method,
                 detail::ErasedHandler handler);
 
     /// Finds or creates a child of node matching seg's kind and name/literal.
     /// Returns the child node pointer (never null — creates if absent).
-    TrieNode* ensure_child(TrieNode* node, const detail::Segment& seg);
+    TrieNode& ensure_child(TrieNode& node, const detail::Segment& seg);
+
+private:
+    /// Owns the root TrieNode for the main Router.
+    /// Null for group sub-Routers (they reference a node in the parent's trie).
+    std::unique_ptr<TrieNode> root_;
+
+    /// Registration entry point.
+    /// = root_.get() for the main Router.
+    /// = pointer into a parent's trie for group sub-Routers.
+    std::optional<std::reference_wrapper<TrieNode>> insert_root_;
+
+    /// true iff this Impl owns root_ (i.e. not a group sub-Router).
+    bool owns_root_{true};
 };
 
 // =============================================================================

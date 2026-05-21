@@ -15,7 +15,7 @@ TEST_CASE("ring buffer basics - push and pop preserves order", "[log]")
     constexpr std::size_t kCount = 10;
     for (std::size_t i = 0; i < kCount; ++i) {
         aevox::LogEntry entry;
-        entry.level = aevox::LogLevel::Info;
+        entry.set_level(aevox::LogLevel::Info);
         entry.set_message(std::to_string(i));
         REQUIRE(queue.try_push(entry));
     }

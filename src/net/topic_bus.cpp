@@ -7,8 +7,15 @@
 
 #include "net/topic_bus.hpp"
 
+#include <cstddef>
+#include <functional>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
+#include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace aevox::net {
@@ -26,7 +33,7 @@ void TopicBus::subscribe(std::string_view topic, const std::shared_ptr<TopicSubs
 
     // Check for existing subscription (idempotent).
     for (const auto& wp : vec) {
-        if (auto sp = wp.lock(); sp && sp.get() == subscriber.get()) {
+        if (auto sp = wp.lock(); sp && std::addressof(*sp) == std::addressof(*subscriber)) {
             return; // already subscribed
         }
     }
@@ -37,13 +44,13 @@ void TopicBus::subscribe(std::string_view topic, const std::shared_ptr<TopicSubs
 // TopicBus::unsubscribe
 // =============================================================================
 
-void TopicBus::unsubscribe(const TopicSubscriber* subscriber)
+void TopicBus::unsubscribe(const TopicSubscriber& subscriber)
 {
     const std::unique_lock lock{mutex_};
     for (auto& [topic_key, vec] : topics_) {
-        std::erase_if(vec, [subscriber](const std::weak_ptr<TopicSubscriber>& wp) {
+        std::erase_if(vec, [&subscriber](const std::weak_ptr<TopicSubscriber>& wp) {
             auto sp = wp.lock();
-            return !sp || sp.get() == subscriber;
+            return !sp || std::addressof(*sp) == std::addressof(subscriber);
         });
     }
 }
@@ -53,7 +60,7 @@ void TopicBus::unsubscribe(const TopicSubscriber* subscriber)
 // =============================================================================
 
 std::size_t TopicBus::publish(std::string_view topic, std::string_view message,
-                              const TopicSubscriber* sender)
+                              std::optional<std::reference_wrapper<const TopicSubscriber>> sender)
 {
     const std::string topic_key{topic};
 
@@ -90,7 +97,7 @@ std::size_t TopicBus::publish(std::string_view topic, std::string_view message,
     // Deliver to each live subscriber (outside any lock — prevents lock inversion).
     std::size_t deliveries = 0;
     for (const auto& sp : live_subs) {
-        if (sp.get() == sender)
+        if (sender && std::addressof(*sp) == std::addressof(sender->get()))
             continue; // suppress self-publish
         sp->send_from_bus(message);
         ++deliveries;

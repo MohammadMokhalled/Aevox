@@ -17,11 +17,40 @@
 #include "asio_executor.hpp"
 
 #include <aevox/async.hpp> // for aevox::detail::tl_post_to_* thread-locals
+#include <aevox/error.hpp>
+#include <aevox/executor.hpp>
+#include <aevox/task.hpp>
+#include <aevox/tcp_stream.hpp>
 
-#include <algorithm> // std::max
-#include <format>
-#include <stdexcept>
+#include <asio/as_tuple.hpp>
+#include <asio/awaitable.hpp>
+#include <asio/detached.hpp>
+#include <asio/error.hpp>
+#include <asio/error_code.hpp>
+#include <asio/executor_work_guard.hpp>
+#include <asio/impl/co_spawn.hpp>
+#include <asio/io_context.hpp>
+#include <asio/ip/tcp.hpp>
+#include <asio/post.hpp>
+#include <asio/socket_base.hpp>
+#include <asio/steady_timer.hpp>
+#include <asio/system_error.hpp>
+#include <asio/thread_pool.hpp>
+#include <asio/use_awaitable.hpp>
+
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <functional>
+#include <future>
+#include <memory>
+#include <optional>
+#include <string_view>
 #include <thread>
+#include <utility>
 
 namespace {
 
@@ -223,9 +252,13 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
 
     auto io_exec = io_ctx_.get_executor();
 
+    std::optional<std::reference_wrapper<asio::thread_pool>> cpu_pool_ref;
+    if (cpu_pool_) {
+        cpu_pool_ref = std::ref(*cpu_pool_);
+    }
+
     for (std::size_t i = 0; i < config_.thread_count; ++i) {
-        io_threads_.emplace_back([this, io_exec,
-                                  cpu_pool_ptr = cpu_pool_ ? &*cpu_pool_ : nullptr]() {
+        io_threads_.emplace_back([this, io_exec, cpu_pool_ref]() {
             // Bind tl_post_to_io — posts any callable to the I/O pool.
             // Takes std::move_only_function<void()> so callers can pass
             // move-only lambdas (e.g. those capturing aevox::Task<T>).
@@ -234,8 +267,8 @@ std::expected<void, aevox::ExecutorError> AsioExecutor::run()
             };
 
             // Bind tl_post_to_cpu — posts to CPU pool (or I/O pool if disabled).
-            if (cpu_pool_ptr != nullptr) {
-                auto cpu_exec            = cpu_pool_ptr->get_executor();
+            if (cpu_pool_ref) {
+                auto cpu_exec            = cpu_pool_ref->get().get_executor();
                 detail::tl_post_to_cpu() = [cpu_exec](std::move_only_function<void()> fn) mutable {
                     asio::post(cpu_exec, std::move(fn));
                 };

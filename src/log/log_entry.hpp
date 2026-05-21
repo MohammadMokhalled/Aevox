@@ -13,6 +13,7 @@
 #include <ranges>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace aevox {
 
@@ -26,19 +27,70 @@ namespace aevox {
  *       `inline_message` to avoid heap allocation on the hot path. Larger
  *       messages fall back to `overflow_message`.
  */
-struct LogEntry
+class LogEntry
 {
+public:
     static constexpr std::size_t kInlineCapacity = 256;
 
-    LogLevel                          level{LogLevel::Info};
-    std::array<char, kInlineCapacity> inline_message{};
-    std::uint16_t                     message_len{0};
-    std::string                       overflow_message; // Only used when message > kInlineCapacity.
-    std::string                       request_id;       // Empty for global logs.
-    std::string                       trace_id;         // Empty unless traceparent was valid.
-    std::string                       span_id;          // Empty unless traceparent was valid.
-    std::size_t                       thread_id{0};     // std::hash<std::thread::id>{}(id).
-    std::chrono::system_clock::time_point timestamp{};  // UTC wall-clock time.
+    void set_level(LogLevel level) noexcept
+    {
+        level_ = level;
+    }
+
+    [[nodiscard]] LogLevel level() const noexcept
+    {
+        return level_;
+    }
+
+    void set_request_id(std::string request_id)
+    {
+        request_id_ = std::move(request_id);
+    }
+
+    [[nodiscard]] std::string_view request_id() const noexcept
+    {
+        return request_id_;
+    }
+
+    void set_trace_id(std::string trace_id)
+    {
+        trace_id_ = std::move(trace_id);
+    }
+
+    [[nodiscard]] std::string_view trace_id() const noexcept
+    {
+        return trace_id_;
+    }
+
+    void set_span_id(std::string span_id)
+    {
+        span_id_ = std::move(span_id);
+    }
+
+    [[nodiscard]] std::string_view span_id() const noexcept
+    {
+        return span_id_;
+    }
+
+    void set_thread_id(std::size_t thread_id) noexcept
+    {
+        thread_id_ = thread_id;
+    }
+
+    [[nodiscard]] std::size_t thread_id() const noexcept
+    {
+        return thread_id_;
+    }
+
+    void set_timestamp(std::chrono::system_clock::time_point timestamp) noexcept
+    {
+        timestamp_ = timestamp;
+    }
+
+    [[nodiscard]] std::chrono::system_clock::time_point timestamp() const noexcept
+    {
+        return timestamp_;
+    }
 
     /**
      * @brief Copies `msg` into inline storage or overflow string.
@@ -48,13 +100,13 @@ struct LogEntry
     void set_message(std::string_view msg) noexcept
     {
         if (msg.size() > kInlineCapacity) {
-            overflow_message = std::string(msg);
-            message_len      = 0;
+            overflow_message_ = std::string(msg);
+            message_len_      = 0;
         }
         else {
-            message_len = static_cast<std::uint16_t>(msg.size());
-            std::ranges::copy(msg, inline_message.begin());
-            overflow_message.clear();
+            message_len_ = static_cast<std::uint16_t>(msg.size());
+            std::ranges::copy(msg, inline_message_.begin());
+            overflow_message_.clear();
         }
     }
 
@@ -63,11 +115,22 @@ struct LogEntry
      */
     [[nodiscard]] std::string_view message() const noexcept
     {
-        if (!overflow_message.empty()) {
-            return overflow_message;
+        if (!overflow_message_.empty()) {
+            return overflow_message_;
         }
-        return {inline_message.data(), message_len};
+        return {inline_message_.data(), message_len_};
     }
+
+private:
+    LogLevel                          level_{LogLevel::Info};
+    std::array<char, kInlineCapacity> inline_message_{};
+    std::uint16_t                     message_len_{0};
+    std::string overflow_message_;                      // Only used when message > kInlineCapacity.
+    std::string request_id_;                            // Empty for global logs.
+    std::string trace_id_;                              // Empty unless traceparent was valid.
+    std::string span_id_;                               // Empty unless traceparent was valid.
+    std::size_t thread_id_{0};                          // std::hash<std::thread::id>{}(id).
+    std::chrono::system_clock::time_point timestamp_{}; // UTC wall-clock time.
 };
 
 } // namespace aevox

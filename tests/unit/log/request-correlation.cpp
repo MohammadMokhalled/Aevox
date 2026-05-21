@@ -1,4 +1,4 @@
-// request-correlation.cpp: verify req.log entries carry context fields
+// request-correlation.cpp: verify req.logger() entries carry context fields
 // ADD ref: Tasks/architecture/AEV-011-arch.md § Test Architecture
 
 #include <aevox/log.hpp>
@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 
 #include "http/request_impl.hpp"
@@ -39,7 +40,7 @@ TEST_CASE("request correlation - log entries carry request_id and thread_id", "[
         ctx.request_id = "req-test-007";
         ctx.thread_id  = 42;
 
-        writer.push(aevox::LogLevel::Info, "correlated message", &ctx);
+        writer.push(aevox::LogLevel::Info, "correlated message", std::cref(ctx));
     } // destructor joins drain thread and flushes all entries
 
     std::ifstream file(path);

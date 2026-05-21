@@ -7,10 +7,16 @@
 
 #include "net/websocket_handshake.hpp"
 
-#include <algorithm>
+#include <aevox/websocket_error.hpp>
+
 #include <cctype>
-#include <cstring>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <span>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "net/base64.hpp"
 #include "net/sha1.hpp"
@@ -92,12 +98,11 @@ std::string compute_accept_key(std::string_view client_key) noexcept
     combined.append(client_key);
     combined.append(kWebSocketGUID);
 
-    // SHA-1 of the combined string.
-    const auto sha_input = std::span<const std::uint8_t>{
-        // reinterpret_cast: char* → uint8_t* for the SHA-1 input span.
-        // Well-defined: aliasing via unsigned char (which uint8_t is required to be)
-        // is explicitly permitted by C++23 [basic.types.general].
-        reinterpret_cast<const std::uint8_t*>(combined.data()), combined.size()};
+    std::vector<std::uint8_t> sha_input;
+    sha_input.reserve(combined.size());
+    for (const char ch : combined) {
+        sha_input.push_back(static_cast<std::uint8_t>(static_cast<unsigned char>(ch)));
+    }
 
     const Sha1Digest digest = sha1_compute(sha_input);
 

@@ -151,12 +151,7 @@ template <typename Fn> struct PoolAwaitable
 {
     using R = std::invoke_result_t<Fn>;
 
-    // Stored inline on the coroutine frame — no allocation.
-    Fn                                                                      fn;
-    std::conditional_t<std::is_void_v<R>, std::monostate, std::optional<R>> result{};
-    std::exception_ptr                                                      exception{};
-
-    explicit PoolAwaitable(Fn&& callable) : fn(std::move(callable)) {}
+    explicit PoolAwaitable(Fn&& callable) : fn_{std::move(callable)} {}
 
     // Never immediately ready — always suspends.
     [[nodiscard]] bool await_ready() const noexcept
@@ -181,14 +176,14 @@ template <typename Fn> struct PoolAwaitable
         detail::tl_post_to_cpu()([this, caller, resume = detail::tl_post_to_io()]() mutable {
             try {
                 if constexpr (std::is_void_v<R>) {
-                    std::invoke(fn);
+                    std::invoke(fn_);
                 }
                 else {
-                    result.emplace(std::invoke(fn));
+                    result_.emplace(std::invoke(fn_));
                 }
             }
             catch (...) {
-                exception = std::current_exception();
+                exception_ = std::current_exception();
             }
             // Resume caller on the I/O pool, not the CPU pool thread.
             // Backend dispatch ensures happens-before between writes above and
@@ -204,14 +199,20 @@ template <typename Fn> struct PoolAwaitable
      */
     R await_resume()
     {
-        if (exception)
-            std::rethrow_exception(exception);
+        if (exception_)
+            std::rethrow_exception(exception_);
         if constexpr (!std::is_void_v<R>) {
-            if (result.has_value())
-                return std::move(*result);
+            if (result_.has_value())
+                return std::move(*result_);
             std::terminate(); // invariant: fn() always sets result when no exception
         }
     }
+
+private:
+    // Stored inline on the coroutine frame — no allocation.
+    Fn                                                                      fn_;
+    std::conditional_t<std::is_void_v<R>, std::monostate, std::optional<R>> result_{};
+    std::exception_ptr                                                      exception_{};
 };
 
 // =============================================================================
@@ -226,9 +227,7 @@ template <typename Fn> struct PoolAwaitable
  */
 struct SleepAwaitable
 {
-    std::chrono::steady_clock::duration duration;
-
-    explicit SleepAwaitable(std::chrono::steady_clock::duration d) : duration{d} {}
+    explicit SleepAwaitable(std::chrono::steady_clock::duration duration) : duration_{duration} {}
 
     [[nodiscard]] bool await_ready() const noexcept
     {
@@ -239,10 +238,13 @@ struct SleepAwaitable
     {
         assert(detail::tl_schedule_after() && "sleep() called outside an executor-managed thread");
 
-        detail::tl_schedule_after()(duration, [caller]() mutable { caller.resume(); });
+        detail::tl_schedule_after()(duration_, [caller]() mutable { caller.resume(); });
     }
 
     void await_resume() noexcept {}
+
+private:
+    std::chrono::steady_clock::duration duration_;
 };
 
 // =============================================================================
@@ -270,13 +272,55 @@ struct SleepAwaitable
  */
 template <typename... Ts> struct WhenAllState
 {
-    std::tuple<std::optional<Ts>...> results;
-    std::mutex                       exception_mutex;
-    std::exception_ptr               first_exception;
-    std::atomic<std::size_t>         remaining;
-    std::coroutine_handle<>          continuation;
+    explicit WhenAllState(std::size_t n) : remaining_{n} {}
 
-    explicit WhenAllState(std::size_t n) : remaining{n} {}
+    template <std::size_t I, typename Value> void store_result(Value&& value)
+    {
+        std::get<I>(results_).emplace(std::forward<Value>(value));
+    }
+
+    void capture_exception()
+    {
+        std::scoped_lock const lock{exception_mutex_};
+        if (!first_exception_) {
+            first_exception_ = std::current_exception();
+        }
+    }
+
+    [[nodiscard]] bool mark_one_complete() noexcept
+    {
+        return remaining_.fetch_sub(1, std::memory_order_acq_rel) == 1;
+    }
+
+    void set_continuation(std::coroutine_handle<> continuation) noexcept
+    {
+        continuation_ = continuation;
+    }
+
+    [[nodiscard]] std::coroutine_handle<> continuation() const noexcept
+    {
+        return continuation_;
+    }
+
+    void rethrow_first_exception_if_any() const
+    {
+        if (first_exception_) {
+            std::rethrow_exception(first_exception_);
+        }
+    }
+
+    [[nodiscard]] std::tuple<Ts...> take_results()
+    {
+        return std::apply([](auto&... opts) { return std::make_tuple(std::move(*opts)...); },
+                          results_);
+    }
+
+private:
+    std::tuple<std::optional<Ts>...> results_;
+    std::mutex                       exception_mutex_;
+    std::exception_ptr               first_exception_;
+    std::atomic<std::size_t>         remaining_;
+    std::coroutine_handle<>          continuation_;
 };
 
 // =============================================================================
@@ -297,21 +341,19 @@ FireAndForget when_all_subtask(Task<std::tuple_element_t<I, std::tuple<Ts...>>> 
                                std::shared_ptr<WhenAllState<Ts...>>             state)
 {
     try {
-        std::get<I>(state->results).emplace(co_await task);
+        state->template store_result<I>(co_await task);
     }
     catch (...) {
-        std::lock_guard const lock{state->exception_mutex};
-        if (!state->first_exception)
-            state->first_exception = std::current_exception();
+        state->capture_exception();
     }
 
     // Decrement the counter. If this was the last sub-task (previous value == 1),
     // resume the outer when_all coroutine on the I/O pool.
     // acq_rel ordering: all writes to results/first_exception happen-before
     // the continuation read in await_resume() (which runs after resume).
-    if (state->remaining.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    if (state->mark_one_complete()) {
         assert(detail::tl_post_to_io() && "when_all sub-task not on an executor-managed thread");
-        auto cont = state->continuation;
+        auto cont = state->continuation();
         detail::tl_post_to_io()([cont]() mutable { cont.resume(); });
     }
 }
@@ -331,10 +373,7 @@ FireAndForget when_all_subtask(Task<std::tuple_element_t<I, std::tuple<Ts...>>> 
  */
 template <typename... Ts> struct WhenAllAwaitable
 {
-    std::tuple<Task<Ts>...>              tasks;
-    std::shared_ptr<WhenAllState<Ts...>> state;
-
-    explicit WhenAllAwaitable(Task<Ts>... tasks) : tasks{std::move(tasks)...} {}
+    explicit WhenAllAwaitable(Task<Ts>... tasks) : tasks_{std::move(tasks)...} {}
 
     [[nodiscard]] bool await_ready() const noexcept
     {
@@ -345,14 +384,14 @@ template <typename... Ts> struct WhenAllAwaitable
     {
         assert(detail::tl_post_to_io() && "when_all() called outside an executor-managed thread");
 
-        state               = std::make_shared<WhenAllState<Ts...>>(sizeof...(Ts));
-        state->continuation = caller;
+        state_ = std::make_shared<WhenAllState<Ts...>>(sizeof...(Ts));
+        state_->set_continuation(caller);
 
         // Spawn all sub-tasks. Each captures a copy of the shared_ptr so state
         // stays alive until the last sub-task completes.
         [&]<std::size_t... I>(std::index_sequence<I...>) {
             (detail::tl_post_to_io()(
-                 [state = state, task = std::move(std::get<I>(tasks))]() mutable {
+                 [state = state_, task = std::move(std::get<I>(tasks_))]() mutable {
                      when_all_subtask<I, Ts...>(std::move(task), std::move(state));
                  }),
              ...);
@@ -367,12 +406,13 @@ template <typename... Ts> struct WhenAllAwaitable
      */
     std::tuple<Ts...> await_resume()
     {
-        if (state->first_exception)
-            std::rethrow_exception(state->first_exception);
-
-        return std::apply([](auto&... opts) { return std::make_tuple(std::move(*opts)...); },
-                          state->results);
+        state_->rethrow_first_exception_if_any();
+        return state_->take_results();
     }
+
+private:
+    std::tuple<Task<Ts>...>              tasks_;
+    std::shared_ptr<WhenAllState<Ts...>> state_;
 };
 
 } // namespace detail

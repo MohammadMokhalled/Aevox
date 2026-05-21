@@ -237,7 +237,7 @@ public:
      *                 with `/`. Example: `"/api/v1"`.
      * @return         Child Router scoped to the prefix.
      * @note   Not thread-safe. Must be called before `dispatch()`.
-     * @note   **Lifetime:** The child Router holds a raw non-owning pointer into
+     * @note   **Lifetime:** The child Router holds a non-owning reference into
      *         the parent's trie. The child must not outlive the parent Router.
      *         Moving the parent invalidates the child. Use child Routers only
      *         during the registration phase (before `listen()`).

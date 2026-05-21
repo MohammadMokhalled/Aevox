@@ -76,7 +76,7 @@ int main()
 
     ankerl::nanobench::Bench().minEpochIterations(1000).run(
         "TopicBus publish - 100 subscribers", [&] {
-            const std::size_t delivered = bus.publish("bench-topic", "hello", nullptr);
+            const std::size_t delivered = bus.publish("bench-topic", "hello");
             ankerl::nanobench::doNotOptimizeAway(delivered);
         });
 

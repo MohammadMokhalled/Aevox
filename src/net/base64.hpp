@@ -25,6 +25,22 @@ namespace detail {
 /// cppcoreguidelines-pro-bounds-constant-array-index on runtime indices.
 inline constexpr std::string_view kBase64Alphabet{
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"};
+inline constexpr std::size_t   kInputGroupBytes{3};
+inline constexpr std::size_t   kOutputGroupChars{4};
+inline constexpr std::size_t   kOneRemainingByte{1};
+inline constexpr std::size_t   kTwoRemainingBytes{2};
+inline constexpr std::uint32_t kSixBitMask{0x3FU};
+inline constexpr unsigned      kFirstByteShift{16U};
+inline constexpr unsigned      kSecondByteShift{8U};
+inline constexpr unsigned      kFirstSextetShift{18U};
+inline constexpr unsigned      kSecondSextetShift{12U};
+inline constexpr unsigned      kThirdSextetShift{6U};
+inline constexpr unsigned      kSingleByteShift{2U};
+inline constexpr unsigned      kSingleBytePadShift{4U};
+inline constexpr unsigned      kTwoByteFirstShift{8U};
+inline constexpr unsigned      kTwoByteSecondShift{10U};
+inline constexpr unsigned      kTwoByteThirdShift{4U};
+inline constexpr unsigned      kTwoBytePadShift{2U};
 
 } // namespace detail
 
@@ -38,8 +54,10 @@ inline constexpr std::string_view kBase64Alphabet{
  */
 [[nodiscard]] inline std::string base64_encode(std::span<const std::uint8_t> input) noexcept
 {
-    const std::size_t in_size  = input.size();
-    const std::size_t out_size = ((in_size + 2U) / 3U) * 4U;
+    const std::size_t in_size = input.size();
+    const std::size_t out_size =
+        ((in_size + detail::kTwoRemainingBytes) / detail::kInputGroupBytes) *
+        detail::kOutputGroupChars;
 
     std::string result;
     result.resize(out_size);
@@ -48,32 +66,43 @@ inline constexpr std::string_view kBase64Alphabet{
     std::size_t in_pos  = 0;
 
     // Process full groups of 3 input bytes → 4 output characters.
-    while (in_pos + 3U <= in_size) {
-        const std::uint32_t trio = (static_cast<std::uint32_t>(input[in_pos]) << 16U) |
-                                   (static_cast<std::uint32_t>(input[in_pos + 1]) << 8U) |
-                                   (static_cast<std::uint32_t>(input[in_pos + 2]));
-        result[out_pos++] = detail::kBase64Alphabet[(trio >> 18U) & 0x3FU];
-        result[out_pos++] = detail::kBase64Alphabet[(trio >> 12U) & 0x3FU];
-        result[out_pos++] = detail::kBase64Alphabet[(trio >> 6U) & 0x3FU];
-        result[out_pos++] = detail::kBase64Alphabet[trio & 0x3FU];
-        in_pos += 3U;
+    while (in_pos + detail::kInputGroupBytes <= in_size) {
+        const std::uint32_t trio =
+            (static_cast<std::uint32_t>(input[in_pos]) << detail::kFirstByteShift) |
+            (static_cast<std::uint32_t>(input[in_pos + detail::kOneRemainingByte])
+             << detail::kSecondByteShift) |
+            (static_cast<std::uint32_t>(input[in_pos + detail::kTwoRemainingBytes]));
+        result[out_pos++] =
+            detail::kBase64Alphabet[(trio >> detail::kFirstSextetShift) & detail::kSixBitMask];
+        result[out_pos++] =
+            detail::kBase64Alphabet[(trio >> detail::kSecondSextetShift) & detail::kSixBitMask];
+        result[out_pos++] =
+            detail::kBase64Alphabet[(trio >> detail::kThirdSextetShift) & detail::kSixBitMask];
+        result[out_pos++] = detail::kBase64Alphabet[trio & detail::kSixBitMask];
+        in_pos += detail::kInputGroupBytes;
     }
 
     // Handle 1 or 2 remaining bytes.
     const std::size_t remainder = in_size - in_pos;
-    if (remainder == 1U) {
-        const auto val    = static_cast<std::uint32_t>(input[in_pos]);
-        result[out_pos++] = detail::kBase64Alphabet[(val >> 2U) & 0x3FU];
-        result[out_pos++] = detail::kBase64Alphabet[(val << 4U) & 0x3FU];
+    if (remainder == detail::kOneRemainingByte) {
+        const auto val = static_cast<std::uint32_t>(input[in_pos]);
+        result[out_pos++] =
+            detail::kBase64Alphabet[(val >> detail::kSingleByteShift) & detail::kSixBitMask];
+        result[out_pos++] =
+            detail::kBase64Alphabet[(val << detail::kSingleBytePadShift) & detail::kSixBitMask];
         result[out_pos++] = '=';
         result[out_pos++] = '=';
     }
-    else if (remainder == 2U) {
-        const std::uint32_t val = (static_cast<std::uint32_t>(input[in_pos]) << 8U) |
-                                  (static_cast<std::uint32_t>(input[in_pos + 1]));
-        result[out_pos++] = detail::kBase64Alphabet[(val >> 10U) & 0x3FU];
-        result[out_pos++] = detail::kBase64Alphabet[(val >> 4U) & 0x3FU];
-        result[out_pos++] = detail::kBase64Alphabet[(val << 2U) & 0x3FU];
+    else if (remainder == detail::kTwoRemainingBytes) {
+        const std::uint32_t val =
+            (static_cast<std::uint32_t>(input[in_pos]) << detail::kTwoByteFirstShift) |
+            (static_cast<std::uint32_t>(input[in_pos + detail::kOneRemainingByte]));
+        result[out_pos++] =
+            detail::kBase64Alphabet[(val >> detail::kTwoByteSecondShift) & detail::kSixBitMask];
+        result[out_pos++] =
+            detail::kBase64Alphabet[(val >> detail::kTwoByteThirdShift) & detail::kSixBitMask];
+        result[out_pos++] =
+            detail::kBase64Alphabet[(val << detail::kTwoBytePadShift) & detail::kSixBitMask];
         result[out_pos++] = '=';
     }
 

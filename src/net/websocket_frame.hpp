@@ -61,11 +61,22 @@ enum class ParseFrameErrorKind : std::uint8_t
 struct ParseFrameError
 {
     ParseFrameError(ParseFrameErrorKind error_kind, aevox::WebSocketError websocket_error) noexcept
-        : kind{error_kind}, error{std::move(websocket_error)}
+        : kind_{error_kind}, error_{std::move(websocket_error)}
     {}
 
-    ParseFrameErrorKind   kind{};
-    aevox::WebSocketError error;
+    [[nodiscard]] ParseFrameErrorKind kind() const noexcept
+    {
+        return kind_;
+    }
+
+    [[nodiscard]] const aevox::WebSocketError& error() const noexcept
+    {
+        return error_;
+    }
+
+private:
+    ParseFrameErrorKind   kind_{};
+    aevox::WebSocketError error_;
 };
 
 // =============================================================================

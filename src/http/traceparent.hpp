@@ -18,9 +18,25 @@
 #include <cctype>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string_view>
 
 namespace aevox::detail {
+
+inline constexpr std::size_t  kTraceParentLength{55};
+inline constexpr std::size_t  kTraceVersion0Index{0};
+inline constexpr std::size_t  kTraceVersion1Index{1};
+inline constexpr std::size_t  kTraceVersionSeparatorIndex{2};
+inline constexpr std::size_t  kTraceIdStartIndex{3};
+inline constexpr std::size_t  kTraceIdLength{32};
+inline constexpr std::size_t  kTraceIdSeparatorIndex{35};
+inline constexpr std::size_t  kParentIdStartIndex{36};
+inline constexpr std::size_t  kParentIdLength{16};
+inline constexpr std::size_t  kParentIdSeparatorIndex{52};
+inline constexpr std::size_t  kTraceFlagsStartIndex{53};
+inline constexpr std::size_t  kTraceFlagsLength{2};
+inline constexpr std::uint8_t kTraceHexBase{10};
+inline constexpr std::uint8_t kTraceHighNibbleShift{4};
 
 /**
  * @brief Parsed components of a W3C Trace Context traceparent header.
@@ -30,9 +46,9 @@ namespace aevox::detail {
  */
 struct TraceParent
 {
-    std::array<char, 32> trace_id{};  ///< 32 lowercase hex characters.
-    std::array<char, 16> parent_id{}; ///< 16 lowercase hex characters.
-    std::uint8_t         flags{0};    ///< Trace flags byte (bit 0 = sampled).
+    std::array<char, kTraceIdLength>  trace_id{};  ///< 32 lowercase hex characters.
+    std::array<char, kParentIdLength> parent_id{}; ///< 16 lowercase hex characters.
+    std::uint8_t                      flags{0};    ///< Trace flags byte (bit 0 = sampled).
 };
 
 /**
@@ -57,17 +73,19 @@ struct TraceParent
 [[nodiscard]] inline std::optional<TraceParent> parse_traceparent(std::string_view header) noexcept
 {
     // Length check: "00-<32>-<16>-<2>" = 2 + 1 + 32 + 1 + 16 + 1 + 2 = 55
-    if (header.size() != 55) {
+    if (header.size() != kTraceParentLength) {
         return std::nullopt;
     }
 
     // Separator positions: index 2, 35, 52
-    if (header[2] != '-' || header[35] != '-' || header[52] != '-') {
+    if (header[kTraceVersionSeparatorIndex] != '-' || header[kTraceIdSeparatorIndex] != '-' ||
+        header[kParentIdSeparatorIndex] != '-')
+    {
         return std::nullopt;
     }
 
     // Version check: must be "00"
-    if (header[0] != '0' || header[1] != '0') {
+    if (header[kTraceVersion0Index] != '0' || header[kTraceVersion1Index] != '0') {
         return std::nullopt;
     }
 
@@ -79,16 +97,15 @@ struct TraceParent
     // Validate and extract trace-id (indices 3..34, 32 chars)
     TraceParent result;
     bool        trace_id_all_zero = true;
-    const char* src               = header.data() + 3;
-    char*       dst               = result.trace_id.data();
-    for (std::size_t i = 0; i < 32; ++i, ++src, ++dst) {
-        const char c = *src;
+    auto        trace_id          = std::span<char>{result.trace_id};
+    for (std::size_t i = 0; i < kTraceIdLength; ++i) {
+        const char c = header[kTraceIdStartIndex + i];
         if (c >= 'A' && c <= 'F') {
-            *dst              = static_cast<char>(c - 'A' + 'a');
+            trace_id[i]       = static_cast<char>(c - 'A' + 'a');
             trace_id_all_zero = false;
         }
         else if (is_lower_hex(c)) {
-            *dst = c;
+            trace_id[i] = c;
             if (c != '0') {
                 trace_id_all_zero = false;
             }
@@ -103,16 +120,15 @@ struct TraceParent
 
     // Validate and extract parent-id (indices 36..51, 16 chars)
     bool parent_id_all_zero = true;
-    src                     = header.data() + 36;
-    dst                     = result.parent_id.data();
-    for (std::size_t i = 0; i < 16; ++i, ++src, ++dst) {
-        const char c = *src;
+    auto parent_id          = std::span<char>{result.parent_id};
+    for (std::size_t i = 0; i < kParentIdLength; ++i) {
+        const char c = header[kParentIdStartIndex + i];
         if (c >= 'A' && c <= 'F') {
-            *dst               = static_cast<char>(c - 'A' + 'a');
+            parent_id[i]       = static_cast<char>(c - 'A' + 'a');
             parent_id_all_zero = false;
         }
         else if (is_lower_hex(c)) {
-            *dst = c;
+            parent_id[i] = c;
             if (c != '0') {
                 parent_id_all_zero = false;
             }
@@ -126,8 +142,8 @@ struct TraceParent
     }
 
     // Validate trace-flags (indices 53..54, 2 hex chars)
-    for (std::size_t i = 0; i < 2; ++i) {
-        const char c = header[53 + i];
+    for (std::size_t i = 0; i < kTraceFlagsLength; ++i) {
+        const char c = header[kTraceFlagsStartIndex + i];
         if (!(is_lower_hex(c) || (c >= 'A' && c <= 'F'))) {
             return std::nullopt;
         }
@@ -140,15 +156,16 @@ struct TraceParent
             return static_cast<std::uint8_t>(c - '0');
         }
         if (c >= 'a' && c <= 'f') {
-            return static_cast<std::uint8_t>(c - 'a' + 10);
+            return static_cast<std::uint8_t>(c - 'a' + kTraceHexBase);
         }
         if (c >= 'A' && c <= 'F') {
-            return static_cast<std::uint8_t>(c - 'A' + 10);
+            return static_cast<std::uint8_t>(c - 'A' + kTraceHexBase);
         }
         return 0; // unreachable — validated above
     };
-    result.flags =
-        static_cast<std::uint8_t>((hex_nibble(header[53]) << 4) | hex_nibble(header[54]));
+    result.flags = static_cast<std::uint8_t>(
+        (hex_nibble(header[kTraceFlagsStartIndex]) << kTraceHighNibbleShift) |
+        hex_nibble(header[kTraceFlagsStartIndex + 1U]));
 
     return result;
 }

@@ -11,21 +11,56 @@
 #include "net/websocket_session.hpp"
 
 #include <aevox/async.hpp> // tl_post_to_io
+#include <aevox/task.hpp>
+#include <aevox/tcp_stream.hpp>
+#include <aevox/websocket.hpp>
+#include <aevox/websocket_error.hpp>
+#include <aevox/websocket_handler.hpp>
+
+#include <asio/io_context.hpp>
+#include <asio/post.hpp>
+#include <asio/strand.hpp>
+
+#include <atomic>
+#include <coroutine>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "net/asio_tcp_stream.hpp" // get_tcp_stream_executor()
 #include "net/topic_bus.hpp"
+#include "net/websocket_frame.hpp"
 
 namespace aevox::net {
+
+namespace {
+
+constexpr std::size_t   kReadChunkSize{4096};
+constexpr std::uint16_t kCloseProtocolError{1002};
+constexpr std::uint16_t kCloseUnsupportedData{1003};
+constexpr std::uint16_t kCloseMessageTooLarge{1009};
+constexpr std::size_t   kCloseCodeBytes{2};
+constexpr unsigned      kCloseCodeHighByteShift{8U};
+
+} // namespace
 
 // =============================================================================
 // WebSocketSession — construction
 // =============================================================================
 
 WebSocketSession::WebSocketSession(PrivateTag, aevox::TcpStream stream,
-                                   asio::strand<asio::io_context::executor_type> strand,
-                                   TopicBus* bus, aevox::WebSocketHandler handler,
-                                   std::size_t max_payload, std::string remote_addr,
-                                   std::string initial_topic)
+                                   asio::strand<asio::io_context::executor_type>   strand,
+                                   std::optional<std::reference_wrapper<TopicBus>> bus,
+                                   aevox::WebSocketHandler handler, std::size_t max_payload,
+                                   std::string remote_addr, std::string initial_topic)
     : stream_{std::move(stream)}, bus_{bus}, handler_{std::move(handler)},
       max_payload_{max_payload}, remote_addr_{std::move(remote_addr)},
       current_topic_{std::move(initial_topic)}, strand_{std::move(strand)}
@@ -34,20 +69,20 @@ WebSocketSession::WebSocketSession(PrivateTag, aevox::TcpStream stream,
 WebSocketSession::~WebSocketSession()
 {
     // Unsubscribe from all topics when the session is destroyed.
-    if (bus_) {
-        bus_->unsubscribe(static_cast<const aevox::net::TopicSubscriber*>(this));
-    }
+    (void)bus_.transform([this](std::reference_wrapper<TopicBus> bus) {
+        bus.get().unsubscribe(static_cast<const aevox::net::TopicSubscriber&>(*this));
+        return true;
+    });
 }
 
 // =============================================================================
 // WebSocketSession::create — factory
 // =============================================================================
 
-std::shared_ptr<WebSocketSession> WebSocketSession::create(aevox::TcpStream stream, TopicBus* bus,
-                                                           aevox::WebSocketHandler handler,
-                                                           std::size_t             max_payload,
-                                                           std::string             remote_addr,
-                                                           std::string             initial_topic)
+std::shared_ptr<WebSocketSession> WebSocketSession::create(
+    aevox::TcpStream stream, std::optional<std::reference_wrapper<TopicBus>> bus,
+    aevox::WebSocketHandler handler, std::size_t max_payload, std::string remote_addr,
+    std::string initial_topic)
 {
     // Obtain the io_context executor from the TcpStream before moving it.
     // get_tcp_stream_executor() is defined in asio_tcp_stream.cpp where TcpStream::Impl
@@ -131,13 +166,14 @@ aevox::Task<std::expected<void, aevox::WebSocketError>> WebSocketSession::close_
 void WebSocketSession::subscribe(std::string_view topic)
 {
     current_topic_ = std::string{topic};
-    if (bus_) {
-        // shared_from_this() returns shared_ptr<WebSocketSession>; TopicBus needs
-        // shared_ptr<TopicSubscriber>. Since WebSocketSession : TopicSubscriber,
-        // the implicit conversion applies.
-        const auto sub = std::shared_ptr<aevox::net::TopicSubscriber>{shared_from_this()};
-        bus_->subscribe(topic, sub);
-    }
+    // shared_from_this() returns shared_ptr<WebSocketSession>; TopicBus needs
+    // shared_ptr<TopicSubscriber>. Since WebSocketSession : TopicSubscriber,
+    // the implicit conversion applies.
+    const auto sub = std::shared_ptr<aevox::net::TopicSubscriber>{shared_from_this()};
+    (void)bus_.transform([topic, &sub](std::reference_wrapper<TopicBus> bus) {
+        bus.get().subscribe(topic, sub);
+        return true;
+    });
 }
 
 // =============================================================================
@@ -146,9 +182,11 @@ void WebSocketSession::subscribe(std::string_view topic)
 
 void WebSocketSession::publish(std::string_view topic, std::string_view message)
 {
-    if (bus_) {
-        bus_->publish(topic, message, static_cast<const aevox::net::TopicSubscriber*>(this));
-    }
+    (void)bus_.transform([this, topic, message](std::reference_wrapper<TopicBus> bus) {
+        bus.get().publish(topic, message,
+                          std::cref(static_cast<const aevox::net::TopicSubscriber&>(*this)));
+        return true;
+    });
 }
 
 // =============================================================================
@@ -298,19 +336,19 @@ aevox::Task<void> WebSocketSession::wait_for_close()
     // suspended and never waking up.
     struct WaitAwaitable
     {
-        WebSocketSession* session;
+        explicit WaitAwaitable(WebSocketSession& session) noexcept : session_{session} {}
 
         [[nodiscard]] bool await_ready() const noexcept
         {
-            return session->closed_.load(std::memory_order_seq_cst);
+            return session_.get().closed_.load(std::memory_order_seq_cst);
         }
 
         bool await_suspend(std::coroutine_handle<> h) noexcept
         {
             // Store atomically so do_read_loop can see it from any thread.
-            session->close_waiter_addr_.store(h.address(), std::memory_order_seq_cst);
+            session_.get().close_waiter_addr_.store(h.address(), std::memory_order_seq_cst);
 
-            if (!session->closed_.load(std::memory_order_seq_cst)) {
+            if (!session_.get().closed_.load(std::memory_order_seq_cst)) {
                 return true; // genuinely suspended — read loop will resume us
             }
 
@@ -319,7 +357,7 @@ aevox::Task<void> WebSocketSession::wait_for_close()
             // takes it. If we win: resume immediately (return false). If the read loop
             // already claimed it (address already null): stay suspended and let the
             // loop resume us via h.resume().
-            return try_claim_waiter(session->close_waiter_addr_, h.address());
+            return try_claim_waiter(session_.get().close_waiter_addr_, h.address());
         }
 
         [[nodiscard]] static bool try_claim_waiter(std::atomic<void*>& slot,
@@ -330,9 +368,12 @@ aevox::Task<void> WebSocketSession::wait_for_close()
         }
 
         void await_resume() noexcept {}
+
+    private:
+        std::reference_wrapper<WebSocketSession> session_;
     };
 
-    co_await WaitAwaitable{this};
+    co_await WaitAwaitable{*this};
 }
 
 // =============================================================================
@@ -356,7 +397,6 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
 {
     // Read buffer accumulates partial frames.
     std::vector<std::byte> accumulator;
-    constexpr std::size_t  kReadChunkSize = 4096;
 
     // M-1 + M-2 fix: do_read_loop runs on the raw io_context executor (not the strand_).
     // drain_send_queue() runs on strand_ and also calls stream_.write(). Two concurrent
@@ -395,7 +435,7 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                                      true /* expect_masked — client frames must be masked */);
 
             if (!parse_result) {
-                if (parse_result.error().kind == ParseFrameErrorKind::Incomplete) {
+                if (parse_result.error().kind() == ParseFrameErrorKind::Incomplete) {
                     break;
                 }
 
@@ -406,12 +446,14 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                 if (close_sent_.compare_exchange_strong(expected, true, std::memory_order_acq_rel,
                                                         std::memory_order_acquire))
                 {
-                    const auto& err = parse_result.error().error;
+                    const auto& err = parse_result.error().error();
                     if (err.code() == aevox::WebSocketErrorCode::FrameTooLarge) {
-                        enqueue_priority_frame(emit_close_frame(1009, "Message too large"));
+                        enqueue_priority_frame(
+                            emit_close_frame(kCloseMessageTooLarge, "Message too large"));
                     }
                     else {
-                        enqueue_priority_frame(emit_close_frame(1002, "Protocol error"));
+                        enqueue_priority_frame(
+                            emit_close_frame(kCloseProtocolError, "Protocol error"));
                     }
                 }
                 close_session();
@@ -426,11 +468,12 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                 case Opcode::Text:
                 case Opcode::Binary: {
                     // Deliver to on_message callback.
-                    const auto&            payload = result.frame.payload;
-                    const std::string_view payload_sv{
-                        // reinterpret_cast: byte* → char* for string_view construction.
-                        // Well-defined: char aliasing is permitted.
-                        reinterpret_cast<const char*>(payload.data()), payload.size()};
+                    std::string payload_text;
+                    payload_text.reserve(result.frame.payload.size());
+                    for (const std::byte byte : result.frame.payload) {
+                        payload_text.push_back(std::to_integer<char>(byte));
+                    }
+                    const std::string_view payload_sv{payload_text};
 
                     // Create a WebSocket handle for the callback.
                     // We create a temporary handle pointing to the same session.
@@ -452,11 +495,11 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
 
                 case Opcode::Close: {
                     // Extract close code from payload (if present).
-                    std::uint16_t close_code = 1000;
-                    if (result.frame.payload.size() >= 2) {
+                    std::uint16_t close_code = aevox::kWebSocketNormalClosureCode;
+                    if (result.frame.payload.size() >= kCloseCodeBytes) {
                         close_code = (static_cast<std::uint16_t>(
                                           static_cast<std::uint8_t>(result.frame.payload[0]))
-                                      << 8U) |
+                                      << kCloseCodeHighByteShift) |
                                      static_cast<std::uint16_t>(
                                          static_cast<std::uint8_t>(result.frame.payload[1]));
                     }
@@ -487,7 +530,8 @@ aevox::Task<void> WebSocketSession::do_read_loop(std::shared_ptr<WebSocketSessio
                                                             std::memory_order_acquire))
                     {
                         enqueue_priority_frame(
-                            emit_close_frame(1003, "Continuation frames not supported"));
+                            emit_close_frame(kCloseUnsupportedData,
+                                             "Continuation frames not supported"));
                     }
                     close_session();
                     session_ended = true;

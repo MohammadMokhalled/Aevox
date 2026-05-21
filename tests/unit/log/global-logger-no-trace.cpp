@@ -35,7 +35,7 @@ TEST_CASE("global logger - omits request_id and trace fields", "[log][tracing]")
         aevox::AsyncLogWriter writer(config);
 
         // Global log — no context pointer.
-        writer.push(aevox::LogLevel::Info, "global test message", nullptr);
+        writer.push(aevox::LogLevel::Info, "global test message");
     }
 
     std::ifstream file(path);

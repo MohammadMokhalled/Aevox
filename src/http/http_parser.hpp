@@ -8,9 +8,8 @@
 // out of this header.
 //
 // Buffer ownership (read before using ParsedRequest):
-//   ParsedRequest::method, target, and headers are zero-copy views into the
-//   buffer passed to feed(). Keep that buffer alive for the lifetime of the
-//   ParsedRequest.
+//   ParsedRequest::method, target, and headers are views into parser-owned
+//   storage. They remain valid until the next feed() or reset() call.
 //   ParsedRequest::body is a span into an internal buffer (chunk_buf) owned by
 //   HttpParser::Impl. ALL body bytes — Content-Length and chunked alike — are
 //   accumulated there, giving body a uniform lifetime regardless of transfer
@@ -67,9 +66,9 @@ enum class ParseError : std::uint8_t
 /**
  * Structured view of a parsed HTTP/1.1 request.
  *
- * method, target, and headers are zero-copy views into the buffer passed to
- * HttpParser::feed(). The caller must keep that buffer alive until reset() or
- * the next feed() call invalidates this struct. body is an exception: see below.
+ * method, target, and headers are views into parser-owned storage. The caller
+ * must finish using ParsedRequest before the next feed() or reset() call
+ * invalidates this struct.
  *
  * body: All body bytes — whether delivered via Content-Length or chunked
  *       transfer encoding — are accumulated into an internal buffer owned by
@@ -87,7 +86,7 @@ struct ParsedRequest
     int              version_major{1};
     int              version_minor{1};
 
-    // Headers as (name, value) pairs. Views into the feed() buffer.
+    // Headers as (name, value) pairs. Views into parser-owned storage.
     // Header names are NOT lowercased — comparison must be case-insensitive
     // per RFC 7230 §3.2.
     std::vector<std::pair<std::string_view, std::string_view>> headers;
@@ -207,7 +206,7 @@ public:
     void reset() noexcept;
 
 private:
-    struct Impl;
+    class Impl;
     std::unique_ptr<Impl> impl_;
 };
 

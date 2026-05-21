@@ -9,11 +9,9 @@
 // instantiates the templates (i.e. internal framework code and tests).
 //
 // Buffer lifetime contract:
-//   Impl owns both the raw TCP read buffer (buffer) and the ParsedRequest
-//   derived from it. std::string_view fields in parsed.method, parsed.target,
-//   and parsed.headers point into buffer. Moving std::vector<std::byte> does
-//   NOT invalidate existing pointers/references into it — the move transfers
-//   ownership of the heap allocation, preserving all addresses.
+//   Impl owns the raw TCP read buffer (buffer) and the ParsedRequest derived
+//   from it. ParsedRequest method, target, and headers are parser-owned views
+//   valid until the connection parser is reset after request handling.
 //   parsed.body is a span into the parser's internal chunk_buf (owned by the
 //   ConnectionHandler, not by Impl). It must not be used after the parser is
 //   reset or destroyed.
@@ -28,6 +26,9 @@
 #include <any>
 #include <cctype>
 #include <charconv>
+#include <functional>
+#include <iterator>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -48,68 +49,137 @@ namespace aevox {
 // Request::Impl
 // =============================================================================
 
-struct Request::Impl
+class Request::Impl
 {
+private:
     /// Raw TCP read buffer — owns the memory that parsed string_views point into.
-    std::vector<std::byte> buffer;
+    std::vector<std::byte> buffer_;
 
     /// Structured view of the parsed request. method, target, and headers are
     /// zero-copy views into buffer. body is a span into the parser's chunk_buf
     /// (owned by ConnectionHandler, not by this Impl).
-    aevox::detail::ParsedRequest parsed;
+    aevox::detail::ParsedRequest parsed_;
 
     /// Cached split of parsed.target at the first '?'.
     /// path_view is the portion before '?'; query_view is the portion after.
     /// Both are zero-copy views into buffer (since target is a view into buffer).
-    std::string_view path_view;
-    std::string_view query_view;
+    std::string_view path_view_;
+    std::string_view query_view_;
 
     /// Path parameters injected by the Router via Request::set_params().
     /// Keys are parameter names as declared in the route pattern; values are raw strings.
-    std::unordered_map<std::string, std::string> params;
+    std::unordered_map<std::string, std::string> params_;
 
     /// Per-request middleware context bag. Keys are application-defined strings
     /// (e.g. "auth.user"). Values are type-erased via std::any.
-    std::unordered_map<std::string, std::any> context;
+    std::unordered_map<std::string, std::any> context_;
 
     // -------------------------------------------------------------------------
     // WebSocket upgrade support — set by the connection handler before dispatch.
     // -------------------------------------------------------------------------
 
-    /// Non-owning pointer to the connection's TcpStream.
+    /// Non-owning reference to the connection's TcpStream.
     /// Set by the connection handler so that upgrade_websocket() can consume it.
-    /// Null for requests that were not set up for WebSocket upgrade.
-    aevox::TcpStream* stream{nullptr};
+    /// Empty for requests that were not set up for WebSocket upgrade.
+    std::optional<std::reference_wrapper<aevox::TcpStream>> stream_;
 
-    /// Non-owning pointer to the App-owned TopicBus (null if not a WS route).
-    aevox::net::TopicBus* topic_bus{nullptr};
+    /// Non-owning reference to the App-owned TopicBus, empty if not a WS route.
+    std::optional<std::reference_wrapper<aevox::net::TopicBus>> topic_bus_;
 
     /// Maximum payload bytes (from AppConfig::max_body_size).
-    std::size_t max_payload{10UZ * 1024UZ * 1024UZ}; // 10 MiB default
+    static constexpr std::size_t kDefaultMaxPayloadBytes{10UZ * 1024UZ * 1024UZ};
+    std::size_t                  max_payload_{kDefaultMaxPayloadBytes};
 
     /// WebSocket lifecycle callbacks — set by App::ws() dispatch before upgrade_websocket().
-    aevox::WebSocketHandler ws_handler;
+    aevox::WebSocketHandler ws_handler_;
 
     /// Per-request logging context.
-    RequestContext log_context;
+    RequestContext log_context_;
 
+public:
     /// Constructs Impl, taking ownership of buffer and the parsed request.
     /// Computes path_view and query_view from parsed.target by splitting at '?'.
     Impl(std::vector<std::byte> buf, aevox::detail::ParsedRequest pr,
          std::unordered_map<std::string, std::string> initial_params = {})
-        : buffer{std::move(buf)}, parsed{std::move(pr)}, params{std::move(initial_params)}
+        : buffer_{std::move(buf)}, parsed_{std::move(pr)}, params_{std::move(initial_params)}
     {
         // Split parsed.target on the first '?' to compute path and query views.
         // Both path_view and query_view are views into buffer (via parsed.target).
-        const auto pos = parsed.target.find('?');
+        const auto pos = parsed_.target.find('?');
         if (pos == std::string_view::npos) {
-            path_view  = parsed.target;
-            query_view = {};
+            path_view_  = parsed_.target;
+            query_view_ = {};
         }
         else {
-            path_view  = parsed.target.substr(0, pos);
-            query_view = parsed.target.substr(pos + 1);
+            path_view_  = parsed_.target.substr(0, pos);
+            query_view_ = parsed_.target.substr(pos + 1);
         }
+    }
+
+    [[nodiscard]] const aevox::detail::ParsedRequest& parsed() const noexcept
+    {
+        return parsed_;
+    }
+    [[nodiscard]] std::string_view path_view() const noexcept
+    {
+        return path_view_;
+    }
+    [[nodiscard]] std::string_view query_view() const noexcept
+    {
+        return query_view_;
+    }
+    [[nodiscard]] std::unordered_map<std::string, std::string>& params() noexcept
+    {
+        return params_;
+    }
+    [[nodiscard]] const std::unordered_map<std::string, std::string>& params() const noexcept
+    {
+        return params_;
+    }
+    [[nodiscard]] std::unordered_map<std::string, std::any>& context() noexcept
+    {
+        return context_;
+    }
+    [[nodiscard]] std::optional<std::reference_wrapper<aevox::TcpStream>> stream() const noexcept
+    {
+        return stream_;
+    }
+    void set_stream(aevox::TcpStream& stream) noexcept
+    {
+        stream_ = stream;
+    }
+    void clear_stream() noexcept
+    {
+        stream_.reset();
+    }
+    [[nodiscard]] std::optional<std::reference_wrapper<aevox::net::TopicBus>> topic_bus()
+        const noexcept
+    {
+        return topic_bus_;
+    }
+    void set_topic_bus(aevox::net::TopicBus& topic_bus) noexcept
+    {
+        topic_bus_ = topic_bus;
+    }
+    [[nodiscard]] std::size_t max_payload() const noexcept
+    {
+        return max_payload_;
+    }
+    void set_max_payload(std::size_t max_payload) noexcept
+    {
+        max_payload_ = max_payload;
+    }
+    [[nodiscard]] aevox::WebSocketHandler& ws_handler() noexcept
+    {
+        return ws_handler_;
+    }
+    [[nodiscard]] RequestContext& log_context() noexcept
+    {
+        return log_context_;
+    }
+    [[nodiscard]] const RequestContext& log_context() const noexcept
+    {
+        return log_context_;
     }
 };
 
@@ -122,8 +192,8 @@ template <typename T>
 [[nodiscard]] std::expected<T, ParamError> Request::param(std::string_view name) const noexcept
 {
     // Look up the parameter by name in the router-injected params map.
-    auto it = impl_->params.find(std::string{name});
-    if (it == impl_->params.end()) {
+    auto it = impl_->params().find(std::string{name});
+    if (it == impl_->params().end()) {
         return std::unexpected(ParamError::NotFound);
     }
 
@@ -140,9 +210,12 @@ template <typename T>
     }
     else {
         // Arithmetic type (integral or floating_point) — use from_chars.
-        T result{};
-        const auto [ptr, ec] = std::from_chars(raw.data(), raw.data() + raw.size(), result);
-        if (ec != std::errc{} || ptr != raw.data() + raw.size()) {
+        T                 result{};
+        const char* const first      = raw.c_str();
+        const auto        char_count = static_cast<std::ptrdiff_t>(raw.size());
+        const char* const last       = std::next(first, char_count);
+        const auto [ptr, ec]         = std::from_chars(first, last, result);
+        if (ec != std::errc{} || ptr != last) {
             return std::unexpected(ParamError::BadConversion);
         }
         return result;
@@ -158,13 +231,12 @@ template <typename T>
 [[nodiscard]] aevox::Task<std::expected<T, aevox::JsonError>> Request::json() const
 {
 #if defined(AEVOX_JSON_BACKEND_GLAZE)
-    // Body bytes are stable for the request lifetime (owned by Impl::buffer).
-    // The body span points into the parser's buffer; convert to string_view
-    // for the backend. No copy is performed.
-    // reinterpret_cast: std::byte* -> const char* — well-defined per
-    // [basic.types]/2 as std::byte is an alias for unsigned char.
-    const auto body_sv = std::string_view{reinterpret_cast<const char*>(impl_->parsed.body.data()),
-                                          impl_->parsed.body.size()};
+    std::string body_text;
+    body_text.reserve(impl_->parsed().body.size());
+    for (const std::byte byte : impl_->parsed().body) {
+        body_text.push_back(std::to_integer<char>(byte));
+    }
+    const auto                              body_sv = std::string_view{body_text};
     constexpr aevox::internal::GlazeBackend kBackend{};
     co_return kBackend.template deserialize<T>(body_sv);
 #else
@@ -181,13 +253,13 @@ template <typename T> void Request::set(std::string_view key, T&& value)
 {
     // Store by value in the context bag. std::string key ensures the key
     // outlives the set() call site (no dangling view risk).
-    impl_->context.insert_or_assign(std::string{key}, std::any{std::forward<T>(value)});
+    impl_->context().insert_or_assign(std::string{key}, std::any{std::forward<T>(value)});
 }
 
 template <typename T> [[nodiscard]] std::optional<T> Request::get(std::string_view key) const
 {
-    auto it = impl_->context.find(std::string{key});
-    if (it == impl_->context.end()) {
+    auto it = impl_->context().find(std::string{key});
+    if (it == impl_->context().end()) {
         return std::nullopt;
     }
     // std::any_cast returns nullptr on type mismatch when used with pointer form.
@@ -247,6 +319,20 @@ namespace {
 } // anonymous namespace
 
 // =============================================================================
+// Request::logger()
+// =============================================================================
+
+inline Logger& Request::logger() noexcept
+{
+    return log_;
+}
+
+inline const Logger& Request::logger() const noexcept
+{
+    return log_;
+}
+
+// =============================================================================
 // Request::is_websocket_upgrade()
 // =============================================================================
 
@@ -255,7 +341,7 @@ inline bool Request::is_websocket_upgrade() const noexcept
     if (!impl_)
         return false;
 
-    const auto& headers = impl_->parsed.headers;
+    const auto& headers = impl_->parsed().headers;
 
     // Check Upgrade: websocket (case-insensitive value).
     const std::string_view upgrade_val = ws_find_header(headers, "Upgrade");
@@ -282,15 +368,24 @@ inline bool Request::is_websocket_upgrade() const noexcept
 inline aevox::Task<std::expected<aevox::WebSocket, aevox::WebSocketError>>
 Request::upgrade_websocket()
 {
-    if (!impl_ || !impl_->stream) {
+    if (!impl_) {
         co_return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::InvalidHandshake,
                                                         "No TcpStream available for upgrade"});
     }
 
+    auto stream_ref = impl_->stream();
+    if (!stream_ref) {
+        co_return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::InvalidHandshake,
+                                                        "No TcpStream available for upgrade"});
+    }
+
+    auto& stream        = stream_ref.value().get();
+    auto  topic_bus_ref = impl_->topic_bus();
+
     // Build HandshakeHeaders from the parsed request.
     aevox::net::HandshakeHeaders hs_headers;
     {
-        const auto& headers          = impl_->parsed.headers;
+        const auto& headers          = impl_->parsed().headers;
         hs_headers.upgrade           = ws_find_header(headers, "Upgrade");
         hs_headers.connection        = ws_find_header(headers, "Connection");
         hs_headers.sec_websocket_key = ws_find_header(headers, "Sec-WebSocket-Key");
@@ -313,10 +408,9 @@ Request::upgrade_websocket()
                                      accept_key + "\r\n\r\n";
 
     // Write the 101 response.
-    const std::span<const std::byte> resp_bytes{reinterpret_cast<const std::byte*>(
-                                                    response_str.data()),
-                                                response_str.size()};
-    auto                             write_res = co_await impl_->stream->write(resp_bytes);
+    const auto response_chars = std::span<const char>{response_str.data(), response_str.size()};
+    const auto resp_bytes     = std::as_bytes(response_chars);
+    auto       write_res      = co_await stream.write(resp_bytes);
     if (!write_res) {
         co_return std::unexpected(aevox::WebSocketError{aevox::WebSocketErrorCode::SendFailed,
                                                         "Failed to write HTTP 101 response"});
@@ -324,18 +418,18 @@ Request::upgrade_websocket()
 
     // Extract remote address from the TcpStream (not available directly —
     // store empty string for now; address is retrieved before upgrade in app_impl).
-    // The actual remote address is stored in impl_->parsed or passed separately.
+    // The actual remote address is stored in impl_->parsed() or passed separately.
     // For v0.2, we use an empty string fallback; app_impl.cpp sets the proper address
     // via a separate mechanism when WebSocket routes are used.
     std::string remote_addr;
-    auto        remote_it = impl_->params.find("__remote_addr__");
-    if (remote_it != impl_->params.end())
+    auto        remote_it = impl_->params().find("__remote_addr__");
+    if (remote_it != impl_->params().end())
         remote_addr = remote_it->second;
 
     // Extract the first path parameter as the initial topic.
     std::string initial_topic;
     // The first non-internal parameter is the initial topic.
-    for (const auto& [k, v] : impl_->params) {
+    for (const auto& [k, v] : impl_->params()) {
         if (!k.empty() && k[0] != '_') {
             initial_topic = v;
             break;
@@ -344,12 +438,12 @@ Request::upgrade_websocket()
 
     // Create the WebSocketSession (takes ownership of the TcpStream).
     auto session = aevox::net::WebSocketSession::create(
-        std::move(*impl_->stream), impl_->topic_bus,
-        std::move(impl_->ws_handler), // set by App::ws() dispatch before this call
-        impl_->max_payload, std::move(remote_addr), std::move(initial_topic));
+        std::move(stream), topic_bus_ref,
+        std::move(impl_->ws_handler()), // set by App::ws() dispatch before this call
+        impl_->max_payload(), std::move(remote_addr), std::move(initial_topic));
 
-    // Null out the stream pointer (it was moved).
-    impl_->stream = nullptr;
+    // Clear the stream reference (it was moved).
+    impl_->clear_stream();
 
     // Build and return the WebSocket handle.
     co_return session->make_handle(session);
@@ -363,7 +457,7 @@ Request::upgrade_websocket()
 // <unordered_map> into a public header). The Router injects captured
 // path parameters directly through its friend-class access to Request::Impl:
 //
-//   req.impl_->params = std::move(captured_params);
+//   req.impl_->params() = std::move(captured_params);
 //
 // This is valid because `friend class Router` (declared in request.hpp) grants
 // the Router class access to all private members of Request, including impl_.
@@ -393,22 +487,30 @@ inline Request make_request_from_impl(std::vector<std::byte>       buffer,
         std::make_unique<Request::Impl>(std::move(buffer), std::move(parsed)));
 }
 
-/// Returns a read-only pointer to Request's Impl for internal inspection (tests).
-/// Returns nullptr for a moved-from Request.
+/// Returns a read-only reference to Request's Impl for internal inspection (tests).
+/// Returns std::nullopt for a moved-from Request.
 /// Friend of Request — declared in request.hpp (in aevox namespace, not detail).
-inline const Request::Impl* get_request_impl(const Request& req) noexcept
+inline std::optional<std::reference_wrapper<const Request::Impl>> get_request_impl(
+    const Request& req) noexcept
 {
-    return req.impl_.get();
+    if (!req.impl_) {
+        return std::nullopt;
+    }
+    return std::cref(*req.impl_);
 }
 
-/// Returns a mutable pointer to Request's Impl for internal param injection.
+/// Returns a mutable reference to Request's Impl for internal param injection.
 /// Used by tests (to set params after construction) and the Router
-/// (which uses friend class Router to directly write req.impl_->params).
-/// Returns nullptr for a moved-from Request.
+/// (which uses friend class Router to directly write req.impl_->params()).
+/// Returns std::nullopt for a moved-from Request.
 /// Friend of Request — declared in request.hpp (in aevox namespace, not detail).
-inline Request::Impl* get_mutable_request_impl(Request& req) noexcept
+inline std::optional<std::reference_wrapper<Request::Impl>> get_mutable_request_impl(
+    Request& req) noexcept
 {
-    return req.impl_.get();
+    if (!req.impl_) {
+        return std::nullopt;
+    }
+    return std::ref(*req.impl_);
 }
 
 } // namespace aevox

@@ -13,25 +13,56 @@
 #include "asio_tcp_stream.hpp"
 
 #include <aevox/async.hpp> // for aevox::detail::tl_post_to_io
+#include <aevox/error.hpp>
+#include <aevox/task.hpp>
+#include <aevox/tcp_stream.hpp>
 
-#include <asio.hpp>
+#include <asio/buffer.hpp>
+#include <asio/error.hpp>
+#include <asio/error_code.hpp>
+#include <asio/io_context.hpp>
+#include <asio/ip/tcp.hpp>
+#include <asio/write.hpp>
 
+#include <cassert>
+#include <coroutine>
+#include <cstddef>
+#include <expected>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <system_error>
+#include <utility>
+#include <vector>
 
 // =============================================================================
 // TcpStream::Impl — contains the Asio socket (defined here, forward-declared in
 // include/aevox/tcp_stream.hpp)
 // =============================================================================
 
-struct aevox::TcpStream::Impl
+class aevox::TcpStream::Impl
 {
-    asio::ip::tcp::socket socket; // owns the accepted TCP connection
-    asio::io_context*     io_ctx; // non-owning; lifetime guaranteed by AsioExecutor
-
+public:
     // Thread-safety: not thread-safe — used by one connection coroutine.
     // Move semantics: not movable after construction (socket is move-only).
     // Ownership: owned by TcpStream via unique_ptr<Impl>.
-    Impl(asio::ip::tcp::socket s, asio::io_context& ctx) : socket{std::move(s)}, io_ctx{&ctx} {}
+    Impl(asio::ip::tcp::socket s, asio::io_context& ctx) : socket_{std::move(s)}, io_ctx_{ctx} {}
+
+    [[nodiscard]] asio::ip::tcp::socket& tcp_socket() noexcept
+    {
+        return socket_;
+    }
+
+    [[nodiscard]] asio::io_context& io_context() noexcept
+    {
+        return io_ctx_.get();
+    }
+
+private:
+    asio::ip::tcp::socket                    socket_; // owns the accepted TCP connection
+    std::reference_wrapper<asio::io_context> io_ctx_; // lifetime guaranteed by AsioExecutor
 };
 
 // =============================================================================
@@ -46,17 +77,11 @@ struct aevox::TcpStream::Impl
 
 namespace {
 
-struct ReadAwaitable
+class ReadAwaitable
 {
-    asio::ip::tcp::socket* socket; // non-owning; lifetime guaranteed by TcpStream::Impl
-    std::size_t            max_bytes;
-
-    // Inline storage on the coroutine frame:
-    std::vector<std::byte>        buffer;
-    std::optional<aevox::IoError> error;
-
+public:
     ReadAwaitable(asio::ip::tcp::socket& s, std::size_t max_bytes)
-        : socket{&s}, max_bytes{max_bytes}
+        : socket_{s}, max_bytes_{max_bytes}
     {}
 
     [[nodiscard]] bool await_ready() const noexcept
@@ -69,44 +94,50 @@ struct ReadAwaitable
         assert(aevox::detail::tl_post_to_io() &&
                "TcpStream::read() called outside an executor-managed thread");
 
-        buffer.resize(max_bytes);
+        buffer_.resize(max_bytes_);
         auto post_to_io = aevox::detail::tl_post_to_io();
 
-        // reinterpret_cast: vector<byte>::data() → char* for Asio buffer.
-        // Well-defined per C++23 [basic.types.general]: std::byte is a distinct
-        // type alias for unsigned char; aliasing via char* is explicitly permitted.
-        socket->async_read_some(asio::buffer(reinterpret_cast<char*>(buffer.data()), buffer.size()),
-                                [this, caller, post_to_io](asio::error_code ec,
-                                                           std::size_t      n) mutable {
-                                    if (!ec) {
-                                        buffer.resize(n);
-                                    }
-                                    else if (ec == asio::error::eof) {
-                                        error = aevox::IoError::Eof;
-                                        buffer.clear();
-                                    }
-                                    else if (ec == asio::error::operation_aborted) {
-                                        error = aevox::IoError::Cancelled;
-                                    }
-                                    else if (ec == asio::error::connection_reset) {
-                                        error = aevox::IoError::Reset;
-                                    }
-                                    else {
-                                        error = aevox::IoError::Unknown;
-                                    }
-                                    // Resume the read() coroutine on the I/O pool.
-                                    // The post establishes happens-before between the writes above
-                                    // and the await_resume() read below (Asio completion ordering).
-                                    post_to_io([caller]() mutable { caller.resume(); });
-                                });
+        socket_.get().async_read_some(asio::buffer(buffer_.data(), buffer_.size()),
+                                      [this, caller, post_to_io](asio::error_code ec,
+                                                                 std::size_t      n) mutable {
+                                          if (!ec) {
+                                              buffer_.resize(n);
+                                          }
+                                          else if (ec == asio::error::eof) {
+                                              error_ = aevox::IoError::Eof;
+                                              buffer_.clear();
+                                          }
+                                          else if (ec == asio::error::operation_aborted) {
+                                              error_ = aevox::IoError::Cancelled;
+                                          }
+                                          else if (ec == asio::error::connection_reset) {
+                                              error_ = aevox::IoError::Reset;
+                                          }
+                                          else {
+                                              error_ = aevox::IoError::Unknown;
+                                          }
+                                          // Resume the read() coroutine on the I/O pool.
+                                          // The post establishes happens-before between the writes
+                                          // above and the await_resume() read below (Asio
+                                          // completion ordering).
+                                          post_to_io([caller]() mutable { caller.resume(); });
+                                      });
     }
 
     [[nodiscard]] std::expected<std::vector<std::byte>, aevox::IoError> await_resume()
     {
-        if (error)
-            return std::unexpected{*error};
-        return std::move(buffer);
+        if (error_)
+            return std::unexpected{*error_};
+        return std::move(buffer_);
     }
+
+private:
+    std::reference_wrapper<asio::ip::tcp::socket> socket_; // non-owning; lifetime guaranteed
+    std::size_t                                   max_bytes_;
+
+    // Inline storage on the coroutine frame.
+    std::vector<std::byte>        buffer_;
+    std::optional<aevox::IoError> error_;
 };
 
 // =============================================================================
@@ -117,21 +148,16 @@ struct ReadAwaitable
 // (documented in tcp_stream.hpp).
 // =============================================================================
 
-struct WriteAwaitable
+class WriteAwaitable
 {
-    asio::ip::tcp::socket*     socket; // non-owning; lifetime guaranteed by TcpStream::Impl
-    std::span<const std::byte> data;
-
-    // Inline storage on the coroutine frame:
-    std::optional<aevox::IoError> error;
-
+public:
     WriteAwaitable(asio::ip::tcp::socket& s, std::span<const std::byte> data)
-        : socket{&s}, data{data}
+        : socket_{s}, data_{data}
     {}
 
     [[nodiscard]] bool await_ready() const noexcept
     {
-        return data.empty(); // empty write is a no-op — skip suspension
+        return data_.empty(); // empty write is a no-op — skip suspension
     }
 
     void await_suspend(std::coroutine_handle<> caller)
@@ -141,22 +167,19 @@ struct WriteAwaitable
 
         auto post_to_io = aevox::detail::tl_post_to_io();
 
-        // reinterpret_cast: span<const byte>::data() → const char* for Asio.
-        // Well-defined per C++23 [basic.types.general]: aliasing via const char* is permitted.
-        asio::async_write(*socket,
-                          asio::buffer(reinterpret_cast<const char*>(data.data()), data.size()),
+        asio::async_write(socket_.get(), asio::buffer(data_.data(), data_.size()),
                           [this, caller, post_to_io](asio::error_code ec, std::size_t) mutable {
                               if (!ec) {
                                   // success — error_ stays empty
                               }
                               else if (ec == asio::error::operation_aborted) {
-                                  error = aevox::IoError::Cancelled;
+                                  error_ = aevox::IoError::Cancelled;
                               }
                               else if (ec == asio::error::connection_reset) {
-                                  error = aevox::IoError::Reset;
+                                  error_ = aevox::IoError::Reset;
                               }
                               else {
-                                  error = aevox::IoError::Unknown;
+                                  error_ = aevox::IoError::Unknown;
                               }
                               post_to_io([caller]() mutable { caller.resume(); });
                           });
@@ -164,10 +187,17 @@ struct WriteAwaitable
 
     [[nodiscard]] std::expected<void, aevox::IoError> await_resume()
     {
-        if (error)
-            return std::unexpected{*error};
+        if (error_)
+            return std::unexpected{*error_};
         return {};
     }
+
+private:
+    std::reference_wrapper<asio::ip::tcp::socket> socket_; // non-owning; lifetime guaranteed
+    std::span<const std::byte>                    data_;
+
+    // Inline storage on the coroutine frame.
+    std::optional<aevox::IoError> error_;
 };
 
 } // anonymous namespace
@@ -196,7 +226,7 @@ bool TcpStream::valid() const noexcept
 
 Task<std::expected<std::vector<std::byte>, IoError>> TcpStream::read(std::size_t max_bytes)
 {
-    co_return co_await ReadAwaitable{impl_->socket, max_bytes};
+    co_return co_await ReadAwaitable{impl_->tcp_socket(), max_bytes};
 }
 
 // =============================================================================
@@ -205,7 +235,7 @@ Task<std::expected<std::vector<std::byte>, IoError>> TcpStream::read(std::size_t
 
 Task<std::expected<void, IoError>> TcpStream::write(std::span<const std::byte> data)
 {
-    co_return co_await WriteAwaitable{impl_->socket, data};
+    co_return co_await WriteAwaitable{impl_->tcp_socket(), data};
 }
 
 // =============================================================================
@@ -265,12 +295,12 @@ aevox::TcpStream TcpStreamFactory::make(asio::ip::tcp::socket socket, asio::io_c
 
 namespace aevox {
 
-/// Returns mutable Impl pointer for internal net/ code (WebSocketSession).
+/// Returns mutable Impl reference for internal net/ code (WebSocketSession).
 /// Defined here because TcpStream::Impl is complete in this TU.
 /// Friend declared in tcp_stream.hpp.
-TcpStream::Impl* get_tcp_stream_impl(TcpStream& stream) noexcept
+TcpStream::Impl& get_tcp_stream_impl(TcpStream& stream) noexcept
 {
-    return stream.impl_.get();
+    return *stream.impl_;
 }
 
 } // namespace aevox
@@ -282,7 +312,7 @@ namespace aevox::net {
 /// Declared in asio_tcp_stream.hpp.
 asio::io_context::executor_type get_tcp_stream_executor(aevox::TcpStream& stream) noexcept
 {
-    return get_tcp_stream_impl(stream)->io_ctx->get_executor();
+    return get_tcp_stream_impl(stream).io_context().get_executor();
 }
 
 } // namespace aevox::net

@@ -8,6 +8,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 
 #include "log/async_writer.hpp"
@@ -51,7 +52,7 @@ TEST_CASE("request_id - is 16 hex characters in JSON output", "[log][tracing]")
         ctx.request_id = "a1b2c3d4e5f6a7b8";
         ctx.thread_id  = 1;
 
-        writer.push(aevox::LogLevel::Info, "test", &ctx);
+        writer.push(aevox::LogLevel::Info, "test", std::cref(ctx));
     }
 
     std::ifstream file(path);

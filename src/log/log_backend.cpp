@@ -6,6 +6,10 @@
 
 #include "log_backend.hpp"
 
+#include <aevox/log.hpp>
+
+#include <memory>
+
 #include "spdlog_backend.hpp"
 
 namespace aevox {

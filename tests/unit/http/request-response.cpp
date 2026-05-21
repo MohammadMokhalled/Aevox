@@ -50,15 +50,15 @@ std::string_view bytes_as_string_view(const std::vector<std::byte>& v) noexcept
 /// Two-step approach (M2 fix — avoids naming aevox::Request::Impl in this TU):
 ///   1. make_request_from_impl(buffer, parsed) constructs Impl internally via
 ///      the friend function defined in request_impl.hpp.
-///   2. get_mutable_request_impl() returns a non-const Impl pointer (friend fn)
+///   2. get_mutable_request_impl() returns a non-const Impl reference (friend fn)
 ///      so we can inject the path params after construction without naming Impl.
 aevox::Request make_test_request(std::vector<std::byte> buffer, aevox::detail::ParsedRequest parsed,
                                  std::unordered_map<std::string, std::string> params = {})
 {
     auto req = aevox::make_request_from_impl(std::move(buffer), std::move(parsed));
     if (!params.empty()) {
-        auto* impl   = aevox::get_mutable_request_impl(req);
-        impl->params = std::move(params);
+        auto impl            = aevox::get_mutable_request_impl(req);
+        impl->get().params() = std::move(params);
     }
     return req;
 }
@@ -212,10 +212,10 @@ TEST_CASE("Request - param<string_view> - zero-copy, no allocation", "[http][req
     // Zero-copy verification: the string_view data pointer must equal the
     // address of the string stored inside the params map in Impl.
     // Use auto to avoid naming aevox::Request::Impl (which is private after M2 fix).
-    // get_request_impl is a friend function returning const Request::Impl*.
-    const auto* impl = aevox::get_request_impl(req);
-    REQUIRE(impl != nullptr);
-    const std::string& stored = impl->params.at("token");
+    // get_request_impl is a friend function returning a const Request::Impl reference.
+    const auto impl = aevox::get_request_impl(req);
+    REQUIRE(impl.has_value());
+    const std::string& stored = impl->get().params().at("token");
     CHECK(result->data() == stored.data());
 }
 

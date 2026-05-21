@@ -146,26 +146,20 @@ All three enumerators are non-overlapping. A `switch` with all three cases needs
 
 ```cpp
 // include/aevox/config.hpp
-struct ConfigErrorDetail {
-    ConfigError  code{ConfigError::FileNotFound};
-    std::string  message;   // human-readable description
-    std::string  key;       // offending TOML key (populated for InvalidValue only)
-
+class ConfigErrorDetail {
+public:
     [[nodiscard]] ConfigError      error_code() const noexcept;
     [[nodiscard]] std::string_view error_message() const noexcept;
     [[nodiscard]] std::string_view error_key() const noexcept;
 };
 ```
 
-`code` is the machine-readable discriminant. `message` is always populated with a
-human-readable description. `key` is only populated when `code == ConfigError::InvalidValue`
-and names the TOML key whose value failed validation.
+`error_code()` is the machine-readable discriminant. `error_message()` is always populated with a
+human-readable description. `error_key()` is only populated when
+`error_code() == ConfigError::InvalidValue` and names the TOML key whose value failed validation.
 
 `ConfigErrorDetail` is a value type — safe to copy or move across threads. A moved-from
-instance has empty `message` and `key`.
-
-The public fields remain available for compatibility. Prefer the accessor methods in new
-code because they match the other structured Aevox error detail types.
+instance has empty message and key views.
 
 ---
 
@@ -195,10 +189,10 @@ to a string literal — it never dangles and requires no heap allocation.
 void report(const aevox::ConfigErrorDetail& err)
 {
     std::cerr << std::format("config error [{}]: {}\n",
-                             aevox::to_string(err.code),
-                             err.message);
-    if (err.code == aevox::ConfigError::InvalidValue)
-        std::cerr << std::format("  offending key: {}\n", err.key);
+                             aevox::to_string(err.error_code()),
+                             err.error_message());
+    if (err.error_code() == aevox::ConfigError::InvalidValue)
+        std::cerr << std::format("  offending key: {}\n", err.error_key());
 }
 ```
 
@@ -258,8 +252,8 @@ int main()
     if (!result) {
         const auto& err = result.error();
         std::cerr << std::format("[{}] {}\n",
-                                 aevox::to_string(err.code),
-                                 err.message);
+                                 aevox::to_string(err.error_code()),
+                                 err.error_message());
         return 1;
     }
 

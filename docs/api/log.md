@@ -18,9 +18,9 @@ Key features:
 ```cpp
 #include <aevox/log.hpp>
 
-// Inside a handler — req.log is already set up by the framework
+// Inside a handler — req.logger() is already set up by the framework
 app.get("/orders/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.log.info("Processing order {}", req.param<int>("id").value());
+    req.logger().info("Processing order {}", req.param<int>("id").value());
     // ...
     co_return aevox::Response::ok(result);
 });

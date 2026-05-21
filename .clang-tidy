@@ -12,23 +12,13 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   modernize-*,
   -modernize-use-trailing-return-type,
-  -modernize-raw-string-literal,
   cppcoreguidelines-*,
-  -cppcoreguidelines-avoid-magic-numbers,
-  -cppcoreguidelines-avoid-c-arrays,
-  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
-  -cppcoreguidelines-pro-type-reinterpret-cast,
-  -cppcoreguidelines-pro-type-union-use,
-  -cppcoreguidelines-non-private-member-variables-in-classes,
   -cppcoreguidelines-avoid-reference-coroutine-parameters,
   -cppcoreguidelines-avoid-capturing-lambda-coroutines,
   concurrency-*,
   performance-*,
   misc-*,
-  -misc-include-cleaner,
-  -misc-non-private-member-variables-in-classes,
   readability-identifier-naming,
-  -readability-magic-numbers
 
 WarningsAsErrors: "*"
 

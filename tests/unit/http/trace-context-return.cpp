@@ -80,15 +80,15 @@ TEST_CASE("trace_context - returns view of original header when valid", "[http][
     auto              req = make_request_with_traceparent(tp);
 
     // Populate traceparent in log_context as app_impl.cpp would do.
-    auto*      impl   = aevox::get_mutable_request_impl(req);
+    auto       impl   = aevox::get_mutable_request_impl(req);
     const auto parsed = aevox::detail::parse_traceparent(tp);
     if (!parsed) {
         FAIL("parse_traceparent should return a value");
     }
-    const auto& pv                = *parsed;
-    impl->log_context.trace_id    = std::string(pv.trace_id.begin(), pv.trace_id.end());
-    impl->log_context.span_id     = std::string(pv.parent_id.begin(), pv.parent_id.end());
-    impl->log_context.traceparent = tp;
+    const auto& pv                        = *parsed;
+    impl->get().log_context().trace_id    = std::string(pv.trace_id.begin(), pv.trace_id.end());
+    impl->get().log_context().span_id     = std::string(pv.parent_id.begin(), pv.parent_id.end());
+    impl->get().log_context().traceparent = tp;
 
     const auto result = req.trace_context();
     if (!result) {
@@ -114,15 +114,15 @@ TEST_CASE("trace_context - string_view survives Request move", "[http][tracing]"
     auto              req = make_request_with_traceparent(tp);
 
     // Populate log_context as app_impl.cpp would.
-    auto*      impl   = aevox::get_mutable_request_impl(req);
+    auto       impl   = aevox::get_mutable_request_impl(req);
     const auto parsed = aevox::detail::parse_traceparent(tp);
     if (!parsed) {
         FAIL("parse_traceparent should return a value");
     }
-    const auto& pv                = *parsed;
-    impl->log_context.trace_id    = std::string(pv.trace_id.begin(), pv.trace_id.end());
-    impl->log_context.span_id     = std::string(pv.parent_id.begin(), pv.parent_id.end());
-    impl->log_context.traceparent = tp;
+    const auto& pv                        = *parsed;
+    impl->get().log_context().trace_id    = std::string(pv.trace_id.begin(), pv.trace_id.end());
+    impl->get().log_context().span_id     = std::string(pv.parent_id.begin(), pv.parent_id.end());
+    impl->get().log_context().traceparent = tp;
 
     // Move the Request — unique_ptr<Impl> transfer preserves the allocation
     // address, so the string_view into traceparent remains valid.

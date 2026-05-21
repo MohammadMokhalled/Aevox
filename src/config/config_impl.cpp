@@ -5,8 +5,18 @@
 // to_string(IoError) in src/net/asio_tcp_stream.cpp.
 
 #include <aevox/config.hpp>
+#include <aevox/error.hpp>
+
+#include <string>
+#include <string_view>
+#include <utility>
 
 namespace aevox {
+
+ConfigErrorDetail::ConfigErrorDetail(ConfigError code, std::string message,
+                                     std::string key) noexcept
+    : code_{code}, message_{std::move(message)}, key_{std::move(key)}
+{}
 
 std::string_view to_string(ConfigError e) noexcept
 {
@@ -23,17 +33,17 @@ std::string_view to_string(ConfigError e) noexcept
 
 ConfigError ConfigErrorDetail::error_code() const noexcept
 {
-    return code;
+    return code_;
 }
 
 std::string_view ConfigErrorDetail::error_message() const noexcept
 {
-    return message;
+    return message_;
 }
 
 std::string_view ConfigErrorDetail::error_key() const noexcept
 {
-    return key;
+    return key_;
 }
 
 ErrorCategory category(ConfigError e) noexcept

@@ -51,7 +51,7 @@ struct FinalAwaitable
     template <typename P>
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<P> h) noexcept
     {
-        auto cont = h.promise().continuation;
+        auto cont = h.promise().continuation();
         return cont ? cont : std::noop_coroutine();
     }
 
@@ -173,13 +173,23 @@ public:
             exception_ = std::current_exception();
         }
 
-        // Accessed by FinalAwaitable::await_suspend and Task::await_suspend.
-        std::coroutine_handle<> continuation{};
+        /** @brief Returns the coroutine registered to resume after this Task completes. */
+        [[nodiscard]] std::coroutine_handle<> continuation() const noexcept
+        {
+            return continuation_;
+        }
+
+        /** @brief Registers the coroutine to resume after this Task completes. */
+        void set_continuation(std::coroutine_handle<> continuation) noexcept
+        {
+            continuation_ = continuation;
+        }
 
     private:
         friend class Task<T>;
-        std::optional<T>   result_{};
-        std::exception_ptr exception_{};
+        std::coroutine_handle<> continuation_{};
+        std::optional<T>        result_{};
+        std::exception_ptr      exception_{};
     };
 
     // =========================================================================
@@ -246,7 +256,7 @@ public:
      */
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
     {
-        handle_.promise().continuation = caller;
+        handle_.promise().set_continuation(caller);
         return handle_; // symmetric transfer — compiler tail-calls this
     }
 
@@ -325,11 +335,22 @@ public:
             exception_ = std::current_exception();
         }
 
-        std::coroutine_handle<> continuation{};
+        /** @brief Returns the coroutine registered to resume after this Task completes. */
+        [[nodiscard]] std::coroutine_handle<> continuation() const noexcept
+        {
+            return continuation_;
+        }
+
+        /** @brief Registers the coroutine to resume after this Task completes. */
+        void set_continuation(std::coroutine_handle<> continuation) noexcept
+        {
+            continuation_ = continuation;
+        }
 
     private:
         friend class Task<void>;
-        std::exception_ptr exception_{};
+        std::coroutine_handle<> continuation_{};
+        std::exception_ptr      exception_{};
     };
 
     explicit Task(std::coroutine_handle<promise_type> h) noexcept : handle_{h} {}
@@ -368,7 +389,7 @@ public:
 
     [[nodiscard]] std::coroutine_handle<> await_suspend(std::coroutine_handle<> caller) noexcept
     {
-        handle_.promise().continuation = caller;
+        handle_.promise().set_continuation(caller);
         return handle_;
     }
 

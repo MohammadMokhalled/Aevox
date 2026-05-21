@@ -6,16 +6,23 @@
 
 #include "ring_buffer.hpp"
 
+#include <atomic>
 #include <bit>
+#include <cstddef>
+#include <utility>
+
+#include "log_entry.hpp"
 
 namespace aevox {
 
 namespace {
 
+constexpr std::size_t kOne{1};
+
 [[nodiscard]] std::size_t next_power_of_two(std::size_t n) noexcept
 {
     if (n == 0)
-        return 1;
+        return kOne;
     if (std::has_single_bit(n))
         return n;
     return std::bit_ceil(n);
@@ -23,12 +30,13 @@ namespace {
 
 } // namespace
 
-LockFreeQueue::LockFreeQueue(std::size_t capacity) : capacity_mask_{next_power_of_two(capacity) - 1}
+LockFreeQueue::LockFreeQueue(std::size_t capacity)
+    : capacity_mask_{next_power_of_two(capacity) - kOne}
 {
-    const std::size_t real_capacity = capacity_mask_ + 1;
+    const std::size_t real_capacity = capacity_mask_ + kOne;
     buffer_.resize(real_capacity);
     for (std::size_t i = 0; i < real_capacity; ++i) {
-        buffer_[i].seq.store(i, std::memory_order_relaxed);
+        buffer_[i].store_sequence(i, std::memory_order_relaxed);
     }
 }
 
@@ -43,20 +51,20 @@ bool LockFreeQueue::try_push(LogEntry entry) noexcept
             dropped_.fetch_add(1, std::memory_order_relaxed);
             return false;
         }
-        if (enqueue_pos_.compare_exchange_weak(pos, pos + 1, std::memory_order_relaxed,
+        if (enqueue_pos_.compare_exchange_weak(pos, pos + kOne, std::memory_order_relaxed,
                                                std::memory_order_relaxed))
         {
             break;
         }
     }
 
-    Cell* cell = &buffer_[pos & capacity_mask_];
-    while (cell->seq.load(std::memory_order_relaxed) != pos) {
+    Cell& cell = buffer_[pos & capacity_mask_];
+    while (cell.sequence(std::memory_order_relaxed) != pos) {
         // spin — consumer has not finished reading this slot yet
     }
 
-    cell->entry = std::move(entry);
-    cell->seq.store(pos + 1, std::memory_order_release);
+    cell.set_entry(std::move(entry));
+    cell.store_sequence(pos + kOne, std::memory_order_release);
     return true;
 }
 
@@ -68,14 +76,14 @@ bool LockFreeQueue::try_pop(LogEntry& entry) noexcept
         return false;
     }
 
-    Cell* cell = &buffer_[head & capacity_mask_];
-    while (cell->seq.load(std::memory_order_relaxed) != head + 1) {
+    Cell& cell = buffer_[head & capacity_mask_];
+    while (cell.sequence(std::memory_order_relaxed) != head + kOne) {
         // spin — producer has not finished writing this slot yet
     }
 
-    entry = std::move(cell->entry);
-    cell->seq.store(head + capacity_mask_ + 1, std::memory_order_release);
-    dequeue_pos_.store(head + 1, std::memory_order_release);
+    entry = cell.take_entry();
+    cell.store_sequence(head + capacity_mask_ + kOne, std::memory_order_release);
+    dequeue_pos_.store(head + kOne, std::memory_order_release);
     return true;
 }
 

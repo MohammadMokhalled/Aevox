@@ -6,6 +6,10 @@
 
 #include <aevox/log.hpp>
 
+#include <functional>
+#include <optional>
+#include <string_view>
+
 #include "async_writer.hpp"
 
 namespace aevox {
@@ -14,7 +18,8 @@ namespace aevox {
 // Logger — private constructor
 // =============================================================================
 
-Logger::Logger(AsyncLogWriter* writer, RequestContext* ctx) noexcept
+Logger::Logger(AsyncLogWriter&                                       writer,
+               std::optional<std::reference_wrapper<RequestContext>> ctx) noexcept
     : writer_{writer}, context_{ctx}
 {}
 
@@ -24,12 +29,12 @@ Logger::Logger(AsyncLogWriter* writer, RequestContext* ctx) noexcept
 
 void Logger::log(LogLevel level, std::string_view message) noexcept
 {
-    if (writer_ != nullptr) {
-        writer_->push(level, message, context_);
+    if (writer_) {
+        writer_->get().push(level, message, context_);
     }
 }
 
-void Logger::set_writer(AsyncLogWriter* writer) noexcept
+void Logger::set_writer(AsyncLogWriter& writer) noexcept
 {
     writer_ = writer;
 }

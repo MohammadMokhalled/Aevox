@@ -12,6 +12,14 @@
 
 #include "http/response_impl.hpp"
 
+#include <aevox/response.hpp>
+
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+
 namespace aevox {
 
 // =============================================================================
@@ -105,42 +113,42 @@ Response Response::header(std::string_view name, std::string_view value) &&
 
 Response Response::ok(std::string_view body)
 {
-    return Response{200, std::string{body}, "text/plain"};
+    return Response{kStatusOk, std::string{body}, "text/plain"};
 }
 
 Response Response::created(std::string_view body)
 {
-    return Response{201, std::string{body}, "text/plain"};
+    return Response{kStatusCreated, std::string{body}, "text/plain"};
 }
 
 Response Response::not_found(std::string_view body)
 {
-    return Response{404, std::string{body}, "text/plain"};
+    return Response{kStatusNotFound, std::string{body}, "text/plain"};
 }
 
 Response Response::bad_request(std::string_view body)
 {
-    return Response{400, std::string{body}, "text/plain"};
+    return Response{kStatusBadRequest, std::string{body}, "text/plain"};
 }
 
 Response Response::unauthorized(std::string_view body)
 {
-    return Response{401, std::string{body}, "text/plain"};
+    return Response{kStatusUnauthorized, std::string{body}, "text/plain"};
 }
 
 Response Response::forbidden(std::string_view body)
 {
-    return Response{403, std::string{body}, "text/plain"};
+    return Response{kStatusForbidden, std::string{body}, "text/plain"};
 }
 
 Response Response::json(std::string body)
 {
-    return Response{200, std::move(body), "application/json"};
+    return Response{kStatusOk, std::move(body), "application/json"};
 }
 
 Response Response::method_not_allowed(std::string_view body)
 {
-    return Response{405, std::string{body}, "text/plain"};
+    return Response{kStatusMethodNotAllowed, std::string{body}, "text/plain"};
 }
 
 Response Response::stream(std::string_view content_type)
@@ -148,7 +156,7 @@ Response Response::stream(std::string_view content_type)
     // v0.1: returns a normal Response with empty body and the given Content-Type.
     // The streaming write API is designed separately. This factory exists now so
     // code that calls stream() compiles.
-    return Response{200, {}, std::string{content_type}};
+    return Response{kStatusOk, {}, std::string{content_type}};
 }
 
 Response Response::switching_protocols()
@@ -157,7 +165,7 @@ Response Response::switching_protocols()
     // already upgraded to WebSocket; the connection handler suppresses writing
     // this response to the socket. The real HTTP 101 was already sent by
     // Request::upgrade_websocket().
-    return Response{101, {}, {}};
+    return Response{kStatusSwitchingProtocols, {}, {}};
 }
 
 } // namespace aevox

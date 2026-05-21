@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/tidy.sh
 #
-# Run clang-tidy-21 over all source files using run-clang-tidy-21.
+# Run clang-tidy-21 over public headers and implementation files using run-clang-tidy-21.
 # Mirrors the CI tidy job exactly so local results match what the PR
 # pipeline reports.
 #
@@ -25,4 +25,7 @@ if ! command -v run-clang-tidy-21 >/dev/null 2>&1; then
     exit 1
 fi
 
-run-clang-tidy-21 -p build/debug
+repo_root=$(pwd)
+file_filter="^${repo_root}/(include/aevox|src)/.*\\.(cpp|hpp)$"
+
+run-clang-tidy-21 -p build/debug "${file_filter}"

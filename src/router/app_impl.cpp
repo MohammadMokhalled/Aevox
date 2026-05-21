@@ -10,24 +10,36 @@
 // Design: Tasks/architecture/AEV-004-arch.md §8
 
 #include <aevox/app.hpp>
+#include <aevox/config.hpp>
+#include <aevox/executor.hpp>
+#include <aevox/middleware.hpp>
+#include <aevox/request.hpp>
 #include <aevox/response.hpp>
+#include <aevox/router.hpp>
 #include <aevox/task.hpp>
 #include <aevox/tcp_stream.hpp>
 #include <aevox/websocket_handler.hpp>
 
+#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <csignal>
 #include <cstddef>
-#include <cstring>
+#include <cstdint>
+#include <exception>
 #include <expected>
 #include <format>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <random>
 #include <ranges>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "config/toml_loader.hpp"
@@ -35,6 +47,8 @@
 #include "http/request_impl.hpp"
 #include "http/response_impl.hpp"
 #include "http/traceparent.hpp"
+#include "log/async_writer.hpp"
+#include "net/topic_bus.hpp"
 #include "net/websocket_session.hpp"
 #include "router/router_impl.hpp"
 
@@ -56,6 +70,8 @@ namespace {
 
 // Reserve size for the per-request HTTP response header string builder.
 constexpr std::size_t kResponseHeadReserveSize{256};
+constexpr int         kStatusNoContent{204};
+constexpr int         kStatusPayloadTooLarge{413};
 
 void handle_signal(int) noexcept
 {
@@ -70,25 +86,25 @@ void handle_signal(int) noexcept
 constexpr std::string_view status_text(int code) noexcept
 {
     switch (code) {
-        case 200:
+        case kStatusOk:
             return "OK";
-        case 201:
+        case kStatusCreated:
             return "Created";
-        case 204:
+        case kStatusNoContent:
             return "No Content";
-        case 400:
+        case kStatusBadRequest:
             return "Bad Request";
-        case 401:
+        case kStatusUnauthorized:
             return "Unauthorized";
-        case 403:
+        case kStatusForbidden:
             return "Forbidden";
-        case 404:
+        case kStatusNotFound:
             return "Not Found";
-        case 405:
+        case kStatusMethodNotAllowed:
             return "Method Not Allowed";
-        case 413:
+        case kStatusPayloadTooLarge:
             return "Payload Too Large";
-        case 500:
+        case kStatusInternalServerError:
             return "Internal Server Error";
         default:
             return "Unknown";
@@ -128,7 +144,7 @@ constexpr std::string_view status_text(int code) noexcept
 
 std::vector<std::byte> serialize_response(const Response& resp)
 {
-    const auto*            impl = get_response_impl(resp);
+    const auto             impl = get_response_impl(resp);
     const std::string_view body = resp.body_view();
 
     // Build the response header section into a std::string buffer.
@@ -137,10 +153,11 @@ std::vector<std::byte> serialize_response(const Response& resp)
     head += std::format("HTTP/1.1 {} {}\r\n", resp.status_code(), status_text(resp.status_code()));
 
     if (impl) {
-        if (!has_header_case_insensitive(impl->headers, "Content-Length")) {
+        const auto& response_impl = impl->get();
+        if (!has_header_case_insensitive(response_impl.headers, "Content-Length")) {
             head += std::format("Content-Length: {}\r\n", body.size());
         }
-        for (const auto& [name, value] : impl->headers) {
+        for (const auto& [name, value] : response_impl.headers) {
             head += name;
             head += ": ";
             head += value;
@@ -155,9 +172,13 @@ std::vector<std::byte> serialize_response(const Response& resp)
     // Concatenate header + body into a single byte vector.
     std::vector<std::byte> bytes;
     bytes.resize(head.size() + body.size());
-    std::memcpy(bytes.data(), head.data(), head.size());
-    if (!body.empty())
-        std::memcpy(bytes.data() + head.size(), body.data(), body.size());
+    auto output = std::span<std::byte>{bytes};
+    std::ranges::copy(std::as_bytes(std::span<const char>{head.data(), head.size()}),
+                      output.begin());
+    if (!body.empty()) {
+        std::ranges::copy(std::as_bytes(std::span<const char>{body.data(), body.size()}),
+                          output.subspan(head.size()).begin());
+    }
     return bytes;
 }
 
@@ -291,21 +312,8 @@ void App::listen(std::uint16_t port)
 {
     // Install signal handlers so Ctrl-C stops the executor cleanly.
     signal_executor().store(impl_->executor.get(), std::memory_order_relaxed);
-#ifndef _WIN32
-    // POSIX: sigaction() gives us SA_RESTART semantics and a clean signal mask.
-    struct sigaction sa{};
-    sa.sa_handler = handle_signal;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    sigaction(SIGINT, &sa, nullptr);
-    sigaction(SIGTERM, &sa, nullptr);
-#else
-    // Windows: std::signal() from <csignal> is the portable equivalent.
-    // SIGTERM is defined by the MSVC CRT; SIGBREAK is Windows-specific and
-    // omitted intentionally -- SIGINT covers Ctrl+C.
     std::signal(SIGINT, handle_signal);
     std::signal(SIGTERM, handle_signal);
-#endif
 
     const std::size_t max_body       = impl_->config.max_body_size;
     const std::size_t max_header_cnt = impl_->config.max_header_count;
@@ -314,18 +322,18 @@ void App::listen(std::uint16_t port)
     auto&             global_mw      = impl_->global_middlewares;
     auto&             scoped_mw      = impl_->scoped_middlewares;
 
-    // Capture topic_bus pointer (stable pointer — App::Impl owns it).
-    aevox::net::TopicBus* topic_bus = &impl_->topic_bus;
+    // Capture App-owned services by reference; App::Impl outlives active connections.
+    aevox::net::TopicBus& topic_bus = impl_->topic_bus;
 
     // Initialise async logging subsystem from config.
     impl_->log_writer = std::make_unique<AsyncLogWriter>(impl_->config.logging);
     impl_->log_writer->install_as_global();
 
-    auto* log_writer = impl_->log_writer.get();
+    AsyncLogWriter& log_writer = *impl_->log_writer;
 
     auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw, &scoped_mw,
-                               topic_bus, log_writer](std::uint64_t /*conn_id*/,
-                                                      TcpStream stream) -> Task<void> {
+                               &topic_bus, &log_writer](std::uint64_t /*conn_id*/,
+                                                        TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
@@ -359,33 +367,33 @@ void App::listen(std::uint16_t port)
             // Set the TcpStream pointer and TopicBus on the Request::Impl so that
             // upgrade_websocket() can consume the stream.
             {
-                auto* req_impl        = get_mutable_request_impl(req);
-                req_impl->stream      = &stream;
-                req_impl->topic_bus   = topic_bus;
-                req_impl->max_payload = max_body;
+                auto req_impl = get_mutable_request_impl(req);
+                req_impl->get().set_stream(stream);
+                req_impl->get().set_topic_bus(topic_bus);
+                req_impl->get().set_max_payload(max_body);
 
                 // Set up per-request logging context.
                 // request_id: 16 lowercase hex chars from a per-thread PRNG.
                 thread_local std::mt19937_64 rng{std::random_device{}()};
-                req_impl->log_context.request_id = std::format("{:016x}", rng());
+                req_impl->get().log_context().request_id = std::format("{:016x}", rng());
 
                 // traceparent: W3C Trace Context extraction (AEV-012).
                 const auto tp_hdr = req.header("traceparent");
                 if (tp_hdr) {
                     const auto parsed_tp = aevox::detail::parse_traceparent(*tp_hdr);
                     if (parsed_tp) {
-                        req_impl->log_context.trace_id =
+                        req_impl->get().log_context().trace_id =
                             std::string{parsed_tp->trace_id.begin(), parsed_tp->trace_id.end()};
-                        req_impl->log_context.span_id =
+                        req_impl->get().log_context().span_id =
                             std::string{parsed_tp->parent_id.begin(), parsed_tp->parent_id.end()};
-                        req_impl->log_context.traceparent = std::string{*tp_hdr};
+                        req_impl->get().log_context().traceparent = std::string{*tp_hdr};
                     }
                 }
 
-                req_impl->log_context.thread_id =
+                req_impl->get().log_context().thread_id =
                     std::hash<std::thread::id>{}(std::this_thread::get_id());
-                req_impl->log_context.accept_time = std::chrono::steady_clock::now();
-                req.log                           = log_writer->make_logger(&req_impl->log_context);
+                req_impl->get().log_context().accept_time = std::chrono::steady_clock::now();
+                req.logger() = log_writer.make_logger(req_impl->get().log_context());
             }
 
             // Dispatch through the pipeline (fast path handled inside the function).
@@ -393,7 +401,7 @@ void App::listen(std::uint16_t port)
 
             // Status 101 signals a WebSocket upgrade — the connection has been handed
             // to a WebSocketSession; the stream is no longer ours. Stop the HTTP loop.
-            if (response.status_code() == 101) {
+            if (response.status_code() == kStatusSwitchingProtocols) {
                 co_return;
             }
 
@@ -471,30 +479,32 @@ void App::ws(std::string_view path_pattern, WebSocketHandler handler)
     impl_->ws_handlers[pattern_key] = std::move(handler);
 
     // Register an internal GET handler on the router that performs the upgrade.
-    // We capture the pattern key and a pointer to App::Impl so the handler can
+    // We capture the pattern key and a reference to App::Impl so the handler can
     // look up the WebSocketHandler and access the TopicBus.
     //
     // Safety: impl_ is owned by this App and outlives all connections.
-    App::Impl* app_impl = impl_.get();
+    App::Impl& app_impl = *impl_;
 
     impl_->router.get(path_pattern,
-                      [app_impl, pattern_key](aevox::Request& req) -> aevox::Task<aevox::Response> {
+                      [app_impl = std::ref(app_impl),
+                       pattern_key](aevox::Request& req) -> aevox::Task<aevox::Response> {
+                          auto& app_state = app_impl.get();
                           // Check upgrade headers.
                           if (!req.is_websocket_upgrade()) {
                               co_return aevox::Response::bad_request("WebSocket upgrade required");
                           }
 
                           // Look up the WebSocket handler by pattern.
-                          auto it = app_impl->ws_handlers.find(pattern_key);
-                          if (it == app_impl->ws_handlers.end()) {
+                          auto it = app_state.ws_handlers.find(pattern_key);
+                          if (it == app_state.ws_handlers.end()) {
                               co_return aevox::Response::bad_request("No WebSocket handler found");
                           }
 
                           // Set the handler and context on the request impl before upgrade.
-                          auto* req_impl        = aevox::get_mutable_request_impl(req);
-                          req_impl->topic_bus   = &app_impl->topic_bus;
-                          req_impl->max_payload = app_impl->config.max_body_size;
-                          req_impl->ws_handler  = it->second; // copy handler callbacks
+                          auto req_impl = aevox::get_mutable_request_impl(req);
+                          req_impl->get().set_topic_bus(app_state.topic_bus);
+                          req_impl->get().set_max_payload(app_state.config.max_body_size);
+                          req_impl->get().ws_handler() = it->second; // copy handler callbacks
 
                           // Perform the upgrade handshake.
                           auto ws_result = co_await req.upgrade_websocket();
@@ -514,9 +524,9 @@ void App::ws(std::string_view path_pattern, WebSocketHandler handler)
                           // Impl type (defined in websocket_session.hpp, included above).
                           // Unqualified call — get_websocket_impl is a friend of WebSocket,
                           // injected into namespace aevox; ADL on WebSocket& finds it there.
-                          auto* ws_impl = get_websocket_impl(ws);
-                          if (ws_impl && ws_impl->session) {
-                              auto session = ws_impl->session;
+                          auto ws_impl = get_websocket_impl(ws);
+                          if (ws_impl && ws_impl->get().session) {
+                              auto session = ws_impl->get().session;
                               session->start_read_loop(session);
                               // Park the connection coroutine until the session closes.
                               co_await session->wait_for_close();
