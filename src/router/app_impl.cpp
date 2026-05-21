@@ -359,9 +359,8 @@ void App::listen(std::uint16_t port)
 
             const bool keep_alive = parsed->keep_alive;
 
-            // Build Request — buf moved into Impl; parsed views remain valid because
-            // vector move preserves heap address. parsed->body spans into parser's
-            // internal chunk_buf, which is valid until parser.reset().
+            // Build Request. Parser-owned method/target/header views and body span
+            // remain valid until parser.reset() after the request is handled.
             auto req = make_request_from_impl(std::move(buf), std::move(*parsed));
 
             // Set the TcpStream pointer and TopicBus on the Request::Impl so that

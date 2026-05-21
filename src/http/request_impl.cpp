@@ -15,6 +15,7 @@
 #include "http/request_impl.hpp"
 
 #include <aevox/error.hpp>
+#include <aevox/log.hpp>
 #include <aevox/request.hpp>
 
 #include <algorithm>
@@ -53,6 +54,20 @@ Request::~Request()                             = default;
 // =============================================================================
 
 Request::Request(std::unique_ptr<Impl> impl) noexcept : impl_{std::move(impl)} {}
+
+// =============================================================================
+// logger()
+// =============================================================================
+
+Logger& Request::logger() noexcept
+{
+    return log_;
+}
+
+const Logger& Request::logger() const noexcept
+{
+    return log_;
+}
 
 // =============================================================================
 // valid()

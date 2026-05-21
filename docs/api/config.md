@@ -148,12 +148,15 @@ All three enumerators are non-overlapping. A `switch` with all three cases needs
 // include/aevox/config.hpp
 class ConfigErrorDetail {
 public:
+    ConfigErrorDetail(ConfigError code, std::string message, std::string key = {}) noexcept;
+
     [[nodiscard]] ConfigError      error_code() const noexcept;
     [[nodiscard]] std::string_view error_message() const noexcept;
     [[nodiscard]] std::string_view error_key() const noexcept;
 };
 ```
 
+Construct with the stable error code, a human-readable message, and an optional offending key.
 `error_code()` is the machine-readable discriminant. `error_message()` is always populated with a
 human-readable description. `error_key()` is only populated when
 `error_code() == ConfigError::InvalidValue` and names the TOML key whose value failed validation.

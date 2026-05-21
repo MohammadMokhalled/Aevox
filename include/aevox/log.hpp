@@ -31,8 +31,31 @@
 
 namespace aevox {
 
+/**
+ * @brief Default maximum size, in MiB, for a rotating file log sink.
+ *
+ * Used as `FileSinkConfig::rotate_mb` unless the application overrides it.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
 inline constexpr std::size_t kDefaultLogRotateMb{100};
+
+/**
+ * @brief Default number of rotated file log archives to retain.
+ *
+ * Used as `FileSinkConfig::keep_files` unless the application overrides it.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
 inline constexpr std::size_t kDefaultLogKeepFiles{10};
+
+/**
+ * @brief Default number of entries in the asynchronous logging ring buffer.
+ *
+ * Used as `LogConfig::ring_buffer_entries` unless the application overrides it.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
 inline constexpr std::size_t kDefaultLogRingBufferEntries{65536};
 
 // =============================================================================

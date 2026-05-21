@@ -52,17 +52,17 @@ namespace aevox {
 class Request::Impl
 {
 private:
-    /// Raw TCP read buffer — owns the memory that parsed string_views point into.
+    /// Raw TCP read buffer owned by the Request for body/transport lifetime.
     std::vector<std::byte> buffer_;
 
     /// Structured view of the parsed request. method, target, and headers are
-    /// zero-copy views into buffer. body is a span into the parser's chunk_buf
-    /// (owned by ConnectionHandler, not by this Impl).
+    /// parser-owned views valid until the connection parser is reset. body is a
+    /// span into the parser's chunk_buf (owned by ConnectionHandler, not by this Impl).
     aevox::detail::ParsedRequest parsed_;
 
     /// Cached split of parsed.target at the first '?'.
     /// path_view is the portion before '?'; query_view is the portion after.
-    /// Both are zero-copy views into buffer (since target is a view into buffer).
+    /// Both views refer to parser-owned target storage and share its lifetime.
     std::string_view path_view_;
     std::string_view query_view_;
 
@@ -317,20 +317,6 @@ namespace {
 }
 
 } // anonymous namespace
-
-// =============================================================================
-// Request::logger()
-// =============================================================================
-
-inline Logger& Request::logger() noexcept
-{
-    return log_;
-}
-
-inline const Logger& Request::logger() const noexcept
-{
-    return log_;
-}
 
 // =============================================================================
 // Request::is_websocket_upgrade()

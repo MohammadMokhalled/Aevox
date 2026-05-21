@@ -12,7 +12,7 @@ Aevox logging follows three design principles:
 
 ## Using the Request Logger
 
-Every `Request` has a `log` member. Use it inside handlers:
+Every `Request` exposes `logger()`. Use it inside handlers:
 
 ```cpp
 app.get("/users/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {

@@ -5,7 +5,7 @@
 # Triggers: pull_request targeting main (merge commit checkout)
 # Jobs:
 #   format-check      — clang-format-21 diff over include/ src/ tests/ examples/ (fails PR on violation)
-#   tidy              — clang-tidy-21 check-only via run-clang-tidy-21 -p build/debug (fails PR on any warning)
+#   tidy              — clang-tidy-21 check-only via scripts/tidy.sh (fails PR on any warning)
 #   build             — compiler matrix [gcc×2 + clang-linux×2] × [default, release], ctest
 #   asan-test         — GCC 15, CMake asan preset, ASan + UBSan, ctest
 #   asan-test-clang   — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
@@ -110,7 +110,7 @@ jobs:
           CXX: g++-15
 
       - name: Run clang-tidy-21 (check-only, no --fix)
-        run: run-clang-tidy-21 -p build/debug
+        run: bash scripts/tidy.sh
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Build — compiler matrix (4 entries), ctest
