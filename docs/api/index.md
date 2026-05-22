@@ -18,7 +18,7 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [Middleware](middleware.md) | `<aevox/middleware.hpp>` | Composable middleware pipeline — logging, auth, CORS, request/response interceptors |
 | [Static Files](static-files.md) | `<aevox/middleware/static_files.hpp>` | Middleware for serving read-only application assets from a configured directory |
 | [JSON](json.md) | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` | Automatic request/response JSON serialization via a pluggable backend |
-| [Logging](log.md) | `<aevox/log.hpp>` | Structured async logging — severity levels, per-request correlation, compile-time elision, JSON/pretty sinks |
+| [Logging](log.md) | `<aevox/log.hpp>` | Structured async logging — severity levels, request correlation, bounded queue, JSON/pretty output |
 | [WebSocket](websocket.md) | `<aevox/websocket.hpp>` / `<aevox/websocket_handler.hpp>` / `<aevox/websocket_error.hpp>` | RFC 6455 upgrade, bidirectional messaging, and in-process pub/sub |
 | [Concepts](concepts.md) | `<aevox/concepts.hpp>` | `ParamConvertible`, `Serializable`, `Deserializable` — C++23 concept constraints for parameters and JSON |
 

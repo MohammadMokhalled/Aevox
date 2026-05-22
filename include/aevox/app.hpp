@@ -126,7 +126,10 @@ struct AppConfig
 
     /**
      * @brief Logging subsystem configuration.
-     * Default: INFO level, one ConsoleSink with Pretty format and colour.
+     *
+     * Default: enabled, INFO level, JSON output to stdout, bounded queue
+     * capacity of 8192 entries. File output requires
+     * `logging.destination = LogDestination::File` and `logging.file_path`.
      */
     LogConfig logging{};
 };
@@ -342,7 +345,7 @@ public:
      * Example:
      * @code
      * app.use([](aevox::Request& req, auto next) -> aevox::Task<aevox::Response> {
-     *     req.logger().debug("Before handler");
+     *     aevox::log::debug(req, "Before handler");
      *     auto res = co_await next(req);
      *     res.header("X-Custom", "value");
      *     co_return res;

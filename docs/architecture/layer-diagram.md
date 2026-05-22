@@ -8,7 +8,7 @@ Aevox is organized as a strict set of layers. Each layer depends only on the lay
 graph TD
     AppCode["Application Code"]
     Public["Router + Middleware + Request/Response\ninclude/aevox/"]
-    HttpLog["HttpParser | JsonBackend | LogBackend\nsrc/http/, src/json/, src/log/"]
+    HttpLog["HttpParser | JsonBackend | LogWriter\nsrc/http/, src/json/, src/log/"]
     ExecIface["aevox::Executor (abstract)\nexecutor.hpp — public boundary"]
     AsioImpl["AsioExecutor\nsrc/net/ — Asio confined here"]
     OS["OS I/O\nio_uring / kqueue / IOCP"]

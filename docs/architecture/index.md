@@ -238,7 +238,7 @@ aevox/
 │   │   └── http_parser.cpp             # llhttp callbacks and feed() logic
 │   ├── router/             # Router implementation
 │   ├── json/               # JSON backend implementation (glaze)
-│   └── log/                # Logging backend implementation (spdlog)
+│   └── log/                # Built-in asynchronous logging implementation
 │
 └── tests/
     ├── unit/

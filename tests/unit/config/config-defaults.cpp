@@ -54,6 +54,11 @@ TEST_CASE("Config - absent config file applies all defaults", "[config]")
         CHECK(cfg.executor.thread_count == aevox::kDefaultIoThreadCount);
         CHECK(cfg.executor.cpu_pool_threads == aevox::kDefaultCpuPoolThreads);
         CHECK(cfg.executor.drain_timeout == aevox::kDefaultDrainTimeout);
+        CHECK(cfg.logging.enabled);
+        CHECK(cfg.logging.level == aevox::LogLevel::Info);
+        CHECK(cfg.logging.format == aevox::LogFormat::Json);
+        CHECK(cfg.logging.destination == aevox::LogDestination::Stdout);
+        CHECK(cfg.logging.queue_capacity == 8192);
     }
 
     SECTION("empty config path string - defaults apply")
@@ -87,6 +92,33 @@ drain_timeout = 5
     CHECK(cfg.host == std::string{aevox::kDefaultHost});
     CHECK(cfg.max_body_size == aevox::kDefaultMaxBodySize);
     CHECK(cfg.executor.cpu_pool_threads == aevox::kDefaultCpuPoolThreads);
+}
+
+TEST_CASE("Config - logging section overrides simplified logger fields", "[config]")
+{
+    const std::string toml_content = R"(
+[logging]
+enabled = true
+level = "warn"
+format = "pretty"
+destination = "file"
+file_path = "/tmp/aevox.log"
+queue_capacity = 128
+)";
+    const auto        path         = write_temp_toml(toml_content);
+
+    auto result = aevox::App::create({}, std::string_view{path});
+    std::remove(path.c_str());
+
+    REQUIRE(result.has_value());
+    const auto& logging = result->config().logging;
+    CHECK(logging.enabled);
+    CHECK(logging.level == aevox::LogLevel::Warn);
+    CHECK(logging.format == aevox::LogFormat::Pretty);
+    CHECK(logging.destination == aevox::LogDestination::File);
+    REQUIRE(logging.file_path.has_value());
+    CHECK(*logging.file_path == "/tmp/aevox.log");
+    CHECK(logging.queue_capacity == 128);
 }
 
 TEST_CASE("Config - missing file returns ConfigError::file_not_found", "[config]")

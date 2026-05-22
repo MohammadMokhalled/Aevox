@@ -15,7 +15,6 @@
 #include "http/request_impl.hpp"
 
 #include <aevox/error.hpp>
-#include <aevox/log.hpp>
 #include <aevox/request.hpp>
 
 #include <algorithm>
@@ -56,26 +55,20 @@ Request::~Request()                             = default;
 Request::Request(std::unique_ptr<Impl> impl) noexcept : impl_{std::move(impl)} {}
 
 // =============================================================================
-// logger()
-// =============================================================================
-
-Logger& Request::logger() noexcept
-{
-    return log_;
-}
-
-const Logger& Request::logger() const noexcept
-{
-    return log_;
-}
-
-// =============================================================================
 // valid()
 // =============================================================================
 
 bool Request::valid() const noexcept
 {
     return impl_ != nullptr;
+}
+
+std::string_view Request::id() const noexcept
+{
+    if (!impl_) {
+        return {};
+    }
+    return impl_->request_id();
 }
 
 // =============================================================================
@@ -204,10 +197,10 @@ ErrorCategory category(ParamError e) noexcept
 
 std::optional<std::string_view> Request::trace_context() const noexcept
 {
-    if (!impl_ || impl_->log_context().traceparent.empty()) {
+    if (!impl_ || impl_->traceparent().empty()) {
         return std::nullopt;
     }
-    return std::string_view{impl_->log_context().traceparent};
+    return impl_->traceparent();
 }
 
 // =============================================================================

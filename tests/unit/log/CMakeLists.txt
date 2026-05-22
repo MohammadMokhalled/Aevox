@@ -1,5 +1,5 @@
 # tests/unit/log/CMakeLists.txt
-# Unit tests for the AEV-011 logging subsystem.
+# Unit tests for the AEV-029 logging subsystem.
 # Framework: Catch2 3.
 
 function(add_log_test name)
@@ -18,13 +18,6 @@ function(add_log_test name)
     add_dependencies(aevox_tests_unit ${name})
 endfunction()
 
-add_log_test(log-level-filter)
-add_log_test(ring-buffer-basics)
-add_log_test(ring-buffer-overflow)
-add_log_test(backend-concept)
-add_log_test(spdlog-backend)
-add_log_test(request-correlation)
-add_log_test(global-vs-request-logger)
-add_log_test(log-trace-fields)
-add_log_test(request-id-generation)
-add_log_test(global-logger-no-trace)
+add_log_test(logger-format)
+add_log_test(logger-filtering)
+add_log_test(logger-request-context)

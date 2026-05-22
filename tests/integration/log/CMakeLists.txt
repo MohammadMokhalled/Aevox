@@ -1,5 +1,5 @@
 # tests/integration/log/CMakeLists.txt
-# Integration tests for the AEV-011 logging subsystem.
+# Integration tests for the AEV-029 logging subsystem.
 # Framework: Catch2 3.
 
 function(add_log_integration_test name)
@@ -18,10 +18,5 @@ function(add_log_integration_test name)
     add_dependencies(aevox_tests_integration ${name})
 endfunction()
 
-add_log_integration_test(middleware-auto-log)
-add_log_integration_test(multi-sink-output)
-add_log_integration_test(slow-request-warn)
-add_log_integration_test(exclude-paths)
-add_log_integration_test(middleware-trace-log)
-add_log_integration_test(middleware-no-trace-log)
-add_log_integration_test(trace-context-propagation)
+add_log_integration_test(logger-middleware)
+add_log_integration_test(logger-file-output)
