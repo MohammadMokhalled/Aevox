@@ -12,6 +12,7 @@
 #include <format>
 #include <fstream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "http/http_parser.hpp"
@@ -43,6 +44,32 @@ namespace {
     return std::filesystem::temp_directory_path() /
            std::format("aevox-aev029-unit-{}-{}.log", counter++,
                        std::chrono::steady_clock::now().time_since_epoch().count());
+}
+
+void require_request_log_accepted(const aevox::Request& req)
+{
+    const auto before = aevox::log::stats().accepted;
+    for (int attempt = 0; attempt < 64; ++attempt) {
+        aevox::log::info(req, "traced");
+        if (aevox::log::stats().accepted > before) {
+            return;
+        }
+        std::this_thread::yield();
+    }
+    FAIL("request log entry was not accepted");
+}
+
+void require_global_log_accepted()
+{
+    const auto before = aevox::log::stats().accepted;
+    for (int attempt = 0; attempt < 64; ++attempt) {
+        aevox::log::info("global");
+        if (aevox::log::stats().accepted > before) {
+            return;
+        }
+        std::this_thread::yield();
+    }
+    FAIL("global log entry was not accepted");
 }
 
 } // namespace
@@ -77,7 +104,7 @@ TEST_CASE("AEV-029: request context includes trace fields only when traceparent 
     impl->get().set_trace_id("4bf92f3577b34da6a3ce929d0e0e4736");
     impl->get().set_span_id("00f067aa0ba902b7");
 
-    aevox::log::info(req, "traced");
+    require_request_log_accepted(req);
     REQUIRE(aevox::log::flush().has_value());
     aevox::detail::reset_log_writer();
     writer->reset();
@@ -103,7 +130,7 @@ TEST_CASE("AEV-029: global log record omits request fields", "[log]")
     REQUIRE(writer.has_value());
     aevox::detail::install_log_writer(*writer);
 
-    aevox::log::info("global");
+    require_global_log_accepted();
     REQUIRE(aevox::log::flush().has_value());
     aevox::detail::reset_log_writer();
     writer->reset();
