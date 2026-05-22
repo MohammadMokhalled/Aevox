@@ -183,8 +183,8 @@ is safe to call concurrently.
 
 ## Implementation Notes
 
-The implementation lives in `src/log/`. Public headers expose no spdlog, fmtlib, Asio, llhttp,
-glaze, or toml++ types. The background writer owns the queue and destination; callers only enqueue
+The implementation lives in `src/log/`. Public headers expose no fmtlib, Asio, llhttp, glaze, or
+toml++ types. The background writer owns the queue and destination; callers only enqueue
 records or observe counters.
 
 !!! note

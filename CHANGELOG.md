@@ -71,7 +71,7 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - middleware-plugin example: demonstrates middleware authoring using lambda and struct styles with scoped path-prefix guards (AEV-024)
 
 ### Removed
-- `aevox::Logger`, `aevox::log::global()`, public sink config variants, `LogField`, custom log backend concepts, spdlog-backed logger internals, and `Request::logger()`; these were replaced by the smaller AEV-029 logging API
+- `aevox::Logger`, `aevox::log::global()`, public sink config variants, `LogField`, custom log backend concepts, logger backend internals, and `Request::logger()`; these were replaced by the smaller AEV-029 logging API
 - `aevox::BodyParseError` — stub enum superseded by `aevox::JsonError`; the single value `NotImplemented` is no longer needed now that `Request::json<T>()` is fully implemented
 - `aevox::SerializeError` — stub enum superseded by `aevox::JsonError`; serialization failures now surface as a 500 response with a structured JSON body
 

@@ -32,7 +32,7 @@ This boundary is enforced by the compiler: Asio headers are not on the include p
 
 ### Public API / Internal Implementation Boundary
 
-All files under `include/aevox/` may only include C++ standard library headers and other `include/aevox/` headers. Third-party types — Asio, llhttp, glaze, spdlog, fmtlib — are forbidden in `include/aevox/`.
+All files under `include/aevox/` may only include C++ standard library headers and other `include/aevox/` headers. Third-party types — Asio, llhttp, glaze, fmtlib — are forbidden in `include/aevox/`.
 
 This is enforced by CI: a header-include audit script scans every file under `include/aevox/` and fails the build if any non-standard include is found. It is also enforced by code review.
 

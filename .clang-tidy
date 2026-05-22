@@ -23,7 +23,7 @@ Checks: >
 WarningsAsErrors: "*"
 
 # Include src/ so implementation headers are also linted.
-# Third-party headers (asio, llhttp, glaze, spdlog) are excluded automatically
+# Third-party headers (asio, llhttp, glaze) are excluded automatically
 # because they live outside these paths.
 HeaderFilterRegex: "(include/aevox|src)/.*"
 

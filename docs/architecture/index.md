@@ -58,7 +58,7 @@ graph LR
 
 ### 2. No Third-Party Types in Public Headers (ADR-1)
 
-`include/aevox/` may only include C++ standard library headers. llhttp, glaze, spdlog, fmtlib, and Asio are all implementation details of `src/`.
+`include/aevox/` may only include C++ standard library headers. llhttp, glaze, fmtlib, and Asio are all implementation details of `src/`.
 
 ### 3. Errors as Values (PRD §6.4)
 
