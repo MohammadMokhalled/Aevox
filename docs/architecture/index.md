@@ -266,6 +266,7 @@ In-depth pages covering the design rationale, diagrams, and trade-offs for each 
 | [Coroutines and Task\<T\>](coroutines.md) | What a C++20 coroutine is, how `Task<T>` works, and why callbacks are banned |
 | [Error Model](error-model.md) | Why `std::expected` instead of exceptions, error type hierarchy, propagation patterns |
 | [Layer Diagram](layer-diagram.md) | The full stack with boundary annotations and enforcement rules |
+| [Performance](performance.md) | Benchmark suite workflow, measured hot paths, and baseline policy |
 
 ---
 

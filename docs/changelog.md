@@ -9,6 +9,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Nanobench performance suite workflow with HTTP keep-alive and router dispatch benchmarks,
+  benchmark-stat helper tests, CTest `bench` registration, and architecture documentation (AEV-015)
 - `examples/static-files` — runnable static asset serving example with bundled application-owned assets (AEV-014)
 - `aevox::middleware::static_files()` — secure static file serving middleware with MIME type inference and directory traversal protection (AEV-014)
 - Planned human-gated DevEx work for Claude, Codex, and Windsurf assistant support, documentation refresh, and pipeline stabilization; validation baseline is required as the first implementation step.

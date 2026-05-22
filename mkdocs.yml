@@ -46,6 +46,7 @@ nav:
       - Coroutines: architecture/coroutines.md
       - Error Model: architecture/error-model.md
       - Layer Diagram: architecture/layer-diagram.md
+      - Performance: architecture/performance.md
   - API Reference:
       - Overview: api/index.md
       - Error Categories: api/error.md
