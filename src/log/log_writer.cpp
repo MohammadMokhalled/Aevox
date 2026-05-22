@@ -35,8 +35,9 @@ std::expected<std::shared_ptr<LogWriter>, LogError> LogWriter::create(LogConfig 
         if (auto error = writer->open_destination(); error) {
             return std::unexpected(*error);
         }
-        writer->thread_ =
-            std::jthread{[writer](std::stop_token token) { writer->run(std::move(token)); }};
+        auto* const writer_ptr = writer.get();
+        writer->thread_        = std::jthread{
+            [writer_ptr](std::stop_token token) { writer_ptr->run(std::move(token)); }};
         return writer;
     }
     catch (...) {

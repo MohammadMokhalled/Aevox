@@ -46,6 +46,12 @@ namespace {
                        std::chrono::steady_clock::now().time_since_epoch().count());
 }
 
+[[nodiscard]] std::string read_file(const std::filesystem::path& path)
+{
+    std::ifstream file{path};
+    return {std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+}
+
 void require_request_log_accepted(const aevox::Request& req)
 {
     const auto before = aevox::log::stats().accepted;
@@ -109,8 +115,7 @@ TEST_CASE("AEV-029: request context includes trace fields only when traceparent 
     aevox::detail::reset_log_writer();
     writer->reset();
 
-    std::ifstream file{path};
-    std::string   content{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+    const auto content = read_file(path);
     std::filesystem::remove(path);
 
     REQUIRE(content.find("\"request_id\":\"0000000000000042\"") != std::string::npos);
@@ -135,8 +140,7 @@ TEST_CASE("AEV-029: global log record omits request fields", "[log]")
     aevox::detail::reset_log_writer();
     writer->reset();
 
-    std::ifstream file{path};
-    std::string   content{std::istreambuf_iterator<char>{file}, std::istreambuf_iterator<char>{}};
+    const auto content = read_file(path);
     std::filesystem::remove(path);
 
     REQUIRE(content.find("\"message\":\"global\"") != std::string::npos);
