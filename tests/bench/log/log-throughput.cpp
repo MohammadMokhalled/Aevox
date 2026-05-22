@@ -37,7 +37,7 @@ int main()
     config.sinks = {aevox::FileSinkConfig{.path = path.string(), .format = aevox::LogFormat::JSON}};
 
     aevox::AsyncLogWriter writer(config);
-    aevox::Logger         logger = writer.make_logger(nullptr);
+    aevox::Logger         logger = writer.make_logger();
 
     constexpr std::size_t kThreadCount = 8;
     constexpr auto        kDuration    = std::chrono::seconds(1);

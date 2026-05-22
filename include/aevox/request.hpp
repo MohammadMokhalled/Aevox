@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -185,7 +186,7 @@ public:
     /**
      * @brief Request-correlated logger.
      *
-     * Every log line emitted through `req.log` automatically carries:
+     * Every log line emitted through `req.logger()` automatically carries:
      * - `request_id` — 16-hex-char random ID assigned per connection.
      * - `thread_id` — hashed OS thread ID of the worker handling this request.
      * - `timestamp` — UTC wall-clock, nanosecond precision.
@@ -197,7 +198,17 @@ public:
      *       request lifetime.
      * @note The global logger (`aevox::log::info(...)`) omits request fields.
      */
-    Logger log;
+    [[nodiscard]] Logger& logger() noexcept;
+
+    /**
+     * @brief Request-correlated logger.
+     *
+     * @return Immutable reference to the request logger.
+     * @note Safe to use across `co_await` suspension points because the
+     *       context is owned by `Request::Impl` and lives for the full
+     *       request lifetime.
+     */
+    [[nodiscard]] const Logger& logger() const noexcept;
 
     // -------------------------------------------------------------------------
     // Request line accessors
@@ -466,8 +477,9 @@ private:
     // Application code sees only the incomplete type here and cannot name it.
     // Framework-internal code (and tests) that include request_impl.hpp obtain
     // the complete struct and may construct Request::Impl directly.
-    struct Impl;
+    class Impl;
     std::unique_ptr<Impl> impl_;
+    Logger                log_;
 
     // Only ConnectionHandler in src/http/ may construct a Request.
     explicit Request(std::unique_ptr<Impl> impl) noexcept;
@@ -494,11 +506,12 @@ private:
     friend Request make_request_from_impl(std::vector<std::byte>, detail::ParsedRequest);
 
     /// Read-only Impl access for internal inspection (tests, Router).
-    friend const Impl* get_request_impl(const Request&) noexcept;
+    friend std::optional<std::reference_wrapper<const Impl>> get_request_impl(
+        const Request&) noexcept;
 
     /// Mutable Impl access for internal param injection (tests, Router).
     /// The Router uses req.impl_->params = ... directly via friend class Router.
-    friend Impl* get_mutable_request_impl(Request&) noexcept;
+    friend std::optional<std::reference_wrapper<Impl>> get_mutable_request_impl(Request&) noexcept;
 };
 
 } // namespace aevox

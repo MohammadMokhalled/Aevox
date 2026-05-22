@@ -1,5 +1,7 @@
 #include <aevox/error.hpp>
 
+#include <string_view>
+
 namespace aevox {
 
 std::string_view to_string(ErrorCategory category) noexcept

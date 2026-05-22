@@ -10,6 +10,9 @@
 #include <aevox/response.hpp>
 #include <aevox/task.hpp>
 
+#include <functional>
+#include <utility>
+
 namespace aevox {
 
 Task<Response> Middleware::operator()(Request&                                          req,

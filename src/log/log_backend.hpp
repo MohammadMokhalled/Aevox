@@ -5,6 +5,8 @@
 //
 // Design: Tasks/architecture/AEV-011-arch.md §4.4
 
+#include <aevox/log.hpp>
+
 #include <concepts>
 #include <memory>
 

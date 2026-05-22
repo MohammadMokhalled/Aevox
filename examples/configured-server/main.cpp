@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
     if (!result) {
         const auto& err = result.error();
         std::cerr << std::format("[configured-server] config error ({}): {}\n",
-                                 aevox::to_string(err.code), err.message);
+                                 aevox::to_string(err.error_code()), err.error_message());
         return 1;
     }
 

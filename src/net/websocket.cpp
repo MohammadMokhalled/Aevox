@@ -6,8 +6,19 @@
 //
 // Design: Tasks/architecture/AEV-010-arch.md §3.2, §4.4
 
+#include <aevox/error.hpp>
+#include <aevox/task.hpp>
 #include <aevox/websocket.hpp>
+#include <aevox/websocket_error.hpp>
 
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string_view>
 #include <utility>
 
 #include "net/websocket_session.hpp" // provides complete WebSocket::Impl
@@ -136,9 +147,12 @@ WebSocket make_websocket_handle(std::unique_ptr<WebSocket::Impl> impl) noexcept
 // the connection coroutine via session->wait_for_close().
 // =============================================================================
 
-WebSocket::Impl* get_websocket_impl(WebSocket& ws) noexcept
+std::optional<std::reference_wrapper<WebSocket::Impl>> get_websocket_impl(WebSocket& ws) noexcept
 {
-    return ws.impl_.get();
+    if (!ws.impl_) {
+        return std::nullopt;
+    }
+    return std::ref(*ws.impl_);
 }
 
 // =============================================================================

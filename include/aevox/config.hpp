@@ -150,11 +150,18 @@ enum class ConfigError : std::uint8_t
  * @note Thread-safety: value type — safe to copy or move across threads.
  * @note Move semantics: moved-from `ConfigErrorDetail` has empty `message` and `key`.
  */
-struct ConfigErrorDetail
+class ConfigErrorDetail
 {
-    ConfigError code{ConfigError::FileNotFound}; ///< Discriminant error code.
-    std::string message;                         ///< Human-readable description.
-    std::string key; ///< Offending TOML key (populated for invalid_value only).
+public:
+    /**
+     * @brief Constructs a detailed configuration error.
+     *
+     * @param code     Stable discriminant error code.
+     * @param message  Human-readable description.
+     * @param key      Offending TOML key, or empty when no single key caused the failure.
+     * @note Thread-safety: value construction has no shared state.
+     */
+    ConfigErrorDetail(ConfigError code, std::string message, std::string key = {}) noexcept;
 
     /**
      * @brief Returns the stable configuration error code.
@@ -180,6 +187,11 @@ struct ConfigErrorDetail
      * @note Thread-safety: safe to call concurrently on immutable instances.
      */
     [[nodiscard]] std::string_view error_key() const noexcept;
+
+private:
+    ConfigError code_{ConfigError::FileNotFound};
+    std::string message_;
+    std::string key_;
 };
 
 /**

@@ -7,8 +7,11 @@
 // contract (moved-from JsonError returns an empty view) that the analyser's
 // cplusplus.Move check would otherwise flag as a false positive.
 
+#include <aevox/error.hpp>
 #include <aevox/json_error.hpp>
 
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace aevox {

@@ -8,5 +8,3 @@
 // into the library and to avoid ODR issues in older toolchains.
 //
 // Design: Tasks/architecture/AEV-006-arch.md §4.1
-
-#include <aevox/async.hpp>

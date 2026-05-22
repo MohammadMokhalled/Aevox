@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 
 #include "http/request_impl.hpp"
@@ -36,7 +37,7 @@ TEST_CASE("global vs request logger - global omits request_id", "[log]")
         aevox::AsyncLogWriter writer(config);
 
         // Global log — no context.
-        writer.push(aevox::LogLevel::Info, "global msg", nullptr);
+        writer.push(aevox::LogLevel::Info, "global msg");
 
         // Request log — with context.
         aevox::RequestContext ctx;
@@ -44,7 +45,7 @@ TEST_CASE("global vs request logger - global omits request_id", "[log]")
         ctx.trace_id   = "4bf92f3577b34da6a3ce929d0e0e4736";
         ctx.span_id    = "00f067aa0ba902b7";
         ctx.thread_id  = 99;
-        writer.push(aevox::LogLevel::Info, "request msg", &ctx);
+        writer.push(aevox::LogLevel::Info, "request msg", std::cref(ctx));
     } // destructor joins drain thread and flushes all entries
 
     std::ifstream file(path);

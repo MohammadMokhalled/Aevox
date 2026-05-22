@@ -18,9 +18,9 @@ Key features:
 ```cpp
 #include <aevox/log.hpp>
 
-// Inside a handler — req.log is already set up by the framework
+// Inside a handler — req.logger() is already set up by the framework
 app.get("/orders/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.log.info("Processing order {}", req.param<int>("id").value());
+    req.logger().info("Processing order {}", req.param<int>("id").value());
     // ...
     co_return aevox::Response::ok(result);
 });
@@ -101,8 +101,8 @@ Configuration for a `stdout` sink.
 struct FileSinkConfig
 {
     std::string path;
-    std::size_t rotate_mb{10};
-    std::size_t keep_files{3};
+    std::size_t rotate_mb{100};
+    std::size_t keep_files{10};
     LogFormat   format{LogFormat::JSON};
 };
 ```
@@ -150,7 +150,7 @@ public:
 };
 ```
 
-Lightweight handle to the async logging system. Each `Request` carries a `Logger log` member that is pre-configured with the request's correlation context.
+Lightweight handle to the async logging system. Each `Request` exposes `logger()`, which returns a `Logger` pre-configured with the request's correlation context.
 
 All methods are `noexcept` and return immediately. If the ring buffer is full, the entry is silently dropped.
 

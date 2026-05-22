@@ -34,11 +34,12 @@ TEST_CASE("spdlog backend writes correct JSON fields", "[log]")
         aevox::SpdlogBackend backend(config);
 
         aevox::LogEntry entry;
-        entry.level = aevox::LogLevel::Info;
+        entry.set_level(aevox::LogLevel::Info);
         entry.set_message("hello world");
-        entry.request_id = "req-42";
-        entry.thread_id  = 7;
-        entry.timestamp  = std::chrono::system_clock::time_point{std::chrono::milliseconds{1'234}};
+        entry.set_request_id("req-42");
+        entry.set_thread_id(7);
+        entry.set_timestamp(
+            std::chrono::system_clock::time_point{std::chrono::milliseconds{1'234}});
 
         backend.write(entry);
         backend.flush();

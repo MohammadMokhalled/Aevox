@@ -13,7 +13,7 @@
 
 namespace aevox {
 
-struct LogEntry;
+class LogEntry;
 
 /**
  * @brief spdlog-backed implementation of the LogBackend concept.
@@ -37,7 +37,7 @@ public:
     void flush();
 
 private:
-    struct Impl;
+    class Impl;
     std::unique_ptr<Impl> impl_;
 };
 

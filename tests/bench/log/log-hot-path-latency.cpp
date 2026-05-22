@@ -1,7 +1,7 @@
 // log-hot-path-latency.cpp: measure latency of a single log.info() call
 // ADD ref: Tasks/architecture/AEV-011-arch.md § Test Architecture
 //
-// Target: median <= 100 ns per req.log.info(...) call (ring buffer push only).
+// Target: median <= 100 ns per req.logger().info(...) call (ring buffer push only).
 
 #include <aevox/log.hpp>
 
@@ -32,7 +32,7 @@ int main()
     config.sinks = {aevox::FileSinkConfig{.path = path.string(), .format = aevox::LogFormat::JSON}};
 
     aevox::AsyncLogWriter writer(config);
-    aevox::Logger         logger = writer.make_logger(nullptr);
+    aevox::Logger         logger = writer.make_logger();
 
     ankerl::nanobench::Bench bench;
     bench.title("log hot path latency").unit("ns").relative(true);

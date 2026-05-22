@@ -6,11 +6,24 @@
 
 #include "async_writer.hpp"
 
+#include <aevox/log.hpp>
+
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <iostream>
+#include <memory>
+#include <optional>
+#include <stop_token>
+#include <string_view>
 #include <thread>
+#include <utility>
 
 #include "log_backend.hpp"
 #include "request_context.hpp"
+#include "ring_buffer.hpp"
 #include "spdlog_backend.hpp"
 
 namespace aevox {
@@ -78,22 +91,23 @@ AsyncLogWriter& AsyncLogWriter::operator=(AsyncLogWriter&& other) noexcept
 }
 
 void AsyncLogWriter::push(LogLevel level, std::string_view message,
-                          const RequestContext* ctx) noexcept
+                          std::optional<std::reference_wrapper<const RequestContext>> ctx) noexcept
 {
     try {
         if (static_cast<std::uint8_t>(level) < static_cast<std::uint8_t>(config_.level))
             return;
 
         LogEntry entry;
-        entry.level = level;
+        entry.set_level(level);
         entry.set_message(message);
         if (ctx) {
-            entry.request_id = ctx->request_id;
-            entry.trace_id   = ctx->trace_id;
-            entry.span_id    = ctx->span_id;
-            entry.thread_id  = ctx->thread_id;
+            const RequestContext& context = ctx->get();
+            entry.set_request_id(context.request_id);
+            entry.set_trace_id(context.trace_id);
+            entry.set_span_id(context.span_id);
+            entry.set_thread_id(context.thread_id);
         }
-        entry.timestamp = std::chrono::system_clock::now();
+        entry.set_timestamp(std::chrono::system_clock::now());
 
         (void)queue_->try_push(entry);
     }
@@ -115,12 +129,13 @@ void AsyncLogWriter::flush() noexcept
 
 void AsyncLogWriter::install_as_global() noexcept
 {
-    aevox::log::global().set_writer(this);
+    aevox::log::global().set_writer(*this);
 }
 
-Logger AsyncLogWriter::make_logger(RequestContext* ctx) noexcept
+Logger AsyncLogWriter::make_logger(
+    std::optional<std::reference_wrapper<RequestContext>> ctx) noexcept
 {
-    return Logger(this, ctx);
+    return Logger(*this, ctx);
 }
 
 void AsyncLogWriter::drain_loop()

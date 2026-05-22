@@ -45,7 +45,7 @@ TEST_CASE("TopicBus - subscribe and publish on same topic", "[websocket]")
     bus.subscribe("room1", sub2);
 
     // Publish from a null sender (no self-suppression).
-    const std::size_t delivered = bus.publish("room1", "hello", nullptr);
+    const std::size_t delivered = bus.publish("room1", "hello");
 
     REQUIRE(delivered == 2);
     REQUIRE(sub1->delivery_count.load() == 1);
@@ -59,7 +59,7 @@ TEST_CASE("TopicBus - publish to empty topic delivers nothing", "[websocket]")
     aevox::net::TopicBus bus;
 
     // No subscribers registered — publish should return 0 and not crash.
-    const std::size_t delivered = bus.publish("nonexistent-topic", "msg", nullptr);
+    const std::size_t delivered = bus.publish("nonexistent-topic", "msg");
     REQUIRE(delivered == 0);
 }
 
@@ -99,8 +99,7 @@ TEST_CASE("TopicBus - concurrent subscribe and publish is race-free", "[websocke
             else {
                 // Publishing threads: publish to "shared-topic" kIterations times.
                 for (int iter = 0; iter < kIterations; ++iter) {
-                    total_publishes.fetch_add(static_cast<int>(
-                                                  bus.publish("shared-topic", "ping", nullptr)),
+                    total_publishes.fetch_add(static_cast<int>(bus.publish("shared-topic", "ping")),
                                               std::memory_order_relaxed);
                 }
             }

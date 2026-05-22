@@ -196,7 +196,7 @@ public:
      *          - `ConfigErrorDetail` with `ConfigError::parse_error` if the file
      *            contains invalid TOML.
      *          - `ConfigErrorDetail` with `ConfigError::invalid_value` and the
-     *            offending key in `ConfigErrorDetail::key` if a field fails a range
+     *            offending key in `ConfigErrorDetail::error_key()` if a field fails a range
      *            check.
      *
      * @note `[[nodiscard]]` — discarding the expected silently swallows config errors.
@@ -342,7 +342,7 @@ public:
      * Example:
      * @code
      * app.use([](aevox::Request& req, auto next) -> aevox::Task<aevox::Response> {
-     *     req.log.debug("Before handler");
+     *     req.logger().debug("Before handler");
      *     auto res = co_await next(req);
      *     res.header("X-Custom", "value");
      *     co_return res;

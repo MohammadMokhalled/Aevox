@@ -12,11 +12,26 @@
 
 #include "toml_loader.hpp"
 
+#include <aevox/app.hpp>
+#include <aevox/config.hpp>
+#include <aevox/log.hpp>
+
 #include <array>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <iostream>
-#include <toml++/toml.hpp>
+#include <limits>
+#include <span>
+#include <string>
+#include <string_view>
+#include <toml++/impl/parse_error.hpp>
+#include <toml++/impl/parser.hpp>
+#include <toml++/impl/table.hpp>
+#include <toml++/toml.hpp> // IWYU pragma: keep
 
 namespace aevox::config {
 
@@ -27,6 +42,21 @@ constexpr std::array<std::string_view, 9> kKnownTopLevelKeys{
     "port",           "host",     "backlog", "max_body_size", "request_timeout", "max_header_count",
     "max_read_bytes", "executor", "logging",
 };
+
+constexpr int64_t kMinPositiveValue{1};
+constexpr int64_t kMaxPortValue{std::numeric_limits<std::uint16_t>::max()};
+constexpr int64_t kMaxBodyBytes{2LL * 1024LL * 1024LL * 1024LL};
+constexpr int64_t kMaxRequestTimeoutSeconds{3600};
+constexpr int64_t kMaxHeaderCount{1000};
+constexpr int64_t kMinReadBytes{512};
+constexpr int64_t kMaxReadBytes{16LL * 1024LL * 1024LL};
+constexpr int64_t kMaxExecutorThreadCount{1024};
+constexpr int64_t kMaxExecutorCpuPoolThreads{256};
+constexpr int64_t kMaxDrainTimeoutSeconds{3600};
+constexpr int64_t kMinRingBufferEntries{64};
+constexpr int64_t kMaxRingBufferEntries{1024LL * 1024LL};
+constexpr int64_t kMaxLogRotateMb{4096};
+constexpr int64_t kMaxLogKeepFiles{100};
 
 // Known executor-section key names.
 constexpr std::array<std::string_view, 3> kKnownExecutorKeys{
@@ -53,11 +83,9 @@ bool is_known_key(std::string_view key, std::span<const std::string_view> known)
 
 ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
 {
-    return ConfigErrorDetail{
-        .code    = ConfigError::InvalidValue,
-        .message = std::format("invalid value for '{}': {}", key, reason),
-        .key     = std::string{key},
-    };
+    return ConfigErrorDetail{ConfigError::InvalidValue,
+                             std::format("invalid value for '{}': {}", key, reason),
+                             std::string{key}};
 }
 
 } // namespace
@@ -68,11 +96,8 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     // Check existence before parsing — toml++ throws parse_error for missing files,
     // which would be indistinguishable from a TOML syntax error without this check.
     if (!std::filesystem::exists(std::filesystem::path{path})) {
-        return std::unexpected(ConfigErrorDetail{
-            .code    = ConfigError::FileNotFound,
-            .message = std::format("config file not found: '{}'", path),
-            .key     = {},
-        });
+        return std::unexpected(ConfigErrorDetail{ConfigError::FileNotFound,
+                                                 std::format("config file not found: '{}'", path)});
     }
 
     toml::table tbl;
@@ -80,18 +105,14 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
         tbl = toml::parse_file(path);
     }
     catch (const toml::parse_error& e) {
-        return std::unexpected(ConfigErrorDetail{
-            .code    = ConfigError::ParseError,
-            .message = std::format("TOML parse error in '{}': {}", path, e.description()),
-            .key     = {},
-        });
+        return std::unexpected(
+            ConfigErrorDetail{ConfigError::ParseError,
+                              std::format("TOML parse error in '{}': {}", path, e.description())});
     }
     catch (...) {
-        return std::unexpected(ConfigErrorDetail{
-            .code    = ConfigError::ParseError,
-            .message = std::format("could not read config file '{}'", path),
-            .key     = {},
-        });
+        return std::unexpected(
+            ConfigErrorDetail{ConfigError::ParseError,
+                              std::format("could not read config file '{}'", path)});
     }
 
     // Warn about unrecognised top-level keys.
@@ -106,7 +127,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     // ── port ──────────────────────────────────────────────────────────────────
     if (const auto* v = tbl.get("port")) {
         const auto raw = v->value<int64_t>();
-        if (!raw || *raw < 1 || *raw > 65535)
+        if (!raw || *raw < kMinPositiveValue || *raw > kMaxPortValue)
             return std::unexpected(make_invalid("port", "must be an integer in 1..65535"));
         base.port = static_cast<std::uint16_t>(*raw);
     }
@@ -122,16 +143,15 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     // ── backlog ───────────────────────────────────────────────────────────────
     if (const auto* v = tbl.get("backlog")) {
         const auto raw = v->value<int64_t>();
-        if (!raw || *raw < 1 || *raw > 65535)
+        if (!raw || *raw < kMinPositiveValue || *raw > kMaxPortValue)
             return std::unexpected(make_invalid("backlog", "must be an integer in 1..65535"));
         base.backlog = static_cast<int>(*raw);
     }
 
     // ── max_body_size ─────────────────────────────────────────────────────────
     if (const auto* v = tbl.get("max_body_size")) {
-        const auto        raw         = v->value<int64_t>();
-        constexpr int64_t kMaxAllowed = 2LL * 1024LL * 1024LL * 1024LL; // 2 GiB
-        if (!raw || *raw < 1 || *raw > kMaxAllowed)
+        const auto raw = v->value<int64_t>();
+        if (!raw || *raw < kMinPositiveValue || *raw > kMaxBodyBytes)
             return std::unexpected(
                 make_invalid("max_body_size", "must be an integer in 1..2147483648"));
         base.max_body_size = static_cast<std::size_t>(*raw);
@@ -140,7 +160,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     // ── request_timeout ───────────────────────────────────────────────────────
     if (const auto* v = tbl.get("request_timeout")) {
         const auto raw = v->value<int64_t>();
-        if (!raw || *raw < 1 || *raw > 3600)
+        if (!raw || *raw < kMinPositiveValue || *raw > kMaxRequestTimeoutSeconds)
             return std::unexpected(
                 make_invalid("request_timeout", "must be an integer in 1..3600 (seconds)"));
         base.request_timeout = std::chrono::seconds{*raw};
@@ -149,7 +169,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     // ── max_header_count ──────────────────────────────────────────────────────
     if (const auto* v = tbl.get("max_header_count")) {
         const auto raw = v->value<int64_t>();
-        if (!raw || *raw < 1 || *raw > 1000)
+        if (!raw || *raw < kMinPositiveValue || *raw > kMaxHeaderCount)
             return std::unexpected(
                 make_invalid("max_header_count", "must be an integer in 1..1000"));
         base.max_header_count = static_cast<std::size_t>(*raw);
@@ -157,9 +177,8 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
 
     // ── max_read_bytes ────────────────────────────────────────────────────────
     if (const auto* v = tbl.get("max_read_bytes")) {
-        const auto        raw      = v->value<int64_t>();
-        constexpr int64_t kMaxRead = 16LL * 1024LL * 1024LL; // 16 MiB
-        if (!raw || *raw < 512 || *raw > kMaxRead)
+        const auto raw = v->value<int64_t>();
+        if (!raw || *raw < kMinReadBytes || *raw > kMaxReadBytes)
             return std::unexpected(
                 make_invalid("max_read_bytes", "must be an integer in 512..16777216"));
         base.max_read_bytes = static_cast<std::size_t>(*raw);
@@ -169,11 +188,9 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     if (const auto* ex_node = tbl.get("executor")) {
         const auto* ex = ex_node->as_table();
         if (!ex)
-            return std::unexpected(ConfigErrorDetail{
-                .code    = ConfigError::InvalidValue,
-                .message = "'executor' must be a TOML table section",
-                .key     = "executor",
-            });
+            return std::unexpected(ConfigErrorDetail{ConfigError::InvalidValue,
+                                                     "'executor' must be a TOML table section",
+                                                     "executor"});
 
         // Warn about unrecognised executor keys.
         for (const auto& [key, val] : *ex) {
@@ -188,7 +205,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
         // executor.thread_count
         if (const auto* v = ex->get("thread_count")) {
             const auto raw = v->value<int64_t>();
-            if (!raw || *raw < 0 || *raw > 1024)
+            if (!raw || *raw < 0 || *raw > kMaxExecutorThreadCount)
                 return std::unexpected(
                     make_invalid("executor.thread_count", "must be an integer in 0..1024"));
             base.executor.thread_count = static_cast<std::size_t>(*raw);
@@ -197,7 +214,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
         // executor.cpu_pool_threads
         if (const auto* v = ex->get("cpu_pool_threads")) {
             const auto raw = v->value<int64_t>();
-            if (!raw || *raw < 0 || *raw > 256)
+            if (!raw || *raw < 0 || *raw > kMaxExecutorCpuPoolThreads)
                 return std::unexpected(
                     make_invalid("executor.cpu_pool_threads", "must be an integer in 0..256"));
             base.executor.cpu_pool_threads = static_cast<std::size_t>(*raw);
@@ -206,7 +223,7 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
         // executor.drain_timeout
         if (const auto* v = ex->get("drain_timeout")) {
             const auto raw = v->value<int64_t>();
-            if (!raw || *raw < 1 || *raw > 3600)
+            if (!raw || *raw < kMinPositiveValue || *raw > kMaxDrainTimeoutSeconds)
                 return std::unexpected(make_invalid("executor.drain_timeout",
                                                     "must be an integer in 1..3600 (seconds)"));
             base.executor.drain_timeout = std::chrono::seconds{*raw};
@@ -217,11 +234,9 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
     if (const auto* log_node = tbl.get("logging")) {
         const auto* log_tbl = log_node->as_table();
         if (!log_tbl)
-            return std::unexpected(ConfigErrorDetail{
-                .code    = ConfigError::InvalidValue,
-                .message = "'logging' must be a TOML table section",
-                .key     = "logging",
-            });
+            return std::unexpected(ConfigErrorDetail{ConfigError::InvalidValue,
+                                                     "'logging' must be a TOML table section",
+                                                     "logging"});
 
         // Warn about unrecognised logging keys.
         for (const auto& [key, val] : *log_tbl) {
@@ -259,9 +274,8 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
 
         // logging.ring_buffer_entries
         if (const auto* v = log_tbl->get("ring_buffer_entries")) {
-            const auto        raw      = v->value<int64_t>();
-            constexpr int64_t kMaxRing = 1024LL * 1024LL; // 1M entries
-            if (!raw || *raw < 64 || *raw > kMaxRing)
+            const auto raw = v->value<int64_t>();
+            if (!raw || *raw < kMinRingBufferEntries || *raw > kMaxRingBufferEntries)
                 return std::unexpected(make_invalid("logging.ring_buffer_entries",
                                                     "must be an integer in 64..1048576"));
             base.logging.ring_buffer_entries = static_cast<std::size_t>(*raw);
@@ -309,12 +323,12 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
                     }
                     if (const auto* r = sink_tbl->get("rotate_mb")) {
                         const auto raw = r->value<int64_t>();
-                        if (raw && *raw >= 1 && *raw <= 4096)
+                        if (raw && *raw >= kMinPositiveValue && *raw <= kMaxLogRotateMb)
                             cfg.rotate_mb = static_cast<std::size_t>(*raw);
                     }
                     if (const auto* k = sink_tbl->get("keep_files")) {
                         const auto raw = k->value<int64_t>();
-                        if (raw && *raw >= 1 && *raw <= 100)
+                        if (raw && *raw >= kMinPositiveValue && *raw <= kMaxLogKeepFiles)
                             cfg.keep_files = static_cast<std::size_t>(*raw);
                     }
                     if (const auto* fmt = sink_tbl->get("format")) {

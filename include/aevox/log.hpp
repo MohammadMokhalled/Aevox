@@ -5,7 +5,7 @@
 //
 // Provides level-based logging (trace, debug, info, warn, error, fatal),
 // structured output (JSON / pretty), multi-sink configuration, and
-// request-correlated logging via aevox::Request::log.
+// request-correlated logging via aevox::Request::logger().
 //
 // Thread-safety: All Logger methods are thread-safe. The underlying async
 // writer uses a lock-free ring buffer; formatting and sink I/O happen on a
@@ -21,13 +21,42 @@
 #include <chrono>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
 
 namespace aevox {
+
+/**
+ * @brief Default maximum size, in MiB, for a rotating file log sink.
+ *
+ * Used as `FileSinkConfig::rotate_mb` unless the application overrides it.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
+inline constexpr std::size_t kDefaultLogRotateMb{100};
+
+/**
+ * @brief Default number of rotated file log archives to retain.
+ *
+ * Used as `FileSinkConfig::keep_files` unless the application overrides it.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
+inline constexpr std::size_t kDefaultLogKeepFiles{10};
+
+/**
+ * @brief Default number of entries in the asynchronous logging ring buffer.
+ *
+ * Used as `LogConfig::ring_buffer_entries` unless the application overrides it.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
+inline constexpr std::size_t kDefaultLogRingBufferEntries{65536};
 
 // =============================================================================
 // Severity levels
@@ -109,9 +138,9 @@ struct ConsoleSinkConfig
  */
 struct FileSinkConfig
 {
-    std::string path;           ///< Absolute or relative file path.
-    std::size_t rotate_mb{100}; ///< Maximum file size before rotation.
-    std::size_t keep_files{10}; ///< Number of rotated files to retain.
+    std::string path;                             ///< Absolute or relative file path.
+    std::size_t rotate_mb{kDefaultLogRotateMb};   ///< Maximum file size before rotation.
+    std::size_t keep_files{kDefaultLogKeepFiles}; ///< Number of rotated files to retain.
     LogFormat   format{LogFormat::JSON};
 };
 
@@ -128,7 +157,8 @@ struct LogConfig
 {
     LogLevel                                                     level{LogLevel::Info};
     std::vector<std::variant<ConsoleSinkConfig, FileSinkConfig>> sinks{ConsoleSinkConfig{}};
-    std::size_t ring_buffer_entries{65536}; ///< Per-queue capacity. Power of 2 recommended.
+    std::size_t                                                  ring_buffer_entries{
+        kDefaultLogRingBufferEntries}; ///< Per-queue capacity. Power of 2 recommended.
 };
 
 // =============================================================================
@@ -151,7 +181,7 @@ struct RequestContext;
  * by writing a fallback message, never throwing.
  *
  * @note The global logger (accessed via `aevox::log::info(...)`) has no
- *       request context. The per-request logger (`req.log.info(...)`) carries
+ *       request context. The per-request logger (`req.logger().info(...)`) carries
  *       `request_id`, `thread_id`, and `timestamp` automatically.
  * @note Thread-safe: multiple threads may call `Logger` methods concurrently.
  *       The underlying `AsyncLogWriter` uses a lock-free queue.
@@ -259,12 +289,14 @@ public:
 private:
     friend class AsyncLogWriter;
 
-    class AsyncLogWriter*  writer_{nullptr};
-    struct RequestContext* context_{nullptr};
+    std::optional<std::reference_wrapper<AsyncLogWriter>> writer_;
+    std::optional<std::reference_wrapper<RequestContext>> context_;
 
-    explicit Logger(AsyncLogWriter* writer, RequestContext* ctx = nullptr) noexcept;
+    explicit Logger(
+        AsyncLogWriter&                                       writer,
+        std::optional<std::reference_wrapper<RequestContext>> ctx = std::nullopt) noexcept;
 
-    void set_writer(AsyncLogWriter* writer) noexcept;
+    void set_writer(AsyncLogWriter& writer) noexcept;
 };
 
 // =============================================================================

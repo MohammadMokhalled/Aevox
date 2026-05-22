@@ -24,6 +24,7 @@
 #include <aevox/concepts.hpp>
 #include <aevox/json_error.hpp>
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -308,7 +309,8 @@ private:
 
     // Internal read-only Impl access for serialization (app_impl.cpp).
     // Declared here, defined inline in src/http/response_impl.hpp.
-    friend const Impl* get_response_impl(const Response&) noexcept;
+    friend std::optional<std::reference_wrapper<const Impl>> get_response_impl(
+        const Response&) noexcept;
 };
 
 } // namespace aevox

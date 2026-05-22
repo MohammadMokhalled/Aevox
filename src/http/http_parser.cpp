@@ -6,19 +6,11 @@
 // unit. They never appear in http_parser.hpp.
 //
 // Buffer lifetime invariants:
-//   method, target, and header string_views point into the buffer passed to
-//   feed(). The caller owns that buffer. llhttp_execute() is synchronous — all
-//   callbacks fire and return before feed() returns, so the pointers are valid
-//   for the duration of feed().
-//   body is a span into chunk_buf (owned by Impl). All body bytes — whether
-//   Content-Length or chunked — are copied into chunk_buf by on_body(). This
+//   method, target, and header string_views point into parser_-owned strings.
+//   They remain valid until the next feed() or reset() call.
+//   body is a span into chunk_buf_ (owned by Impl). All body bytes — whether
+//   Content-Length or chunked — are copied into chunk_buf_ by on_body(). This
 //   gives body a uniform lifetime: valid until the next feed() or reset().
-//
-// reinterpret_cast note:
-//   llhttp callbacks use const char* for pointer+length pairs. Casting from
-//   const char* to const std::byte* (and vice versa) is well-defined per
-//   C++23 [basic.types.general]: std::byte aliases any object type.
-//   Each cast carries this comment.
 //
 // Design: Tasks/architecture/AEV-003-arch.md §4.2
 
@@ -26,9 +18,15 @@
 
 #include <llhttp.h>
 
-#include <algorithm>
 #include <cassert>
-#include <cstring>
+#include <cstddef>
+#include <expected>
+#include <memory>
+#include <span>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 namespace aevox::detail {
 
@@ -42,66 +40,89 @@ constexpr std::size_t kHeadersReserveSize{16};
 // HttpParser::Impl
 // =============================================================================
 
-struct HttpParser::Impl
+class HttpParser::Impl
 {
-    llhttp_t          parser{};
-    llhttp_settings_t settings{};
-    ParserConfig      config;
+public:
+    Impl()  = default;
+    ~Impl() = default;
+
+    Impl(const Impl&)            = delete;
+    Impl& operator=(const Impl&) = delete;
+    Impl(Impl&&)                 = delete;
+    Impl& operator=(Impl&&)      = delete;
+
+private:
+    friend class HttpParser;
+
+    llhttp_t          parser_{};
+    llhttp_settings_t settings_{};
+    ParserConfig      config_;
 
     // Current feed() buffer — set in feed(), cleared after return.
-    // Callbacks use this pointer to compute string_view offsets.
-    const char* feed_ptr{nullptr};
-    std::size_t feed_len{0};
+    std::string feed_text_{};
 
     // Accumulation state filled by llhttp callbacks:
-    const char* field_ptr{nullptr}; // current header field name start
-    std::size_t field_len{0};
-    const char* value_ptr{nullptr}; // current header value start
-    std::size_t value_len{0};
-    bool        in_value{false}; // true after first on_header_value for this pair
+    std::string method_buf_{};
+    std::string target_buf_{};
+    std::string field_buf_{};
+    std::string value_buf_{};
+    bool        in_value_{false}; // true after first on_header_value for this pair
 
-    ParsedRequest          pending{};
-    std::vector<std::byte> chunk_buf{}; // assembled chunked body
+    ParsedRequest                                    pending_{};
+    std::vector<std::byte>                           chunk_buf_{}; // assembled chunked body
+    std::vector<std::pair<std::string, std::string>> header_storage_{};
 
-    std::size_t header_count{0};
-    std::size_t body_byte_count{0};
+    std::size_t header_count_{0};
+    std::size_t body_byte_count_{0};
 
-    bool       complete{false};
-    ParseError last_error{ParseError::BadRequest};
-    bool       has_error{false};
+    bool       complete_{false};
+    ParseError last_error_{ParseError::BadRequest};
+    bool       has_error_{false};
 
     // -------------------------------------------------------------------------
     // llhttp callbacks — must return 0 (HPE_OK) or an error code.
     // -------------------------------------------------------------------------
 
+    [[nodiscard]] bool commit_header()
+    {
+        if (field_buf_.empty()) {
+            return true;
+        }
+
+        header_storage_.emplace_back(std::move(field_buf_), std::move(value_buf_));
+        field_buf_.clear();
+        value_buf_.clear();
+        header_count_++;
+        if (header_count_ > config_.max_header_count) {
+            has_error_  = true;
+            last_error_ = ParseError::TooManyHeaders;
+            return false;
+        }
+        return true;
+    }
+
+    void refresh_header_views()
+    {
+        pending_.headers.clear();
+        pending_.headers.reserve(header_storage_.size());
+        for (const auto& [name, value] : header_storage_) {
+            pending_.headers.emplace_back(std::string_view{name}, std::string_view{value});
+        }
+    }
+
     static int on_url(llhttp_t* p, const char* at, std::size_t length)
     {
         auto& s = *static_cast<Impl*>(p->data);
-        // Extend target string_view to cover this segment.
-        if (s.pending.target.empty()) {
-            // reinterpret_cast: const char* → const std::byte* per C++23 [basic.types.general]
-            s.pending.target = std::string_view{at, length};
-        }
-        else {
-            // Extend by re-forming the view (llhttp may call on_url multiple times for long URLs).
-            const char* start = s.pending.target.data();
-            auto const  total = static_cast<std::size_t>((at + length) - start);
-            s.pending.target  = std::string_view{start, total};
-        }
+        s.target_buf_.append(at, length);
+        s.pending_.target = std::string_view{s.target_buf_};
         return HPE_OK;
     }
 
     static int on_method(llhttp_t* p, const char* at, std::size_t length)
     {
         auto& s = *static_cast<Impl*>(p->data);
-        if (s.pending.method.empty()) {
-            s.pending.method = std::string_view{at, length};
-        }
-        else {
-            const char* start = s.pending.method.data();
-            auto const  total = static_cast<std::size_t>((at + length) - start);
-            s.pending.method  = std::string_view{start, total};
-        }
+        s.method_buf_.append(at, length);
+        s.pending_.method = std::string_view{s.method_buf_};
         return HPE_OK;
     }
 
@@ -109,28 +130,15 @@ struct HttpParser::Impl
     {
         auto& s = *static_cast<Impl*>(p->data);
 
-        if (s.in_value) {
+        if (s.in_value_) {
             // Commit the previous field-value pair.
-            s.pending.headers.emplace_back(std::string_view{s.field_ptr, s.field_len},
-                                           std::string_view{s.value_ptr, s.value_len});
-            s.header_count++;
-            if (s.header_count > s.config.max_header_count) {
-                s.has_error  = true;
-                s.last_error = ParseError::TooManyHeaders;
+            if (!s.commit_header()) {
                 return HPE_USER;
             }
-            s.in_value  = false;
-            s.field_ptr = nullptr; // must reset so next field starts fresh
+            s.in_value_ = false;
         }
 
-        // Start or extend the current field name.
-        if (!s.in_value && s.field_ptr == nullptr) {
-            s.field_ptr = at;
-            s.field_len = length;
-        }
-        else if (!s.in_value) {
-            s.field_len = static_cast<std::size_t>((at + length) - s.field_ptr);
-        }
+        s.field_buf_.append(at, length);
 
         return HPE_OK;
     }
@@ -139,14 +147,8 @@ struct HttpParser::Impl
     {
         auto& s = *static_cast<Impl*>(p->data);
 
-        if (!s.in_value) {
-            s.value_ptr = at;
-            s.value_len = length;
-            s.in_value  = true;
-        }
-        else {
-            s.value_len = static_cast<std::size_t>((at + length) - s.value_ptr);
-        }
+        s.value_buf_.append(at, length);
+        s.in_value_ = true;
 
         return HPE_OK;
     }
@@ -156,26 +158,20 @@ struct HttpParser::Impl
         auto& s = *static_cast<Impl*>(p->data);
 
         // Commit the last header pair (if any).
-        if (s.field_ptr != nullptr) {
-            s.pending.headers.emplace_back(std::string_view{s.field_ptr, s.field_len},
-                                           std::string_view{s.value_ptr, s.value_len});
-            s.header_count++;
-            if (s.header_count > s.config.max_header_count) {
-                s.has_error  = true;
-                s.last_error = ParseError::TooManyHeaders;
+        if (!s.field_buf_.empty()) {
+            if (!s.commit_header()) {
                 return HPE_USER;
             }
-            s.field_ptr = nullptr;
-            s.value_ptr = nullptr;
         }
+        s.refresh_header_views();
 
-        s.pending.version_major = llhttp_get_http_major(p);
-        s.pending.version_minor = llhttp_get_http_minor(p);
-        s.pending.keep_alive    = (llhttp_should_keep_alive(p) != 0);
-        s.pending.upgrade       = (llhttp_get_upgrade(p) != 0);
+        s.pending_.version_major = llhttp_get_http_major(p);
+        s.pending_.version_minor = llhttp_get_http_minor(p);
+        s.pending_.keep_alive    = (llhttp_should_keep_alive(p) != 0);
+        s.pending_.upgrade       = (llhttp_get_upgrade(p) != 0);
 
         // Pre-allocate headers capacity now that count is known — no benefit here,
-        // but chunk_buf capacity is retained across reset() calls for keep-alive.
+        // but chunk_buf_ capacity is retained across reset() calls for keep-alive.
         return HPE_OK;
     }
 
@@ -183,23 +179,24 @@ struct HttpParser::Impl
     {
         auto& s = *static_cast<Impl*>(p->data);
 
-        s.body_byte_count += length;
-        if (s.body_byte_count > s.config.max_body_bytes) {
-            s.has_error  = true;
-            s.last_error = ParseError::TooLarge;
+        s.body_byte_count_ += length;
+        if (s.body_byte_count_ > s.config_.max_body_bytes) {
+            s.has_error_  = true;
+            s.last_error_ = ParseError::TooLarge;
             return HPE_USER;
         }
 
-        // reinterpret_cast: const char* → const std::byte* per C++23 [basic.types.general]
-        const auto* bytes = reinterpret_cast<const std::byte*>(at);
-        s.chunk_buf.insert(s.chunk_buf.end(), bytes, bytes + length);
+        const auto body = std::string_view{at, length};
+        for (const char byte : body) {
+            s.chunk_buf_.push_back(static_cast<std::byte>(static_cast<unsigned char>(byte)));
+        }
         return HPE_OK;
     }
 
     // on_message_complete — HPE_PAUSED return-code contract
     //
     // Returning HPE_PAUSED is the contract that feed() relies on to distinguish
-    // "message complete" from "need more data". Do NOT change this to
+    // "message complete_" from "need more data". Do NOT change this to
     // HPE_OK + llhttp_pause(): calling llhttp_pause() inside a callback does not
     // halt llhttp_execute() on the *current* call — the pause only takes effect
     // on the next call to llhttp_execute(), which means execute() returns HPE_OK
@@ -207,32 +204,32 @@ struct HttpParser::Impl
     // devlog deviation #1).
     static int on_message_complete(llhttp_t* p)
     {
-        auto& s    = *static_cast<Impl*>(p->data);
-        s.complete = true;
+        auto& s     = *static_cast<Impl*>(p->data);
+        s.complete_ = true;
         return HPE_PAUSED;
     }
 };
 
 // =============================================================================
-// HttpParser — special members (defined here: Impl is complete)
+// HttpParser — special members (defined here: Impl is complete_)
 // =============================================================================
 
 HttpParser::HttpParser(ParserConfig config) noexcept : impl_{std::make_unique<Impl>()}
 {
-    impl_->config = config;
-    impl_->pending.headers.reserve(kHeadersReserveSize);
+    impl_->config_ = config;
+    impl_->pending_.headers.reserve(kHeadersReserveSize);
 
-    llhttp_settings_init(&impl_->settings);
-    impl_->settings.on_url              = Impl::on_url;
-    impl_->settings.on_method           = Impl::on_method;
-    impl_->settings.on_header_field     = Impl::on_header_field;
-    impl_->settings.on_header_value     = Impl::on_header_value;
-    impl_->settings.on_headers_complete = Impl::on_headers_complete;
-    impl_->settings.on_body             = Impl::on_body;
-    impl_->settings.on_message_complete = Impl::on_message_complete;
+    llhttp_settings_init(&impl_->settings_);
+    impl_->settings_.on_url              = Impl::on_url;
+    impl_->settings_.on_method           = Impl::on_method;
+    impl_->settings_.on_header_field     = Impl::on_header_field;
+    impl_->settings_.on_header_value     = Impl::on_header_value;
+    impl_->settings_.on_headers_complete = Impl::on_headers_complete;
+    impl_->settings_.on_body             = Impl::on_body;
+    impl_->settings_.on_message_complete = Impl::on_message_complete;
 
-    llhttp_init(&impl_->parser, HTTP_REQUEST, &impl_->settings);
-    impl_->parser.data = impl_.get();
+    llhttp_init(&impl_->parser_, HTTP_REQUEST, &impl_->settings_);
+    impl_->parser_.data = impl_.get();
 }
 
 HttpParser::HttpParser(HttpParser&&) noexcept            = default;
@@ -248,33 +245,29 @@ HttpParser::~HttpParser() noexcept                       = default;
 {
     assert(impl_ && "feed() called on moved-from HttpParser");
 
-    // reinterpret_cast: const std::byte* → const char* for llhttp.
-    // Well-defined per C++23 [basic.types.general].
-    const auto*       ptr = reinterpret_cast<const char*>(data.data());
-    std::size_t const len = data.size();
-
-    impl_->feed_ptr = ptr;
-    impl_->feed_len = len;
-
-    llhttp_errno_t const rc = llhttp_execute(&impl_->parser, ptr, len);
-
-    impl_->feed_ptr = nullptr;
-    impl_->feed_len = 0;
-
-    if (impl_->has_error) {
-        return std::unexpected{impl_->last_error};
+    impl_->feed_text_.clear();
+    impl_->feed_text_.reserve(data.size());
+    for (const std::byte byte : data) {
+        impl_->feed_text_.push_back(std::to_integer<char>(byte));
     }
 
-    if (rc == HPE_PAUSED && impl_->complete) {
-        // Complete message parsed; resume parser state for next call.
-        llhttp_resume(&impl_->parser);
+    const std::string_view feed_view{impl_->feed_text_};
+    llhttp_errno_t const   rc = llhttp_execute(&impl_->parser_, feed_view.data(), feed_view.size());
 
-        // All body bytes (Content-Length and chunked alike) are in chunk_buf via
+    if (impl_->has_error_) {
+        return std::unexpected{impl_->last_error_};
+    }
+
+    if (rc == HPE_PAUSED && impl_->complete_) {
+        // Complete message parsed; resume parser_ state for next call.
+        llhttp_resume(&impl_->parser_);
+
+        // All body bytes (Content-Length and chunked alike) are in chunk_buf_ via
         // on_body(). body is a span into that internal buffer; it remains valid
         // until the next feed() or reset() call.
-        impl_->pending.body = std::span<const std::byte>{impl_->chunk_buf};
+        impl_->pending_.body = std::span<const std::byte>{impl_->chunk_buf_};
 
-        return std::move(impl_->pending);
+        return std::move(impl_->pending_);
     }
 
     if (rc == HPE_OK) {
@@ -282,7 +275,7 @@ HttpParser::~HttpParser() noexcept                       = default;
         return std::unexpected{ParseError::Incomplete};
     }
 
-    // Any other error code (HPE_USER is handled via has_error above).
+    // Any other error code (HPE_USER is handled via has_error_ above).
     return std::unexpected{ParseError::BadRequest};
 }
 
@@ -294,25 +287,26 @@ void HttpParser::reset() noexcept
 {
     assert(impl_ && "reset() called on moved-from HttpParser");
 
-    llhttp_reset(&impl_->parser);
-    impl_->parser.data = impl_.get();
+    llhttp_reset(&impl_->parser_);
+    impl_->parser_.data = impl_.get();
 
-    // Clear accumulated state. chunk_buf capacity is retained (amortizes
+    // Clear accumulated state. chunk_buf_ capacity is retained (amortizes
     // re-allocations across keep-alive requests).
-    impl_->pending = ParsedRequest{};
-    impl_->chunk_buf.clear();
-    impl_->field_ptr       = nullptr;
-    impl_->field_len       = 0;
-    impl_->value_ptr       = nullptr;
-    impl_->value_len       = 0;
-    impl_->in_value        = false;
-    impl_->header_count    = 0;
-    impl_->body_byte_count = 0;
-    impl_->complete        = false;
-    impl_->has_error       = false;
+    impl_->pending_ = ParsedRequest{};
+    impl_->chunk_buf_.clear();
+    impl_->method_buf_.clear();
+    impl_->target_buf_.clear();
+    impl_->field_buf_.clear();
+    impl_->value_buf_.clear();
+    impl_->header_storage_.clear();
+    impl_->in_value_        = false;
+    impl_->header_count_    = 0;
+    impl_->body_byte_count_ = 0;
+    impl_->complete_        = false;
+    impl_->has_error_       = false;
 
-    impl_->pending.headers.clear();
-    impl_->pending.headers.reserve(kHeadersReserveSize);
+    impl_->pending_.headers.clear();
+    impl_->pending_.headers.reserve(kHeadersReserveSize);
 }
 
 } // namespace aevox::detail

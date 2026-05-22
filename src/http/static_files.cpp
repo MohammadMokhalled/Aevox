@@ -1,3 +1,5 @@
+#include <aevox/error.hpp>
+#include <aevox/middleware.hpp>
 #include <aevox/middleware/static_files.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
@@ -6,18 +8,30 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
+#include <cstdint>
+#include <expected>
+#include <filesystem>
 #include <fstream>
+#include <functional>
+#include <ios>
 #include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace aevox::middleware {
 namespace {
+
+constexpr unsigned char kAsciiControlLimit{0x20U};
+constexpr unsigned char kAsciiDelete{0x7FU};
+constexpr unsigned char kHexAlphaOffset{10U};
 
 struct StaticFilesState
 {
@@ -41,7 +55,7 @@ struct ResolvedPath
 [[nodiscard]] bool is_ascii_control(char ch) noexcept
 {
     const auto value = static_cast<unsigned char>(ch);
-    return value < 0x20U || value == 0x7FU;
+    return value < kAsciiControlLimit || value == kAsciiDelete;
 }
 
 [[nodiscard]] bool is_hex_digit(char ch) noexcept
@@ -56,9 +70,9 @@ struct ResolvedPath
         return static_cast<unsigned char>(ch - '0');
     }
     if (ch >= 'a' && ch <= 'f') {
-        return static_cast<unsigned char>(ch - 'a' + 10);
+        return static_cast<unsigned char>(ch - 'a' + kHexAlphaOffset);
     }
-    return static_cast<unsigned char>(ch - 'A' + 10);
+    return static_cast<unsigned char>(ch - 'A' + kHexAlphaOffset);
 }
 
 [[nodiscard]] bool has_invalid_url_path_char(std::string_view value) noexcept

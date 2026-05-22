@@ -14,14 +14,14 @@ TEST_CASE("ring buffer overflow - excess push returns false and increments drop 
 
     for (std::size_t i = 0; i < 4; ++i) {
         aevox::LogEntry entry;
-        entry.level = aevox::LogLevel::Info;
+        entry.set_level(aevox::LogLevel::Info);
         entry.set_message(std::to_string(i));
         REQUIRE(queue.try_push(entry));
     }
 
     // 5th push should fail.
     aevox::LogEntry overflow;
-    overflow.level = aevox::LogLevel::Warn;
+    overflow.set_level(aevox::LogLevel::Warn);
     overflow.set_message("overflow");
     REQUIRE_FALSE(queue.try_push(overflow));
     REQUIRE(queue.dropped_count() == 1);

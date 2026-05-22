@@ -191,17 +191,17 @@ public:
 private:
     // Pimpl: hides backend networking socket and context reference.
     // Defined only in src/net/ implementation files — backend types never leak here.
-    struct Impl;
+    class Impl;
     std::unique_ptr<Impl> impl_;
 
     // Only the concrete stream factory in src/net/ may call the private constructor.
     friend class aevox::net::TcpStreamFactory;
 
     // Internal accessor for WebSocketSession strand construction.
-    // Returns a mutable pointer to TcpStream::Impl for use by internal net/ code.
+    // Returns a mutable reference to TcpStream::Impl for use by internal net/ code.
     // Resolved to aevox::get_tcp_stream_impl by ADL once the definition is visible
     // (defined in src/net/ implementation files).
-    friend Impl* get_tcp_stream_impl(TcpStream&) noexcept;
+    friend Impl& get_tcp_stream_impl(TcpStream&) noexcept;
 
     // Private constructor: called exclusively by the concrete stream factory.
     explicit TcpStream(std::unique_ptr<Impl> impl) noexcept;

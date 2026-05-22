@@ -14,10 +14,13 @@
 #include <atomic>
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 #include "log_entry.hpp"
 
 namespace aevox {
+
+inline constexpr std::size_t kCacheLineBytes{64};
 
 #ifdef _MSC_VER
     #pragma warning(push)
@@ -66,11 +69,13 @@ public:
     LockFreeQueue& operator=(LockFreeQueue&&)      = delete;
 
 private:
-    struct Cell
+    class Cell
     {
-        alignas(64) std::atomic<std::size_t> seq;
-        LogEntry entry;
+    private:
+        alignas(kCacheLineBytes) std::atomic<std::size_t> seq_{0};
+        LogEntry entry_;
 
+    public:
         Cell()  = default;
         ~Cell() = default;
 
@@ -78,22 +83,42 @@ private:
         Cell& operator=(const Cell&) = delete;
 
         Cell(Cell&& other) noexcept
-            : seq(other.seq.load(std::memory_order_relaxed)), entry(std::move(other.entry))
+            : seq_(other.seq_.load(std::memory_order_relaxed)), entry_(std::move(other.entry_))
         {}
 
         Cell& operator=(Cell&& other) noexcept
         {
-            seq.store(other.seq.load(std::memory_order_relaxed), std::memory_order_relaxed);
-            entry = std::move(other.entry);
+            seq_.store(other.seq_.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            entry_ = std::move(other.entry_);
             return *this;
+        }
+
+        void store_sequence(std::size_t value, std::memory_order order) noexcept
+        {
+            seq_.store(value, order);
+        }
+
+        [[nodiscard]] std::size_t sequence(std::memory_order order) const noexcept
+        {
+            return seq_.load(order);
+        }
+
+        void set_entry(LogEntry entry) noexcept
+        {
+            entry_ = std::move(entry);
+        }
+
+        [[nodiscard]] LogEntry take_entry() noexcept
+        {
+            return std::move(entry_);
         }
     };
 
-    alignas(64) std::atomic<std::size_t> enqueue_pos_{0};
+    alignas(kCacheLineBytes) std::atomic<std::size_t> enqueue_pos_{0};
     std::vector<Cell> buffer_;
     std::size_t       capacity_mask_{0};
-    alignas(64) std::atomic<std::size_t> dequeue_pos_{0};
-    alignas(64) std::atomic<std::size_t> dropped_{0};
+    alignas(kCacheLineBytes) std::atomic<std::size_t> dequeue_pos_{0};
+    alignas(kCacheLineBytes) std::atomic<std::size_t> dropped_{0};
 };
 
 #ifdef _MSC_VER

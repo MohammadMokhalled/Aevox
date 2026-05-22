@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <string>
 
 #include "log/async_writer.hpp"
@@ -39,7 +40,7 @@ TEST_CASE("log entry - trace fields populated when traceparent valid", "[log][tr
         ctx.span_id    = "00f067aa0ba902b7";
         ctx.thread_id  = 42;
 
-        writer.push(aevox::LogLevel::Info, "traced message", &ctx);
+        writer.push(aevox::LogLevel::Info, "traced message", std::cref(ctx));
     }
 
     std::ifstream file(path);
@@ -71,7 +72,7 @@ TEST_CASE("log entry - trace fields absent when traceparent missing", "[log][tra
         ctx.thread_id  = 42;
         // trace_id and span_id left empty
 
-        writer.push(aevox::LogLevel::Info, "untraced message", &ctx);
+        writer.push(aevox::LogLevel::Info, "untraced message", std::cref(ctx));
     }
 
     std::ifstream file(path);
@@ -99,7 +100,7 @@ TEST_CASE("log entry - trace fields absent for global logger (no context)", "[lo
         aevox::AsyncLogWriter writer(config);
 
         // Global log — no context.
-        writer.push(aevox::LogLevel::Info, "global message", nullptr);
+        writer.push(aevox::LogLevel::Info, "global message");
     }
 
     std::ifstream file(path);

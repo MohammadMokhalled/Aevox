@@ -14,11 +14,18 @@
 
 #include "http/request_impl.hpp"
 
+#include <aevox/error.hpp>
+#include <aevox/log.hpp>
+#include <aevox/request.hpp>
+
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
+#include <memory>
 #include <optional>
-#include <ranges>
+#include <span>
 #include <string_view>
+#include <utility>
 
 // <winnt.h> (via Asio on Windows) defines DELETE as a numeric macro which
 // collides with HttpMethod::DELETE. This TU is the only consumer, so a plain
@@ -49,6 +56,20 @@ Request::~Request()                             = default;
 Request::Request(std::unique_ptr<Impl> impl) noexcept : impl_{std::move(impl)} {}
 
 // =============================================================================
+// logger()
+// =============================================================================
+
+Logger& Request::logger() noexcept
+{
+    return log_;
+}
+
+const Logger& Request::logger() const noexcept
+{
+    return log_;
+}
+
+// =============================================================================
 // valid()
 // =============================================================================
 
@@ -65,7 +86,7 @@ HttpMethod Request::method() const noexcept
 {
     // HTTP methods are case-sensitive uppercase per RFC 7230. Map the seven
     // supported verbs; anything else yields HttpMethod::Unknown.
-    const std::string_view m = impl_->parsed.method;
+    const std::string_view m = impl_->parsed().method;
     if (m == "GET")
         return HttpMethod::GET;
     if (m == "POST")
@@ -89,12 +110,12 @@ HttpMethod Request::method() const noexcept
 
 std::string_view Request::path() const noexcept
 {
-    return impl_->path_view;
+    return impl_->path_view();
 }
 
 std::string_view Request::query() const noexcept
 {
-    return impl_->query_view;
+    return impl_->query_view();
 }
 
 // =============================================================================
@@ -106,14 +127,14 @@ std::optional<std::string_view> Request::header(std::string_view name) const noe
     // Case-insensitive comparison: lowercase both characters before comparing.
     // Uses std::ranges::find_if over the parsed headers vector (linear scan;
     // typical requests have < 30 headers — no heap allocation in this path).
-    auto it = std::ranges::find_if(impl_->parsed.headers, [name](const auto& pair) {
+    auto it = std::ranges::find_if(impl_->parsed().headers, [name](const auto& pair) {
         return std::ranges::equal(pair.first, name, [](char a, char b) noexcept {
             return std::tolower(static_cast<unsigned char>(a)) ==
                    std::tolower(static_cast<unsigned char>(b));
         });
     });
 
-    if (it == impl_->parsed.headers.end()) {
+    if (it == impl_->parsed().headers.end()) {
         return std::nullopt;
     }
     return it->second;
@@ -125,7 +146,7 @@ std::optional<std::string_view> Request::header(std::string_view name) const noe
 
 std::span<const std::byte> Request::body() const noexcept
 {
-    return impl_->parsed.body;
+    return impl_->parsed().body;
 }
 
 // =============================================================================
@@ -183,10 +204,10 @@ ErrorCategory category(ParamError e) noexcept
 
 std::optional<std::string_view> Request::trace_context() const noexcept
 {
-    if (!impl_ || impl_->log_context.traceparent.empty()) {
+    if (!impl_ || impl_->log_context().traceparent.empty()) {
         return std::nullopt;
     }
-    return std::string_view{impl_->log_context.traceparent};
+    return std::string_view{impl_->log_context().traceparent};
 }
 
 // =============================================================================

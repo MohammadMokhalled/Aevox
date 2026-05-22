@@ -179,8 +179,8 @@ TEST_CASE("WebSocket frame - parse masked client-to-server text frame", "[websoc
                                                        std::size_t{1024U} * 1024U, true);
 
         REQUIRE_FALSE(result.has_value());
-        REQUIRE(result.error().kind == aevox::net::ParseFrameErrorKind::Incomplete);
-        REQUIRE(result.error().error.code() == aevox::WebSocketErrorCode::ProtocolError);
+        REQUIRE(result.error().kind() == aevox::net::ParseFrameErrorKind::Incomplete);
+        REQUIRE(result.error().error().code() == aevox::WebSocketErrorCode::ProtocolError);
     }
 }
 

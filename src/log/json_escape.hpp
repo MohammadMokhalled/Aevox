@@ -14,6 +14,8 @@
 
 namespace aevox {
 
+inline constexpr unsigned char kJsonControlCharacterLimit{0x20U};
+
 inline std::string json_escape(std::string_view s)
 {
     std::string out;
@@ -42,7 +44,7 @@ inline std::string json_escape(std::string_view s)
                 out += "\\t";
                 break;
             default:
-                if (static_cast<unsigned char>(c) < 0x20) {
+                if (static_cast<unsigned char>(c) < kJsonControlCharacterLimit) {
                     out += std::format("\\u{:04x}", static_cast<unsigned char>(c));
                 }
                 else {

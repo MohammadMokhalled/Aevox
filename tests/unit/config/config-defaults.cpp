@@ -94,7 +94,6 @@ TEST_CASE("Config - missing file returns ConfigError::file_not_found", "[config]
     auto result = aevox::App::create({}, "/nonexistent/path/aevox_test.toml");
 
     REQUIRE_FALSE(result.has_value());
-    CHECK(result.error().code == aevox::ConfigError::FileNotFound);
     CHECK(result.error().error_code() == aevox::ConfigError::FileNotFound);
     CHECK_FALSE(result.error().error_message().empty());
     CHECK(aevox::category(result.error()) == aevox::ErrorCategory::NotFound);
@@ -126,8 +125,7 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         std::remove(path.c_str());
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == aevox::ConfigError::InvalidValue);
-        CHECK(result.error().key == "port");
+        CHECK(result.error().error_code() == aevox::ConfigError::InvalidValue);
         CHECK(result.error().error_key() == "port");
         CHECK(aevox::category(result.error()) == aevox::ErrorCategory::Validation);
     }
@@ -139,8 +137,8 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         std::remove(path.c_str());
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == aevox::ConfigError::InvalidValue);
-        CHECK(result.error().key == "executor.drain_timeout");
+        CHECK(result.error().error_code() == aevox::ConfigError::InvalidValue);
+        CHECK(result.error().error_key() == "executor.drain_timeout");
     }
 
     SECTION("max_header_count = 9999 is above valid range")
@@ -150,8 +148,8 @@ TEST_CASE("Config - invalid value returns ConfigError::invalid_value", "[config]
         std::remove(path.c_str());
 
         REQUIRE_FALSE(result.has_value());
-        CHECK(result.error().code == aevox::ConfigError::InvalidValue);
-        CHECK(result.error().key == "max_header_count");
+        CHECK(result.error().error_code() == aevox::ConfigError::InvalidValue);
+        CHECK(result.error().error_key() == "max_header_count");
     }
 }
 

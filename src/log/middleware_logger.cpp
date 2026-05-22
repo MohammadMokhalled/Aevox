@@ -5,11 +5,16 @@
 // Design: Tasks/architecture/AEV-011-arch.md §3.2
 
 #include <aevox/log.hpp>
+#include <aevox/middleware.hpp>
 #include <aevox/middleware/logger.hpp>
+#include <aevox/request.hpp>
+#include <aevox/response.hpp>
+#include <aevox/task.hpp>
 
 #include <chrono>
 #include <format>
 #include <string>
+#include <utility>
 
 #include "json_escape.hpp"
 
@@ -50,11 +55,11 @@ Middleware logger(LoggerMiddlewareConfig config)
 
         const std::string msg =
             format_middleware_message(req, response, duration_ms, config.format);
-        req.log.log(config.level, msg);
+        req.logger().log(config.level, msg);
 
         if (duration_ms > config.slow_request_threshold) {
-            req.log.warn("Slow request: {} {} took {}ms", std::string{to_string(req.method())},
-                         std::string{req.path()}, duration_ms.count());
+            req.logger().warn("Slow request: {} {} took {}ms", std::string{to_string(req.method())},
+                              std::string{req.path()}, duration_ms.count());
         }
 
         co_return response;

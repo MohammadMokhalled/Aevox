@@ -34,10 +34,10 @@ TEST_CASE("log level filter - trace and debug are dropped when level is info", "
 
     {
         aevox::AsyncLogWriter writer(config);
-        writer.push(aevox::LogLevel::Trace, "trace msg", nullptr);
-        writer.push(aevox::LogLevel::Debug, "debug msg", nullptr);
-        writer.push(aevox::LogLevel::Info, "info msg", nullptr);
-        writer.push(aevox::LogLevel::Warn, "warn msg", nullptr);
+        writer.push(aevox::LogLevel::Trace, "trace msg");
+        writer.push(aevox::LogLevel::Debug, "debug msg");
+        writer.push(aevox::LogLevel::Info, "info msg");
+        writer.push(aevox::LogLevel::Warn, "warn msg");
     } // destructor joins drain thread and flushes all entries
 
     std::ifstream file(path);

@@ -12,6 +12,8 @@
 #include <aevox/response.hpp>
 
 #include <format>
+#include <functional>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -20,6 +22,16 @@
 #endif
 
 namespace aevox {
+
+inline constexpr int kStatusOk{200};
+inline constexpr int kStatusSwitchingProtocols{101};
+inline constexpr int kStatusCreated{201};
+inline constexpr int kStatusBadRequest{400};
+inline constexpr int kStatusUnauthorized{401};
+inline constexpr int kStatusForbidden{403};
+inline constexpr int kStatusNotFound{404};
+inline constexpr int kStatusMethodNotAllowed{405};
+inline constexpr int kStatusInternalServerError{500};
 
 // =============================================================================
 // Response::Impl
@@ -53,13 +65,14 @@ template <typename T>
         const auto detail = std::string{result.error().message()};
         const auto error_body =
             std::format(R"({{"error":"json_serialization_failed","detail":"{}"}})", detail);
-        return Response{500, error_body, "application/json"};
+        return Response{kStatusInternalServerError, error_body, "application/json"};
     }
-    return Response{200, std::move(*result), "application/json"};
+    return Response{kStatusOk, std::move(*result), "application/json"};
 #else
     (void)value;
     return Response{
-        500, R"({"error":"no_json_backend","detail":"Set AEVOX_JSON_BACKEND to glaze in CMake."})",
+        kStatusInternalServerError,
+        R"({"error":"no_json_backend","detail":"Set AEVOX_JSON_BACKEND to glaze in CMake."})",
         "application/json"};
 #endif
 }
@@ -68,13 +81,17 @@ template <typename T>
 // Internal serialization accessor (friend of Response — see response.hpp)
 // =============================================================================
 
-/// Returns a read-only pointer to Response's Impl for serialization.
+/// Returns a read-only reference to Response's Impl for serialization.
 /// Used by src/router/app_impl.cpp to iterate all headers when writing
-/// HTTP responses to the wire. Returns nullptr for a moved-from Response.
+/// HTTP responses to the wire. Returns std::nullopt for a moved-from Response.
 /// Friend of Response — declared in response.hpp (in aevox namespace, not detail).
-inline const Response::Impl* get_response_impl(const Response& res) noexcept
+inline std::optional<std::reference_wrapper<const Response::Impl>> get_response_impl(
+    const Response& res) noexcept
 {
-    return res.impl_.get();
+    if (!res.impl_) {
+        return std::nullopt;
+    }
+    return std::cref(*res.impl_);
 }
 
 } // namespace aevox

@@ -17,14 +17,26 @@
 
 #include "router/router_impl.hpp"
 
-#include <algorithm>
+#include <aevox/request.hpp>
+#include <aevox/response.hpp>
+#include <aevox/router.hpp>
+#include <aevox/task.hpp>
+
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <exception>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "http/request_impl.hpp"
+#include "router/handler_wrap.hpp"
 
 namespace aevox {
 
@@ -180,52 +192,53 @@ std::vector<ParamType> extract_param_types(const std::vector<Segment>& segs)
 // Router::Impl — trie insertion helpers
 // =============================================================================
 
-TrieNode* Router::Impl::ensure_child(TrieNode* node, const detail::Segment& seg)
+TrieNode& Router::Impl::ensure_child(TrieNode& node, const detail::Segment& seg)
 {
     using Kind = detail::Segment::Kind;
 
     if (seg.kind == Kind::Static) {
-        for (auto& child : node->static_children) {
+        for (auto& child : node.static_children) {
             if (child->segment == seg.literal)
-                return child.get();
+                return *child;
         }
         auto child     = std::make_unique<TrieNode>();
         child->kind    = TrieNode::NodeKind::Static;
         child->segment = seg.literal;
-        auto* ptr      = child.get();
-        node->static_children.push_back(std::move(child));
-        return ptr;
+        auto& inserted = *child;
+        node.static_children.push_back(std::move(child));
+        return inserted;
     }
 
     if (seg.kind == Kind::Param) {
-        if (!node->param_child) {
-            node->param_child             = std::make_unique<TrieNode>();
-            node->param_child->kind       = TrieNode::NodeKind::Param;
-            node->param_child->segment    = seg.name;
-            node->param_child->param_type = seg.param_type;
+        if (!node.param_child) {
+            node.param_child             = std::make_unique<TrieNode>();
+            node.param_child->kind       = TrieNode::NodeKind::Param;
+            node.param_child->segment    = seg.name;
+            node.param_child->param_type = seg.param_type;
         }
-        return node->param_child.get();
+        return *node.param_child;
     }
 
     // Wildcard
-    if (!node->wildcard_child) {
-        node->wildcard_child          = std::make_unique<TrieNode>();
-        node->wildcard_child->kind    = TrieNode::NodeKind::Wildcard;
-        node->wildcard_child->segment = seg.name;
+    if (!node.wildcard_child) {
+        node.wildcard_child          = std::make_unique<TrieNode>();
+        node.wildcard_child->kind    = TrieNode::NodeKind::Wildcard;
+        node.wildcard_child->segment = seg.name;
     }
-    return node->wildcard_child.get();
+    return *node.wildcard_child;
 }
 
-void Router::Impl::insert(TrieNode* node, std::span<const detail::Segment> segs, HttpMethod method,
+void Router::Impl::insert(TrieNode& node, std::span<const detail::Segment> segs, HttpMethod method,
                           detail::ErasedHandler handler)
 {
+    std::reference_wrapper<TrieNode> current = node;
     while (!segs.empty()) {
-        node = ensure_child(node, segs[0]);
-        segs = segs.subspan(1);
+        current = ensure_child(current.get(), segs[0]);
+        segs    = segs.subspan(1);
     }
-    const auto idx         = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
-    node->handlers.at(idx) = std::move(handler);
-    node->method_mask |= static_cast<std::uint8_t>(1u << idx);
+    const auto idx                 = static_cast<std::size_t>(static_cast<std::uint8_t>(method));
+    current.get().handlers.at(idx) = std::move(handler);
+    current.get().method_mask |= static_cast<std::uint8_t>(1u << idx);
 }
 
 // =============================================================================
@@ -234,11 +247,9 @@ void Router::Impl::insert(TrieNode* node, std::span<const detail::Segment> segs,
 
 Router::Router()
 {
-    auto impl         = std::make_unique<Impl>();
-    impl->root        = std::make_unique<TrieNode>();
-    impl->insert_root = impl->root.get();
-    impl->owns_root   = true;
-    impl_             = std::move(impl);
+    auto impl = std::make_unique<Impl>();
+    impl->init_as_owner(std::make_unique<TrieNode>());
+    impl_ = std::move(impl);
 }
 
 Router::~Router() = default;
@@ -266,7 +277,11 @@ bool Router::valid() const noexcept
 void Router::register_route(HttpMethod method, std::span<const detail::Segment> segs,
                             ErasedHandler handler)
 {
-    impl_->insert(impl_->insert_root, segs, method, std::move(handler));
+    auto insert_root = impl_->insert_root();
+    if (!insert_root) {
+        return;
+    }
+    impl_->insert(insert_root.value().get(), segs, method, std::move(handler));
 }
 
 // =============================================================================
@@ -275,7 +290,12 @@ void Router::register_route(HttpMethod method, std::span<const detail::Segment> 
 
 aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 {
-    if (!impl_ || !impl_->root) {
+    if (!impl_) {
+        co_return aevox::Response::not_found("404 Not Found");
+    }
+
+    const auto root = impl_->root();
+    if (!root) {
         co_return aevox::Response::not_found("404 Not Found");
     }
 
@@ -301,7 +321,7 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
         }
     }
 
-    TrieNode*                                        node = impl_->root.get();
+    std::reference_wrapper<TrieNode>                 node = root.value().get();
     std::vector<std::pair<std::string, std::string>> captured;
     captured.reserve(kCapturedParamsReserveSize);
 
@@ -311,30 +331,31 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
         const std::string_view seg = segs[i];
 
         // 1. Static match
-        TrieNode* static_match = nullptr;
-        for (auto& child : node->static_children) {
+        std::optional<std::reference_wrapper<TrieNode>> static_match;
+        for (auto& child : node.get().static_children) {
             if (child->segment == seg) {
-                static_match = child.get();
+                static_match = *child;
                 break;
             }
         }
         if (static_match) {
-            node = static_match;
+            node = static_match->get();
             continue;
         }
 
         // 2. Named-parameter match
-        if (node->param_child) {
-            captured.emplace_back(node->param_child->segment, std::string{seg});
-            node = node->param_child.get();
+        if (node.get().param_child) {
+            captured.emplace_back(node.get().param_child->segment, std::string{seg});
+            node = *node.get().param_child;
             continue;
         }
 
         // 3. Wildcard match — greedy: captures remainder of path via offset arithmetic
-        if (node->wildcard_child) {
+        if (node.get().wildcard_child) {
             const auto offset = static_cast<std::size_t>(seg.data() - path.data());
-            captured.emplace_back(node->wildcard_child->segment, std::string{path.substr(offset)});
-            node             = node->wildcard_child.get();
+            captured.emplace_back(node.get().wildcard_child->segment,
+                                  std::string{path.substr(offset)});
+            node             = *node.get().wildcard_child;
             wildcard_matched = true;
             break;
         }
@@ -346,25 +367,26 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
     // After processing all path segments, if the current node has a wildcard child
     // that was not yet consumed (e.g. route /files/{path...} dispatched with /files/),
     // capture an empty string and advance.
-    if (!wildcard_matched && node->wildcard_child) {
-        captured.emplace_back(node->wildcard_child->segment, std::string{});
-        node = node->wildcard_child.get();
+    if (!wildcard_matched && node.get().wildcard_child) {
+        captured.emplace_back(node.get().wildcard_child->segment, std::string{});
+        node = *node.get().wildcard_child;
     }
 
     // Check for a registered handler at the matched node.
-    if (node->handlers.at(method_idx)) {
+    if (node.get().handlers.at(method_idx)) {
         // Inject captured path parameters directly via friend-class access.
-        req.impl_->params.clear();
+        req.impl_->params().clear();
         for (auto& [k, v] : captured)
-            req.impl_->params.emplace(k, v);
+            req.impl_->params().emplace(k, v);
 
-        co_return co_await node->handlers.at(method_idx)(req);
+        co_return co_await node.get().handlers.at(method_idx)(req);
     }
 
-    if (node->method_mask != 0) {
+    if (node.get().method_mask != 0) {
         // Path matched but the requested method has no handler → 405.
-        co_return aevox::Response::method_not_allowed().header("Allow", build_allow_header(
-                                                                            node->method_mask));
+        co_return aevox::Response::method_not_allowed().header("Allow",
+                                                               build_allow_header(
+                                                                   node.get().method_mask));
     }
 
     co_return aevox::Response::not_found("404 Not Found");
@@ -376,15 +398,18 @@ aevox::Task<aevox::Response> Router::dispatch(aevox::Request& req) const
 
 Router Router::group(std::string_view prefix)
 {
-    auto  segs = detail::parse_pattern(prefix);
-    auto* node = impl_->insert_root;
-    for (const auto& seg : segs)
-        node = impl_->ensure_child(node, seg);
+    auto segs        = detail::parse_pattern(prefix);
+    auto insert_root = impl_->insert_root();
+    if (!insert_root) {
+        return Router{};
+    }
 
-    auto group_impl         = std::make_unique<Impl>();
-    group_impl->root        = nullptr; // group sub-Router does not own the root
-    group_impl->insert_root = node;
-    group_impl->owns_root   = false;
+    std::reference_wrapper<TrieNode> node = insert_root.value().get();
+    for (const auto& seg : segs)
+        node = impl_->ensure_child(node.get(), seg);
+
+    auto group_impl = std::make_unique<Impl>();
+    group_impl->init_as_group(node.get());
 
     return Router{GroupTag{}, std::move(group_impl)};
 }

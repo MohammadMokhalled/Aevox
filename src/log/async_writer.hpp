@@ -8,7 +8,9 @@
 #include <aevox/log.hpp>
 
 #include <atomic>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <thread>
 
 #include "log_entry.hpp"
@@ -32,8 +34,9 @@ public:
     /**
      * @brief Hot path — called from request handlers on any thread.
      */
-    void push(LogLevel level, std::string_view message,
-              const RequestContext* ctx = nullptr) noexcept;
+    void push(
+        LogLevel level, std::string_view message,
+        std::optional<std::reference_wrapper<const RequestContext>> ctx = std::nullopt) noexcept;
 
     /**
      * @brief Flush all pending entries and block until written.
@@ -50,7 +53,8 @@ public:
      *
      * Used by the connection handler and by tests / benchmarks.
      */
-    [[nodiscard]] Logger make_logger(RequestContext* ctx = nullptr) noexcept;
+    [[nodiscard]] Logger make_logger(
+        std::optional<std::reference_wrapper<RequestContext>> ctx = std::nullopt) noexcept;
 
     // Non-copyable, move-only.
     AsyncLogWriter(AsyncLogWriter&&) noexcept;
