@@ -14,6 +14,8 @@ function(add_log_bench name)
             nanobench::nanobench
     )
     target_compile_options(${name} PRIVATE ${AEVOX_COMPILE_OPTIONS})
+    add_test(NAME ${name} COMMAND ${name})
+    set_tests_properties(${name} PROPERTIES LABELS bench)
     add_dependencies(aevox_tests_bench ${name})
 endfunction()
 

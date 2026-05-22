@@ -10,4 +10,6 @@ add_subdirectory(net)        # accept-loop throughput baseline
 add_subdirectory(middleware) # middleware pipeline throughput benchmark
 add_subdirectory(json)       # JSON serialization throughput baseline
 add_subdirectory(log)        # logging hot-path latency and throughput benchmarks
-add_subdirectory(websocket) # WebSocket throughput and frame-parse benchmarks
+add_subdirectory(websocket)  # WebSocket throughput and frame-parse benchmarks
+add_subdirectory(http)       # HTTP keep-alive request/response benchmark
+add_subdirectory(router)     # Router dispatch throughput benchmark
