@@ -34,7 +34,6 @@
 #include <vector>
 
 #include "http/http_parser.hpp"
-#include "log/request_context.hpp"
 #include "net/topic_bus.hpp"
 #include "net/websocket_handshake.hpp"
 #include "net/websocket_session.hpp"
@@ -93,8 +92,11 @@ private:
     /// WebSocket lifecycle callbacks — set by App::ws() dispatch before upgrade_websocket().
     aevox::WebSocketHandler ws_handler_;
 
-    /// Per-request logging context.
-    RequestContext log_context_;
+    /// Request id and trace fields used by logging and trace propagation.
+    std::string request_id_;
+    std::string trace_id_;
+    std::string span_id_;
+    std::string traceparent_;
 
 public:
     /// Constructs Impl, taking ownership of buffer and the parsed request.
@@ -173,13 +175,37 @@ public:
     {
         return ws_handler_;
     }
-    [[nodiscard]] RequestContext& log_context() noexcept
+    [[nodiscard]] std::string_view request_id() const noexcept
     {
-        return log_context_;
+        return request_id_;
     }
-    [[nodiscard]] const RequestContext& log_context() const noexcept
+    void set_request_id(std::string request_id) noexcept
     {
-        return log_context_;
+        request_id_ = std::move(request_id);
+    }
+    [[nodiscard]] std::string_view trace_id() const noexcept
+    {
+        return trace_id_;
+    }
+    void set_trace_id(std::string trace_id) noexcept
+    {
+        trace_id_ = std::move(trace_id);
+    }
+    [[nodiscard]] std::string_view span_id() const noexcept
+    {
+        return span_id_;
+    }
+    void set_span_id(std::string span_id) noexcept
+    {
+        span_id_ = std::move(span_id);
+    }
+    [[nodiscard]] std::string_view traceparent() const noexcept
+    {
+        return traceparent_;
+    }
+    void set_traceparent(std::string traceparent) noexcept
+    {
+        traceparent_ = std::move(traceparent);
     }
 };
 

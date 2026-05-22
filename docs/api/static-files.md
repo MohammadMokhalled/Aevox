@@ -158,7 +158,7 @@ The returned middleware stores immutable configuration and can be invoked concur
 
 File reads are synchronous in v0.2 and copy the file into the response body. Use a reverse proxy, CDN, or dedicated asset service for large files or high-volume production asset delivery.
 
-The public header contains no Asio, llhttp, glaze, spdlog, or fmtlib types.
+The public header contains no Asio, llhttp, glaze, or fmtlib types.
 
 ## See Also
 

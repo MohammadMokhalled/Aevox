@@ -1,78 +1,63 @@
 # Logging
 
-Structured, asynchronous logging is a first-class subsystem in Aevox. This guide covers how to use it in handlers, how to configure sinks and levels, and how to read the resulting logs.
+Aevox logging is built around a small rule: write useful logs without making request handlers wait
+on file or console I/O. Calls enqueue bounded records, and a background writer formats and writes
+them.
 
-## Philosophy
+## Basic Setup
 
-Aevox logging follows three design principles:
-
-1. **Never block the I/O thread.** `req.logger().info(...)` pushes to a lock-free ring buffer and returns instantly. A background thread handles formatting and disk writes.
-2. **Always know which request produced a log line.** Every `Request` carries a `Logger` that automatically includes `request_id` and `thread_id` in every entry.
-3. **Structured by default.** Sinks output JSON so logs can be ingested by Loki, Elasticsearch, or CloudWatch without parsing.
-
-## Using the Request Logger
-
-Every `Request` exposes `logger()`. Use it inside handlers:
+The default logger writes JSON to stdout at `Info` level:
 
 ```cpp
-app.get("/users/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.logger().info("Fetching user {}", req.param<int>("id").value());
-
-    auto user = co_await db.find_user(req.param<int>("id").value());
-    if (!user) {
-        req.logger().warn("User not found");
-        co_return aevox::Response::not_found("Unknown user");
-    }
-
-    req.logger().info("User found: {}", user->name);
-    co_return aevox::Response::ok(*user);
-});
-```
-
-The resulting log entries contain the request ID automatically:
-
-```json
-{"timestamp":1234567890123,"level":"INFO","message":"Fetching user 42","request_id":"req-7f3a9b2c","thread_id":7}
-```
-
-## Global Logger
-
-For logging outside of request handlers — during startup, shutdown, or in background tasks — use the global logger:
-
-```cpp
-aevox::log::global().info("Server starting on port {}", port);
-```
-
-The global logger is automatically created and installed when `App::listen()` is called. Before that, it is a no-op.
-
-## Runtime Level Filtering
-
-Set `LogConfig::level` to drop entries below the configured severity:
-
-```cpp
-aevox::AppConfig cfg;
-cfg.logging.level = aevox::LogLevel::Info;
-```
-
-With this configuration, `Trace` and `Debug` entries are ignored before they reach the sinks.
-
-## Automatic Request/Response Logging
-
-Add the logger middleware to record every HTTP transaction:
-
-```cpp
+aevox::App app;
 app.use(aevox::middleware::logger());
 ```
 
-This produces one JSON line per request:
+For file output:
 
-```json
-{"timestamp":1234567890123,"level":"INFO","request_id":"req-7f3a9b2c","method":"GET","path":"/users/42","status":200,"duration_ms":12}
+```cpp
+aevox::AppConfig config;
+config.logging.destination = aevox::LogDestination::File;
+config.logging.file_path = "/var/log/aevox/app.log";
+config.logging.format = aevox::LogFormat::Json;
+
+aevox::App app{config};
+app.use(aevox::middleware::logger());
 ```
 
-### Excluding Paths
+## Handler Logs
 
-Skip logging for noisy endpoints:
+Use global functions for startup and background work:
+
+```cpp
+aevox::log::info("Server starting on port {}", port);
+```
+
+Pass a request when the log line should be correlated:
+
+```cpp
+app.get("/users/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
+    aevox::log::info(req, "Fetching user {}", req.param<int>("id").value());
+    co_return aevox::Response::ok("ok");
+});
+```
+
+Request-correlated entries include `request_id`, method, path, and valid trace fields. The same id is
+available to handlers:
+
+```cpp
+std::string_view request_id = req.id();
+```
+
+## Access Logs
+
+`aevox::middleware::logger()` emits one line after the response is produced:
+
+```json
+{"timestamp":"2026-05-22T12:00:00.123456Z","level":"INFO","request_id":"0000000000000001","method":"GET","path":"/users/42","status":200,"duration_us":85,"message":"GET /users/42 -> 200 in 85us"}
+```
+
+Exclude noisy paths:
 
 ```cpp
 app.use(aevox::middleware::logger({
@@ -80,9 +65,7 @@ app.use(aevox::middleware::logger({
 }));
 ```
 
-### Slow Request Warnings
-
-Flag requests that exceed a latency threshold:
+Warn on slow requests:
 
 ```cpp
 app.use(aevox::middleware::logger({
@@ -90,117 +73,43 @@ app.use(aevox::middleware::logger({
 }));
 ```
 
-Slow requests emit an additional `WARN` line with the same `request_id`.
+Slow requests are logged once at `Warn`.
 
-## Configuration
-
-### Programmatic
-
-```cpp
-aevox::AppConfig config;
-config.logging.level = aevox::log::LogLevel::Warn;
-config.logging.sinks = {
-    aevox::log::FileSinkConfig{
-        .path = "/var/log/aevox/app.log",
-        .rotate_mb = 100,
-        .keep_files = 5,
-        .format = aevox::log::LogFormat::JSON,
-    },
-};
-```
-
-### TOML
+## TOML
 
 ```toml
 [logging]
-level = "warn"
-ring_buffer_entries = 65536
-
-[[logging.sinks]]
-type = "file"
-path = "/var/log/aevox/app.log"
+enabled = true
+level = "info"
 format = "json"
-rotate_mb = 100
-keep_files = 5
+destination = "file"
+file_path = "/var/log/aevox/app.log"
+queue_capacity = 16384
 ```
 
-## Ring Buffer Tuning
+Supported destinations are `stdout`, `stderr`, `file`, and `disabled`.
 
-The ring buffer size controls how many entries can be queued between the I/O threads and the drain thread. If the buffer fills up, new entries are silently dropped.
+If file logging cannot start, Aevox reports the logging error to standard error and continues with
+logging disabled. Fix the path or permissions and restart the process to re-enable file output.
 
-| Load profile | Recommended `ring_buffer_entries` |
-|--------------|-----------------------------------|
-| Development  | 4096                              |
-| Low traffic  | 16384                             |
-| High traffic | 65536 (default)                   |
-| Burst traffic| 262144                            |
+## Flush In Tests
 
-Monitor `dropped_count()` on the `LockFreeQueue` in benchmarks to verify the size is adequate.
-
-## Reading Logs
-
-Because sinks output one JSON object per line, standard Unix tools work well:
-
-```bash
-# Filter by request ID
-jq 'select(.request_id == "req-7f3a9b2c")' /var/log/aevox/app.log
-
-# Find slow requests
-jq 'select(.duration_ms > 100)' /var/log/aevox/app.log
-
-# Aggregate error rates
-jq -s 'map(select(.level == "ERROR")) | length' /var/log/aevox/app.log
-```
-
-## Performance
-
-On a typical Linux workstation:
-
-- `req.logger().info(...)` median latency: **~80 ns** (ring buffer push only)
-- Sustained throughput: **>1M entries/sec** across 8 threads
-- Drop rate under load: **<0.1%** with default 64K buffer
-
-See `tests/bench/log/` for reproducible benchmarks.
-
-## Distributed Tracing
-
-Aevox automatically extracts the W3C Trace Context `traceparent` header from every inbound request. When a valid header is present, all log lines emitted through `req.logger()` carry `trace_id` and `span_id` fields — no manual instrumentation required.
-
-### Automatic Log Enrichment
-
-When a request arrives with the header:
-
-```
-traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-```
-
-Every `req.logger().*()` call automatically includes the trace fields:
-
-```json
-{"timestamp":1234567890123,"level":"INFO","message":"Processing order 42","request_id":"a1b2c3d4e5f6a7b8","trace_id":"4bf92f3577b34da6a3ce929d0e0e4736","span_id":"00f067aa0ba902b7","thread_id":7}
-```
-
-When no `traceparent` header is present (or the header is invalid), `trace_id` and `span_id` are omitted from log output entirely.
-
-### Propagating Context to Downstream Services
-
-Use `req.trace_context()` to forward the trace context to outbound HTTP calls:
+The logger is asynchronous. Tests that inspect a log file should flush before reading:
 
 ```cpp
-app.get("/orders/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.logger().info("Processing order {}", req.param<int>("id").value());
-
-    // Forward the traceparent header to downstream services
-    if (auto ctx = req.trace_context(); ctx) {
-        outbound.set_header("traceparent", *ctx);
-    }
-
-    co_return aevox::Response::ok(result);
-});
+REQUIRE(aevox::log::flush().has_value());
 ```
 
-The returned `std::string_view` is valid for the lifetime of the `Request` and contains the exact incoming `traceparent` value — Aevox does not modify it.
+`aevox::log::stats()` exposes accepted, dropped, and written counters for diagnostics.
 
-### request_id Format
+## Trace Context
 
-Each request receives a unique 16-character lowercase hex identifier (e.g. `"a1b2c3d4e5f6a7b8"`), generated from a per-thread PRNG. This replaces the earlier monotonic counter format (`"req-0"`, `"req-1"`, …).
+Aevox extracts valid W3C `traceparent` headers before middleware runs. Request-correlated log lines
+include `trace_id` and `span_id` when those fields are present. Use `req.trace_context()` to forward
+the original header to downstream services.
+
+## See Also
+
+- [Logging API](../api/log.md)
+- [Middleware Guide](middleware.md)
+- [Configuration API](../api/config.md)

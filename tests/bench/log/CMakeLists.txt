@@ -1,5 +1,5 @@
 # tests/bench/log/CMakeLists.txt
-# Performance benchmarks for the AEV-011 logging subsystem.
+# Performance benchmarks for the AEV-029 logging subsystem.
 # Framework: nanobench.
 
 function(add_log_bench name)
@@ -17,5 +17,4 @@ function(add_log_bench name)
     add_dependencies(aevox_tests_bench ${name})
 endfunction()
 
-add_log_bench(log-hot-path-latency)
-add_log_bench(log-throughput)
+add_log_bench(logger-hot-path)

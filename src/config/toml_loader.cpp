@@ -53,10 +53,8 @@ constexpr int64_t kMaxReadBytes{16LL * 1024LL * 1024LL};
 constexpr int64_t kMaxExecutorThreadCount{1024};
 constexpr int64_t kMaxExecutorCpuPoolThreads{256};
 constexpr int64_t kMaxDrainTimeoutSeconds{3600};
-constexpr int64_t kMinRingBufferEntries{64};
-constexpr int64_t kMaxRingBufferEntries{1024LL * 1024LL};
-constexpr int64_t kMaxLogRotateMb{4096};
-constexpr int64_t kMaxLogKeepFiles{100};
+constexpr int64_t kMinLogQueueCapacity{1};
+constexpr int64_t kMaxLogQueueCapacity{1024LL * 1024LL};
 
 // Known executor-section key names.
 constexpr std::array<std::string_view, 3> kKnownExecutorKeys{
@@ -66,10 +64,8 @@ constexpr std::array<std::string_view, 3> kKnownExecutorKeys{
 };
 
 // Known logging-section key names.
-constexpr std::array<std::string_view, 3> kKnownLoggingKeys{
-    "level",
-    "ring_buffer_entries",
-    "sinks",
+constexpr std::array<std::string_view, 6> kKnownLoggingKeys{
+    "enabled", "level", "format", "destination", "file_path", "queue_capacity",
 };
 
 bool is_known_key(std::string_view key, std::span<const std::string_view> known) noexcept
@@ -248,6 +244,14 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
             (void)val;
         }
 
+        // logging.enabled
+        if (const auto* v = log_tbl->get("enabled")) {
+            const auto raw = v->value<bool>();
+            if (!raw)
+                return std::unexpected(make_invalid("logging.enabled", "must be a boolean"));
+            base.logging.enabled = *raw;
+        }
+
         // logging.level
         if (const auto* v = log_tbl->get("level")) {
             const auto raw = v->value<std::string>();
@@ -272,75 +276,54 @@ ConfigErrorDetail make_invalid(std::string_view key, std::string_view reason)
                                  "must be one of: trace, debug, info, warn, error, fatal"));
         }
 
-        // logging.ring_buffer_entries
-        if (const auto* v = log_tbl->get("ring_buffer_entries")) {
-            const auto raw = v->value<int64_t>();
-            if (!raw || *raw < kMinRingBufferEntries || *raw > kMaxRingBufferEntries)
-                return std::unexpected(make_invalid("logging.ring_buffer_entries",
-                                                    "must be an integer in 64..1048576"));
-            base.logging.ring_buffer_entries = static_cast<std::size_t>(*raw);
+        // logging.format
+        if (const auto* v = log_tbl->get("format")) {
+            const auto raw = v->value<std::string>();
+            if (!raw)
+                return std::unexpected(make_invalid("logging.format", "must be a string"));
+            if (*raw == "json")
+                base.logging.format = LogFormat::Json;
+            else if (*raw == "pretty")
+                base.logging.format = LogFormat::Pretty;
+            else
+                return std::unexpected(
+                    make_invalid("logging.format", "must be one of: json, pretty"));
         }
 
-        // logging.sinks
-        if (const auto* sinks_node = log_tbl->get("sinks")) {
-            const auto* arr = sinks_node->as_array();
-            if (!arr)
-                return std::unexpected(make_invalid("logging.sinks", "must be an array of tables"));
+        // logging.destination
+        if (const auto* v = log_tbl->get("destination")) {
+            const auto raw = v->value<std::string>();
+            if (!raw)
+                return std::unexpected(make_invalid("logging.destination", "must be a string"));
+            if (*raw == "stdout")
+                base.logging.destination = LogDestination::Stdout;
+            else if (*raw == "stderr")
+                base.logging.destination = LogDestination::Stderr;
+            else if (*raw == "file")
+                base.logging.destination = LogDestination::File;
+            else if (*raw == "disabled")
+                base.logging.destination = LogDestination::Disabled;
+            else
+                return std::unexpected(
+                    make_invalid("logging.destination",
+                                 "must be one of: stdout, stderr, file, disabled"));
+        }
 
-            base.logging.sinks.clear();
-            for (const auto& elem : *arr) {
-                const auto* sink_tbl = elem.as_table();
-                if (!sink_tbl)
-                    continue; // skip non-table entries silently
+        // logging.file_path
+        if (const auto* v = log_tbl->get("file_path")) {
+            const auto raw = v->value<std::string>();
+            if (!raw)
+                return std::unexpected(make_invalid("logging.file_path", "must be a string"));
+            base.logging.file_path = *raw;
+        }
 
-                const auto type_raw = sink_tbl->get("type");
-                if (!type_raw)
-                    continue;
-                const auto type_str = type_raw->value<std::string>();
-                if (!type_str)
-                    continue;
-
-                if (*type_str == "console") {
-                    ConsoleSinkConfig cfg;
-                    if (const auto* fmt = sink_tbl->get("format")) {
-                        const auto f = fmt->value<std::string>();
-                        if (f && *f == "json")
-                            cfg.format = LogFormat::JSON;
-                    }
-                    if (const auto* c = sink_tbl->get("color")) {
-                        const auto col = c->value<bool>();
-                        if (col)
-                            cfg.color = *col;
-                    }
-                    base.logging.sinks.emplace_back(cfg);
-                }
-                else if (*type_str == "file") {
-                    FileSinkConfig cfg;
-                    if (const auto* p = sink_tbl->get("path")) {
-                        const auto sink_path = p->value<std::string>();
-                        if (sink_path)
-                            cfg.path = *sink_path;
-                    }
-                    if (const auto* r = sink_tbl->get("rotate_mb")) {
-                        const auto raw = r->value<int64_t>();
-                        if (raw && *raw >= kMinPositiveValue && *raw <= kMaxLogRotateMb)
-                            cfg.rotate_mb = static_cast<std::size_t>(*raw);
-                    }
-                    if (const auto* k = sink_tbl->get("keep_files")) {
-                        const auto raw = k->value<int64_t>();
-                        if (raw && *raw >= kMinPositiveValue && *raw <= kMaxLogKeepFiles)
-                            cfg.keep_files = static_cast<std::size_t>(*raw);
-                    }
-                    if (const auto* fmt = sink_tbl->get("format")) {
-                        const auto f = fmt->value<std::string>();
-                        if (f && *f == "json")
-                            cfg.format = LogFormat::JSON;
-                        else if (f && *f == "pretty")
-                            cfg.format = LogFormat::Pretty;
-                    }
-                    base.logging.sinks.emplace_back(cfg);
-                }
-            }
+        // logging.queue_capacity
+        if (const auto* v = log_tbl->get("queue_capacity")) {
+            const auto raw = v->value<int64_t>();
+            if (!raw || *raw < kMinLogQueueCapacity || *raw > kMaxLogQueueCapacity)
+                return std::unexpected(
+                    make_invalid("logging.queue_capacity", "must be an integer in 1..1048576"));
+            base.logging.queue_capacity = static_cast<std::uint32_t>(*raw);
         }
     }
 

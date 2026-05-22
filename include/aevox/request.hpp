@@ -20,7 +20,6 @@
 #include <aevox/concepts.hpp>
 #include <aevox/error.hpp>
 #include <aevox/json_error.hpp>
-#include <aevox/log.hpp>
 #include <aevox/task.hpp>
 #include <aevox/websocket_error.hpp>
 
@@ -179,36 +178,20 @@ public:
      */
     [[nodiscard]] bool valid() const noexcept;
 
-    // -------------------------------------------------------------------------
-    // Request-correlated logger
-    // -------------------------------------------------------------------------
-
     /**
-     * @brief Request-correlated logger.
+     * @brief Returns Aevox's generated request identifier.
      *
-     * Every log line emitted through `req.logger()` automatically carries:
-     * - `request_id` — 16-hex-char random ID assigned per connection.
-     * - `thread_id` — hashed OS thread ID of the worker handling this request.
-     * - `timestamp` — UTC wall-clock, nanosecond precision.
-     * - `trace_id` — W3C trace ID, present when `traceparent` header was valid.
-     * - `span_id` — W3C parent span ID, present alongside `trace_id`.
+     * The id is assigned before middleware and route handlers run. It is stable
+     * for the request lifetime and appears in request-correlated log entries.
      *
-     * @note Safe to use across `co_await` suspension points because the
-     *       context is owned by `Request::Impl` and lives for the full
-     *       request lifetime.
-     * @note The global logger (`aevox::log::info(...)`) omits request fields.
+     * @return Request id as a lowercase hexadecimal string view, or an empty
+     *         view for a moved-from request.
+     * @note Thread-safety: same as `Request`; call on the request's owning
+     *       coroutine/strand.
+     * @note The returned view is valid until the `Request` is destroyed or
+     *       moved from.
      */
-    [[nodiscard]] Logger& logger() noexcept;
-
-    /**
-     * @brief Request-correlated logger.
-     *
-     * @return Immutable reference to the request logger.
-     * @note Safe to use across `co_await` suspension points because the
-     *       context is owned by `Request::Impl` and lives for the full
-     *       request lifetime.
-     */
-    [[nodiscard]] const Logger& logger() const noexcept;
+    [[nodiscard]] std::string_view id() const noexcept;
 
     // -------------------------------------------------------------------------
     // Request line accessors
@@ -479,7 +462,6 @@ private:
     // the complete struct and may construct Request::Impl directly.
     class Impl;
     std::unique_ptr<Impl> impl_;
-    Logger                log_;
 
     // Only ConnectionHandler in src/http/ may construct a Request.
     explicit Request(std::unique_ptr<Impl> impl) noexcept;

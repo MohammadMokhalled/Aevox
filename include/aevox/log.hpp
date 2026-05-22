@@ -3,369 +3,443 @@
 //
 // Public logging API for Aevox.
 //
-// Provides level-based logging (trace, debug, info, warn, error, fatal),
-// structured output (JSON / pretty), multi-sink configuration, and
-// request-correlated logging via aevox::Request::logger().
-//
-// Thread-safety: All Logger methods are thread-safe. The underlying async
-// writer uses a lock-free ring buffer; formatting and sink I/O happen on a
-// dedicated background thread.
-//
-// Invariants:
-//   - No backend networking types appear in this header.
-//   - No spdlog types appear in this header.
-//   - All heap allocation goes through std::make_unique / std::make_shared.
-//
-// Design: Tasks/architecture/AEV-011-arch.md §3.1
+// The v0.2 logger intentionally exposes a small surface: global log functions,
+// request-correlated overloads, one runtime configuration struct, and observable
+// counters. Implementation details such as queues, writer threads, formatting,
+// and destinations live under src/log/.
 
-#include <chrono>
+#include <aevox/error.hpp>
+
 #include <cstdint>
+#include <expected>
 #include <format>
-#include <functional>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <variant>
-#include <vector>
+#include <utility>
 
 namespace aevox {
 
+class Request;
+
 /**
- * @brief Default maximum size, in MiB, for a rotating file log sink.
+ * @brief Default maximum number of queued log entries.
  *
- * Used as `FileSinkConfig::rotate_mb` unless the application overrides it.
+ * Used by `LogConfig::queue_capacity` unless the application overrides it.
  *
  * @note Thread-safety: compile-time constant with no shared mutable state.
  */
-inline constexpr std::size_t kDefaultLogRotateMb{100};
+inline constexpr std::uint32_t kDefaultLogQueueCapacity{8192};
 
 /**
- * @brief Default number of rotated file log archives to retain.
+ * @brief Severity level for a log entry.
  *
- * Used as `FileSinkConfig::keep_files` unless the application overrides it.
+ * Levels are ordered from most verbose to most severe. Runtime filtering drops
+ * entries whose level is lower than `LogConfig::level`.
  *
- * @note Thread-safety: compile-time constant with no shared mutable state.
- */
-inline constexpr std::size_t kDefaultLogKeepFiles{10};
-
-/**
- * @brief Default number of entries in the asynchronous logging ring buffer.
- *
- * Used as `LogConfig::ring_buffer_entries` unless the application overrides it.
- *
- * @note Thread-safety: compile-time constant with no shared mutable state.
- */
-inline constexpr std::size_t kDefaultLogRingBufferEntries{65536};
-
-// =============================================================================
-// Severity levels
-// =============================================================================
-
-/**
- * @brief Severity levels for log entries.
- *
- * @note TRACE and DEBUG are compiled out entirely in release builds
- *       (defined away to zero instructions). INFO and above are always
- *       available at runtime with level-filtering.
+ * @note Thread-safety: values are immutable and safe to use concurrently.
  */
 enum class LogLevel : std::uint8_t
 {
-    Trace, ///< Every coroutine suspension, every byte read. Compiled out in release.
-    Debug, ///< Request lifecycle, middleware, DB queries. Compiled out in release.
-    Info,  ///< Request completed, server started, config loaded.
-    Warn,  ///< Slow requests, retries, deprecated usage.
-    Error, ///< Handler failure, parse error, connection lost.
-    Fatal, ///< Unrecoverable — triggers graceful shutdown.
+    Trace, ///< Most verbose diagnostic output.
+    Debug, ///< Developer-oriented diagnostics.
+    Info,  ///< Normal lifecycle or access-log events.
+    Warn,  ///< Slow requests, retries, or degraded behavior.
+    Error, ///< Handler, parser, or I/O failures.
+    Fatal, ///< Unrecoverable process-level failure.
 };
 
-// =============================================================================
-// Output format
-// =============================================================================
-
 /**
- * @brief Output format selector for log sinks.
+ * @brief Output format for log entries.
+ *
+ * JSON is intended for production ingestion. Pretty is intended for local
+ * development and tests.
+ *
+ * @note Thread-safety: values are immutable and safe to use concurrently.
  */
 enum class LogFormat : std::uint8_t
 {
-    JSON,   ///< Structured JSON output for production log aggregation.
-    Pretty, ///< Human-readable single-line output for development terminals.
+    Json,   ///< Newline-delimited JSON object per entry.
+    Pretty, ///< Human-readable one-line text.
 };
 
-// =============================================================================
-// Structured log fields
-// =============================================================================
-
 /**
- * @brief Fields that may appear in a structured log line.
+ * @brief Output destination used by the built-in logger.
  *
- * Used by the logger middleware to select which fields to emit.
- */
-enum class LogField : std::uint8_t
-{
-    Timestamp,     ///< Unix nanoseconds since epoch.
-    Level,         ///< Log severity (TRACE … FATAL).
-    RequestId,     ///< Unique request identifier assigned by the acceptor.
-    ThreadId,      ///< Hashed OS thread ID that handled the request.
-    Method,        ///< HTTP method (GET, POST, …).
-    Path,          ///< Request path without query string.
-    Status,        ///< HTTP response status code.
-    DurationMs,    ///< Wall-clock time from request start to response sent.
-    Ip,            ///< Client remote address.
-    UserAgent,     ///< Value of the User-Agent header.
-    BodySize,      ///< Response body length in bytes.
-    Message,       ///< Free-form log message text.
-    CorrelationId, ///< Deprecated alias for TraceId. Use TraceId in new code.
-    TraceId,       ///< W3C trace_id from traceparent header (32 hex chars).
-    SpanId,        ///< W3C parent_id (span_id) from traceparent header (16 hex chars).
-};
-
-// =============================================================================
-// Sink configuration
-// =============================================================================
-
-/**
- * @brief Configuration for a console (stdout) sink.
- */
-struct ConsoleSinkConfig
-{
-    LogFormat format{LogFormat::Pretty};
-    bool      color{true};
-};
-
-/**
- * @brief Configuration for a rotating file sink.
- */
-struct FileSinkConfig
-{
-    std::string path;                             ///< Absolute or relative file path.
-    std::size_t rotate_mb{kDefaultLogRotateMb};   ///< Maximum file size before rotation.
-    std::size_t keep_files{kDefaultLogKeepFiles}; ///< Number of rotated files to retain.
-    LogFormat   format{LogFormat::JSON};
-};
-
-// =============================================================================
-// Runtime logging configuration
-// =============================================================================
-
-/**
- * @brief Runtime logging configuration passed to AppConfig.
+ * `File` writes newline-delimited entries to `LogConfig::file_path`.
+ * `Disabled` drops every entry after level checks and is useful for benchmarks
+ * or tests that do not inspect logs.
  *
- * All fields have sensible production defaults.
+ * @note Thread-safety: values are immutable and safe to use concurrently.
+ */
+enum class LogDestination : std::uint8_t
+{
+    Stdout,   ///< Write to standard output.
+    Stderr,   ///< Write to standard error.
+    File,     ///< Append to the configured file path.
+    Disabled, ///< Drop all entries.
+};
+
+/**
+ * @brief Error codes produced while starting or flushing the logging subsystem.
+ *
+ * Logging calls never return errors to request handlers. Startup and flush
+ * operations are fallible because file destinations may fail to open or flush.
+ *
+ * @note Thread-safety: values are immutable and safe to use concurrently.
+ */
+enum class LogError : std::uint8_t
+{
+    FilePathRequired, ///< `LogDestination::File` was selected without `file_path`.
+    FileOpenFailed,   ///< The configured file could not be opened for append.
+    FlushFailed,      ///< The configured destination failed while flushing.
+};
+
+/**
+ * @brief Converts a LogError to a stable human-readable string.
+ *
+ * @param error Error code to describe.
+ * @return Static string literal with process lifetime.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] std::string_view to_string(LogError error) noexcept;
+
+/**
+ * @brief Maps a LogError to the broad Aevox error category.
+ *
+ * @param error Error code to classify.
+ * @return Broad error category for generic handling.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] ErrorCategory category(LogError error) noexcept;
+
+/**
+ * @brief Runtime configuration for the built-in logger.
+ *
+ * `LogConfig` owns all configuration values copied into the internal writer at
+ * `App` startup. Applications may move or destroy the original config after
+ * constructing `App`.
+ *
+ * @note Thread-safety: configuration is read during `App` construction/listen
+ *       startup and is not mutated concurrently by Aevox.
+ * @note Move semantics: movable and copyable; moved-from strings follow normal
+ *       `std::string` rules.
  */
 struct LogConfig
 {
-    LogLevel                                                     level{LogLevel::Info};
-    std::vector<std::variant<ConsoleSinkConfig, FileSinkConfig>> sinks{ConsoleSinkConfig{}};
-    std::size_t                                                  ring_buffer_entries{
-        kDefaultLogRingBufferEntries}; ///< Per-queue capacity. Power of 2 recommended.
+    bool                       enabled{true};         ///< Master switch for the logging subsystem.
+    LogLevel                   level{LogLevel::Info}; ///< Minimum severity accepted by the writer.
+    LogFormat                  format{LogFormat::Json}; ///< Output format used by the writer.
+    LogDestination             destination{LogDestination::Stdout}; ///< Active output destination.
+    std::optional<std::string> file_path{std::nullopt}; ///< Required when destination is `File`.
+    std::uint32_t              queue_capacity{
+        kDefaultLogQueueCapacity}; ///< Maximum queued entries before drops begin.
 };
-
-// =============================================================================
-// Forward declarations for Logger internals
-// =============================================================================
-
-class AsyncLogWriter;
-struct RequestContext;
-
-// =============================================================================
-// Logger
-// =============================================================================
 
 /**
- * @brief Primary logging interface — global and per-request.
+ * @brief Observable counters maintained by the logger.
  *
- * `Logger` is lightweight (two pointers: one to the async writer, one to
- * optional request context). It is safe to copy and move across threads.
- * All methods are `noexcept` — formatting failures are handled internally
- * by writing a fallback message, never throwing.
+ * Counters are monotonic for the lifetime of the installed writer. They are
+ * intended for tests, diagnostics, and future metrics integration.
  *
- * @note The global logger (accessed via `aevox::log::info(...)`) has no
- *       request context. The per-request logger (`req.logger().info(...)`) carries
- *       `request_id`, `thread_id`, and `timestamp` automatically.
- * @note Thread-safe: multiple threads may call `Logger` methods concurrently.
- *       The underlying `AsyncLogWriter` uses a lock-free queue.
+ * @note Thread-safety: returned by value from atomics; safe to read concurrently.
  */
-class Logger
+struct LogStats
 {
-public:
-    /**
-     * @brief Default constructor — creates a no-op logger.
-     *
-     * A default-constructed Logger discards all log entries silently.
-     */
-    Logger() noexcept = default;
-
-    /**
-     * @brief Logs a TRACE-level message.
-     */
-    template <typename... Args> void trace(std::format_string<Args...> fmt, Args&&... args) noexcept
-    {
-        try {
-            log(LogLevel::Trace, std::format(fmt, std::forward<Args>(args)...));
-        }
-        catch (...) {
-            log(LogLevel::Trace, "[format error]");
-        }
-    }
-
-    /**
-     * @brief Logs a DEBUG-level message.
-     */
-    template <typename... Args> void debug(std::format_string<Args...> fmt, Args&&... args) noexcept
-    {
-        try {
-            log(LogLevel::Debug, std::format(fmt, std::forward<Args>(args)...));
-        }
-        catch (...) {
-            log(LogLevel::Debug, "[format error]");
-        }
-    }
-
-    /**
-     * @brief Logs an INFO-level message.
-     */
-    template <typename... Args> void info(std::format_string<Args...> fmt, Args&&... args) noexcept
-    {
-        try {
-            log(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
-        }
-        catch (...) {
-            log(LogLevel::Info, "[format error]");
-        }
-    }
-
-    /**
-     * @brief Logs a WARN-level message.
-     */
-    template <typename... Args> void warn(std::format_string<Args...> fmt, Args&&... args) noexcept
-    {
-        try {
-            log(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
-        }
-        catch (...) {
-            log(LogLevel::Warn, "[format error]");
-        }
-    }
-
-    /**
-     * @brief Logs an ERROR-level message.
-     */
-    template <typename... Args> void error(std::format_string<Args...> fmt, Args&&... args) noexcept
-    {
-        try {
-            log(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
-        }
-        catch (...) {
-            log(LogLevel::Error, "[format error]");
-        }
-    }
-
-    /**
-     * @brief Logs a FATAL-level message.
-     */
-    template <typename... Args> void fatal(std::format_string<Args...> fmt, Args&&... args) noexcept
-    {
-        try {
-            log(LogLevel::Fatal, std::format(fmt, std::forward<Args>(args)...));
-        }
-        catch (...) {
-            log(LogLevel::Fatal, "[format error]");
-        }
-    }
-
-    /**
-     * @brief Logs a pre-formatted message at the given level.
-     *
-     * Used by the middleware and by the templated level methods above.
-     * This is the single non-template entry point — all formatting funnels
-     * here before being pushed to the async writer.
-     *
-     * @param level    Severity level.
-     * @param message  Pre-formatted message text.
-     */
-    void log(LogLevel level, std::string_view message) noexcept;
-
-private:
-    friend class AsyncLogWriter;
-
-    std::optional<std::reference_wrapper<AsyncLogWriter>> writer_;
-    std::optional<std::reference_wrapper<RequestContext>> context_;
-
-    explicit Logger(
-        AsyncLogWriter&                                       writer,
-        std::optional<std::reference_wrapper<RequestContext>> ctx = std::nullopt) noexcept;
-
-    void set_writer(AsyncLogWriter& writer) noexcept;
+    std::uint64_t accepted{0}; ///< Entries accepted into the writer queue.
+    std::uint64_t dropped{0};  ///< Entries dropped by filtering, contention, or capacity.
+    std::uint64_t written{0};  ///< Entries written to the configured destination.
 };
-
-// =============================================================================
-// Global logger free functions
-// =============================================================================
 
 namespace log {
 
 /**
- * @brief Returns the global logger instance.
+ * @brief Logs a preformatted global message.
  *
- * The global logger is initialised lazily on first use with a no-op
- * configuration. `App::listen()` replaces it with the real configured
- * instance before accepting connections.
+ * The call never performs file or console I/O on the caller thread. If the
+ * logger is disabled, the entry is below the configured level, the queue is
+ * full, or the queue lock is contended, the entry is dropped. Dropped entries
+ * are counted in `stats()`.
+ *
+ * @param level Severity level.
+ * @param message Message text. The writer copies the text before this function returns.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: allocation failure or writer absence degrades to a dropped entry.
  */
-[[nodiscard]] Logger& global() noexcept;
+void write(LogLevel level, std::string_view message) noexcept;
 
 /**
- * @brief Logs a TRACE-level message via the global logger.
+ * @brief Logs a preformatted request-correlated message.
+ *
+ * The emitted entry includes the request id, method, path, and trace fields
+ * available on `request`. The call never performs file or console I/O on the
+ * caller thread.
+ *
+ * @param request Request whose context should be attached.
+ * @param level Severity level.
+ * @param message Message text. The writer copies the text before this function returns.
+ * @note Thread-safety: same as `Request`; call on the request's owning coroutine/strand.
+ * @note noexcept: allocation failure or writer absence degrades to a dropped entry.
  */
-template <typename... Args>
-inline void trace(std::format_string<Args...> fmt, Args&&... args) noexcept
+void write(const Request& request, LogLevel level, std::string_view message) noexcept;
+
+/**
+ * @brief Flushes the installed logger.
+ *
+ * Drains queued entries and flushes the active destination. This may block and
+ * must not be called from the request hot path.
+ *
+ * @return Empty expected on success, or `LogError` when the destination flush fails.
+ * @note Thread-safety: safe to call concurrently, but calls serialize internally.
+ */
+[[nodiscard]] std::expected<void, LogError> flush() noexcept;
+
+/**
+ * @brief Returns current logger counters.
+ *
+ * @return Accepted, dropped, and written entry counts for the installed writer.
+ * @note Thread-safety: safe to call concurrently.
+ */
+[[nodiscard]] LogStats stats() noexcept;
+
+/**
+ * @brief Logs a TRACE-level global message.
+ *
+ * @tparam Args Format argument types.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args> void trace(std::format_string<Args...> fmt, Args&&... args) noexcept
 {
-    global().trace(fmt, std::forward<Args>(args)...);
+    try {
+        write(LogLevel::Trace, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(LogLevel::Trace, "[format error]");
+    }
 }
 
 /**
- * @brief Logs a DEBUG-level message via the global logger.
+ * @brief Logs a DEBUG-level global message.
+ *
+ * @tparam Args Format argument types.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: formatting failures emit `"[format error]"`.
  */
-template <typename... Args>
-inline void debug(std::format_string<Args...> fmt, Args&&... args) noexcept
+template <typename... Args> void debug(std::format_string<Args...> fmt, Args&&... args) noexcept
 {
-    global().debug(fmt, std::forward<Args>(args)...);
+    try {
+        write(LogLevel::Debug, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(LogLevel::Debug, "[format error]");
+    }
 }
 
 /**
- * @brief Logs an INFO-level message via the global logger.
+ * @brief Logs an INFO-level global message.
+ *
+ * @tparam Args Format argument types.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: formatting failures emit `"[format error]"`.
  */
-template <typename... Args>
-inline void info(std::format_string<Args...> fmt, Args&&... args) noexcept
+template <typename... Args> void info(std::format_string<Args...> fmt, Args&&... args) noexcept
 {
-    global().info(fmt, std::forward<Args>(args)...);
+    try {
+        write(LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(LogLevel::Info, "[format error]");
+    }
 }
 
 /**
- * @brief Logs a WARN-level message via the global logger.
+ * @brief Logs a WARN-level global message.
+ *
+ * @tparam Args Format argument types.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: formatting failures emit `"[format error]"`.
  */
-template <typename... Args>
-inline void warn(std::format_string<Args...> fmt, Args&&... args) noexcept
+template <typename... Args> void warn(std::format_string<Args...> fmt, Args&&... args) noexcept
 {
-    global().warn(fmt, std::forward<Args>(args)...);
+    try {
+        write(LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(LogLevel::Warn, "[format error]");
+    }
 }
 
 /**
- * @brief Logs an ERROR-level message via the global logger.
+ * @brief Logs an ERROR-level global message.
+ *
+ * @tparam Args Format argument types.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: formatting failures emit `"[format error]"`.
  */
-template <typename... Args>
-inline void error(std::format_string<Args...> fmt, Args&&... args) noexcept
+template <typename... Args> void error(std::format_string<Args...> fmt, Args&&... args) noexcept
 {
-    global().error(fmt, std::forward<Args>(args)...);
+    try {
+        write(LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(LogLevel::Error, "[format error]");
+    }
 }
 
 /**
- * @brief Logs a FATAL-level message via the global logger.
+ * @brief Logs a FATAL-level global message.
+ *
+ * @tparam Args Format argument types.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: safe to call concurrently from multiple threads.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args> void fatal(std::format_string<Args...> fmt, Args&&... args) noexcept
+{
+    try {
+        write(LogLevel::Fatal, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(LogLevel::Fatal, "[format error]");
+    }
+}
+
+/**
+ * @brief Logs a TRACE-level request-correlated message.
+ *
+ * @tparam Args Format argument types.
+ * @param request Request whose correlation context is attached.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: same as `Request`; call on the owning coroutine/strand.
+ * @note noexcept: formatting failures emit `"[format error]"`.
  */
 template <typename... Args>
-inline void fatal(std::format_string<Args...> fmt, Args&&... args) noexcept
+void trace(const Request& request, std::format_string<Args...> fmt, Args&&... args) noexcept
 {
-    global().fatal(fmt, std::forward<Args>(args)...);
+    try {
+        write(request, LogLevel::Trace, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(request, LogLevel::Trace, "[format error]");
+    }
+}
+
+/**
+ * @brief Logs a DEBUG-level request-correlated message.
+ *
+ * @tparam Args Format argument types.
+ * @param request Request whose correlation context is attached.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: same as `Request`; call on the owning coroutine/strand.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args>
+void debug(const Request& request, std::format_string<Args...> fmt, Args&&... args) noexcept
+{
+    try {
+        write(request, LogLevel::Debug, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(request, LogLevel::Debug, "[format error]");
+    }
+}
+
+/**
+ * @brief Logs an INFO-level request-correlated message.
+ *
+ * @tparam Args Format argument types.
+ * @param request Request whose correlation context is attached.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: same as `Request`; call on the owning coroutine/strand.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args>
+void info(const Request& request, std::format_string<Args...> fmt, Args&&... args) noexcept
+{
+    try {
+        write(request, LogLevel::Info, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(request, LogLevel::Info, "[format error]");
+    }
+}
+
+/**
+ * @brief Logs a WARN-level request-correlated message.
+ *
+ * @tparam Args Format argument types.
+ * @param request Request whose correlation context is attached.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: same as `Request`; call on the owning coroutine/strand.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args>
+void warn(const Request& request, std::format_string<Args...> fmt, Args&&... args) noexcept
+{
+    try {
+        write(request, LogLevel::Warn, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(request, LogLevel::Warn, "[format error]");
+    }
+}
+
+/**
+ * @brief Logs an ERROR-level request-correlated message.
+ *
+ * @tparam Args Format argument types.
+ * @param request Request whose correlation context is attached.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: same as `Request`; call on the owning coroutine/strand.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args>
+void error(const Request& request, std::format_string<Args...> fmt, Args&&... args) noexcept
+{
+    try {
+        write(request, LogLevel::Error, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(request, LogLevel::Error, "[format error]");
+    }
+}
+
+/**
+ * @brief Logs a FATAL-level request-correlated message.
+ *
+ * @tparam Args Format argument types.
+ * @param request Request whose correlation context is attached.
+ * @param fmt Compile-time checked format string.
+ * @param args Values referenced by the format string.
+ * @note Thread-safety: same as `Request`; call on the owning coroutine/strand.
+ * @note noexcept: formatting failures emit `"[format error]"`.
+ */
+template <typename... Args>
+void fatal(const Request& request, std::format_string<Args...> fmt, Args&&... args) noexcept
+{
+    try {
+        write(request, LogLevel::Fatal, std::format(fmt, std::forward<Args>(args)...));
+    }
+    catch (...) {
+        write(request, LogLevel::Fatal, "[format error]");
+    }
 }
 
 } // namespace log

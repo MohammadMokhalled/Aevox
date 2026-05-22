@@ -32,7 +32,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "log/async_writer.hpp"
+#include "log/log_writer.hpp"
 #include "net/topic_bus.hpp"
 #include "router/handler_wrap.hpp"
 
@@ -187,7 +187,7 @@ struct App::Impl
     aevox::net::TopicBus topic_bus;
 
     // Async log writer — initialised in App::listen() from config.logging.
-    std::unique_ptr<AsyncLogWriter> log_writer;
+    std::shared_ptr<aevox::detail::LogWriter> log_writer;
 };
 
 } // namespace aevox

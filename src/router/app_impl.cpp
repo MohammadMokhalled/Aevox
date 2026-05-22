@@ -12,6 +12,7 @@
 #include <aevox/app.hpp>
 #include <aevox/config.hpp>
 #include <aevox/executor.hpp>
+#include <aevox/log.hpp>
 #include <aevox/middleware.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
@@ -22,7 +23,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <csignal>
 #include <cstddef>
 #include <cstdint>
@@ -30,14 +30,13 @@
 #include <expected>
 #include <format>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
-#include <random>
 #include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -47,7 +46,7 @@
 #include "http/request_impl.hpp"
 #include "http/response_impl.hpp"
 #include "http/traceparent.hpp"
-#include "log/async_writer.hpp"
+#include "log/log_writer.hpp"
 #include "net/topic_bus.hpp"
 #include "net/websocket_session.hpp"
 #include "router/router_impl.hpp"
@@ -72,6 +71,25 @@ namespace {
 constexpr std::size_t kResponseHeadReserveSize{256};
 constexpr int         kStatusNoContent{204};
 constexpr int         kStatusPayloadTooLarge{413};
+
+[[nodiscard]] std::atomic_uint64_t& request_counter() noexcept
+{
+    static std::atomic_uint64_t instance{0};
+    return instance;
+}
+
+[[nodiscard]] std::shared_ptr<detail::LogWriter> make_disabled_log_writer() noexcept
+{
+    LogConfig fallback;
+    fallback.enabled     = false;
+    fallback.destination = LogDestination::Disabled;
+
+    auto writer = detail::LogWriter::create(std::move(fallback));
+    if (!writer) {
+        return {};
+    }
+    return *writer;
+}
 
 void handle_signal(int) noexcept
 {
@@ -255,7 +273,16 @@ App::App(AppConfig config) : impl_{std::make_unique<Impl>()}
     impl_->executor = make_executor(impl_->config.executor);
 }
 
-App::~App() = default;
+App::~App()
+{
+    if (impl_ && impl_->executor) {
+        impl_->executor->stop();
+    }
+    aevox::detail::reset_log_writer();
+    if (impl_) {
+        impl_->log_writer.reset();
+    }
+}
 
 App::App(App&&) noexcept = default;
 
@@ -326,14 +353,22 @@ void App::listen(std::uint16_t port)
     aevox::net::TopicBus& topic_bus = impl_->topic_bus;
 
     // Initialise async logging subsystem from config.
-    impl_->log_writer = std::make_unique<AsyncLogWriter>(impl_->config.logging);
-    impl_->log_writer->install_as_global();
+    auto log_writer = aevox::detail::LogWriter::create(impl_->config.logging);
+    if (!log_writer) {
+        std::cerr << "aevox: logging disabled: " << aevox::to_string(log_writer.error()) << '\n';
+        impl_->log_writer = make_disabled_log_writer();
+    }
+    else {
+        impl_->log_writer = *log_writer;
+    }
 
-    AsyncLogWriter& log_writer = *impl_->log_writer;
+    if (impl_->log_writer) {
+        aevox::detail::install_log_writer(impl_->log_writer);
+    }
 
     auto connection_handler = [max_body, max_header_cnt, max_read, &router, &global_mw, &scoped_mw,
-                               &topic_bus, &log_writer](std::uint64_t /*conn_id*/,
-                                                        TcpStream stream) -> Task<void> {
+                               &topic_bus](std::uint64_t /*conn_id*/,
+                                           TcpStream stream) -> Task<void> {
         detail::HttpParser parser{{.max_header_count = max_header_cnt, .max_body_bytes = max_body}};
 
         for (;;) {
@@ -372,27 +407,22 @@ void App::listen(std::uint16_t port)
                 req_impl->get().set_max_payload(max_body);
 
                 // Set up per-request logging context.
-                // request_id: 16 lowercase hex chars from a per-thread PRNG.
-                thread_local std::mt19937_64 rng{std::random_device{}()};
-                req_impl->get().log_context().request_id = std::format("{:016x}", rng());
+                const auto next_id =
+                    request_counter().fetch_add(1U, std::memory_order_relaxed) + 1U;
+                req_impl->get().set_request_id(std::format("{:016x}", next_id));
 
                 // traceparent: W3C Trace Context extraction (AEV-012).
                 const auto tp_hdr = req.header("traceparent");
                 if (tp_hdr) {
                     const auto parsed_tp = aevox::detail::parse_traceparent(*tp_hdr);
                     if (parsed_tp) {
-                        req_impl->get().log_context().trace_id =
-                            std::string{parsed_tp->trace_id.begin(), parsed_tp->trace_id.end()};
-                        req_impl->get().log_context().span_id =
-                            std::string{parsed_tp->parent_id.begin(), parsed_tp->parent_id.end()};
-                        req_impl->get().log_context().traceparent = std::string{*tp_hdr};
+                        req_impl->get().set_trace_id(
+                            std::string{parsed_tp->trace_id.begin(), parsed_tp->trace_id.end()});
+                        req_impl->get().set_span_id(
+                            std::string{parsed_tp->parent_id.begin(), parsed_tp->parent_id.end()});
+                        req_impl->get().set_traceparent(std::string{*tp_hdr});
                     }
                 }
-
-                req_impl->get().log_context().thread_id =
-                    std::hash<std::thread::id>{}(std::this_thread::get_id());
-                req_impl->get().log_context().accept_time = std::chrono::steady_clock::now();
-                req.logger() = log_writer.make_logger(req_impl->get().log_context());
             }
 
             // Dispatch through the pipeline (fast path handled inside the function).
@@ -425,6 +455,13 @@ void App::listen(std::uint16_t port)
 
     auto run_result = impl_->executor->run();
     (void)run_result; // stop() → run() returns success; errors are not recoverable here
+    const auto flush_result = aevox::log::flush();
+    if (!flush_result) {
+        std::cerr << "aevox: logging flush failed: " << aevox::to_string(flush_result.error())
+                  << '\n';
+    }
+    aevox::detail::reset_log_writer();
+    impl_->log_writer.reset();
 
     // Clear signal handler so a second listen() call (UB per contract, but defensive)
     // does not double-install.

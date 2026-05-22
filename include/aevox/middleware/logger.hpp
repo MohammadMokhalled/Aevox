@@ -1,12 +1,7 @@
 #pragma once
 // include/aevox/middleware/logger.hpp
 //
-// Public API for the automatic request/response logger middleware.
-//
-// Provides a factory function that returns a Middleware which logs every
-// request/response with configurable fields, format, and exclusion rules.
-//
-// Design: Tasks/architecture/AEV-011-arch.md §3.2
+// Public API for Aevox's automatic request/response access-log middleware.
 
 #include <aevox/log.hpp>
 #include <aevox/middleware.hpp>
@@ -14,40 +9,51 @@
 #include <chrono>
 #include <string>
 #include <unordered_set>
-#include <vector>
 
 namespace aevox::middleware {
 
-inline constexpr std::chrono::milliseconds kDefaultSlowRequestThreshold{500};
+/**
+ * @brief Default threshold used to classify an HTTP request as slow.
+ *
+ * The logger middleware emits slow requests at `LogLevel::Warn` when
+ * `LoggerMiddlewareConfig::log_slow_requests` is enabled.
+ *
+ * @note Thread-safety: compile-time constant with no shared mutable state.
+ */
+inline constexpr std::chrono::milliseconds kDefaultSlowRequestThreshold{
+    std::chrono::milliseconds{500}};
 
 /**
- * @brief Configuration for the automatic request/response logger middleware.
+ * @brief Configuration for automatic request/response access logging.
+ *
+ * The middleware emits one log entry after the downstream handler returns. It
+ * uses the global logging configuration for destination and format; this config
+ * only controls middleware behavior.
+ *
+ * @note Thread-safety: copied into the middleware object at registration time
+ *       and then read concurrently. Do not mutate a registered middleware object
+ *       through captured references.
+ * @note Move semantics: movable and copyable; moved-from containers follow
+ *       standard library rules.
  */
 struct LoggerMiddlewareConfig
 {
-    LogFormat             format{LogFormat::JSON};
-    LogLevel              level{LogLevel::Info};
-    std::vector<LogField> include{
-        LogField::Timestamp, LogField::Level,  LogField::RequestId,  LogField::Method,
-        LogField::Path,      LogField::Status, LogField::DurationMs,
-    };
-    std::unordered_set<std::string> exclude_paths{};
+    LogLevel level{LogLevel::Info};                  ///< Severity used for normal access logs.
+    std::unordered_set<std::string> exclude_paths{}; ///< Exact paths that produce no log entry.
     std::chrono::milliseconds       slow_request_threshold{kDefaultSlowRequestThreshold};
+    bool log_slow_requests{true}; ///< Emits slow requests at Warn when the threshold is exceeded.
 };
 
 /**
- * @brief Factory that returns a Middleware which logs every request/response.
+ * @brief Creates middleware that emits one correlated access log line per request.
  *
- * The middleware measures duration (from entry to response return), extracts
- * the configured fields, and emits one structured log line per request via
- * the global async logger.
+ * The middleware records start time, awaits the next middleware/handler, then
+ * logs method, path, status, duration, request id, and trace fields through
+ * `aevox::log::write(request, ...)`.
  *
- * @param config  Field selection, format, and exclusion rules.
- * @return A Middleware satisfying the `MiddlewareFn` concept.
- *
- * @note The middleware short-circuits (emits nothing) for paths in
- *       `exclude_paths`. This is a fast `unordered_set` lookup before any
- *       timer or field extraction.
+ * @param config Middleware behavior configuration.
+ * @return Move-only middleware object suitable for `App::use()`.
+ * @note Thread-safety: safe for concurrent request invocation after registration.
  */
 [[nodiscard]] Middleware logger(LoggerMiddlewareConfig config = {});
 

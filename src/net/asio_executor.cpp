@@ -173,7 +173,7 @@ asio::awaitable<void> AsioExecutor::run_accept_loop(AcceptLoop& loop)
                 co_return; // stop() closed the acceptor — clean exit
 
             // Transient error (e.g. EMFILE) — log and continue.
-            // TODO: replace with spdlog when logging is wired.
+            // TODO: replace with Aevox logging once executor diagnostics are wired.
             continue;
         }
 

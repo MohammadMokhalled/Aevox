@@ -1,235 +1,198 @@
 # Logging
 
-> Structured, asynchronous logging with per-request correlation and zero-allocation hot path.
+> Structured asynchronous logging with global and request-correlated entry points.
+
+**Header:** `#include <aevox/log.hpp>`
+
+---
 
 ## Overview
 
-The logging subsystem in `<aevox/log.hpp>` provides severity-based structured logging that is fully asynchronous. Log entries are pushed to a lock-free ring buffer by the calling thread; a background drain thread formats and writes them to the configured sinks. This design guarantees that the hot path (`logger.info(...)`) never blocks on I/O.
+Aevox logging uses a bounded queue and a background writer so request handlers never perform file or
+console I/O directly. The public surface is intentionally small: one configuration struct, global
+log functions, request-correlated overloads, `flush()`, and `stats()`.
 
-Key features:
-
-- **No blocking on I/O** — `Logger::info()` returns immediately; a background thread handles disk or console output.
-- **Per-request correlation** — every `Request` carries a `Logger` that automatically tags entries with `request_id` and `thread_id`.
-- **Structured JSON or pretty output** — sink-level control over formatting.
-- **Thread-safe** — multiple request handlers can log concurrently without contention.
+Request-correlated entries include `request_id`, method, path, and valid trace fields. Automatic
+HTTP access logging is provided by `#include <aevox/middleware/logger.hpp>`.
 
 ## Quick Start
 
 ```cpp
-#include <aevox/log.hpp>
+aevox::AppConfig config;
+config.logging.destination = aevox::LogDestination::File;
+config.logging.file_path = "/var/log/aevox/app.log";
 
-// Inside a handler — req.logger() is already set up by the framework
+aevox::App app{config};
+app.use(aevox::middleware::logger());
+
 app.get("/orders/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
-    req.logger().info("Processing order {}", req.param<int>("id").value());
-    // ...
-    co_return aevox::Response::ok(result);
+    aevox::log::info(req, "Processing order {}", req.param<int>("id").value());
+    co_return aevox::Response::ok("ok");
 });
 ```
 
 ## API Reference
 
-### `aevox::log::LogLevel`
+#### `aevox::LogLevel`
 
-```cpp
-enum class LogLevel : std::uint8_t
-{
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
-    Fatal,
-};
-```
+| Value | Meaning | Typical response |
+|---|---|---|
+| `Trace` | Very verbose diagnostics | Enable only during local diagnosis |
+| `Debug` | Developer diagnostics | Enable in development |
+| `Info` | Normal lifecycle and access events | Default production level |
+| `Warn` | Slow requests or degraded behavior | Investigate if sustained |
+| `Error` | Handler, parser, or I/O failure | Alert or inspect logs |
+| `Fatal` | Unrecoverable process-level failure | Shut down or restart |
 
-Severity levels in ascending order. Runtime filtering is controlled by `LogConfig::level`.
+#### `aevox::LogFormat`
 
-### `aevox::log::LogFormat`
+| Value | Meaning | Typical response |
+|---|---|---|
+| `Json` | Newline-delimited JSON object per entry | Use for production ingestion |
+| `Pretty` | Human-readable one-line text | Use for local development |
 
-```cpp
-enum class LogFormat : std::uint8_t
-{
-    JSON,
-    Pretty,
-};
-```
+#### `aevox::LogDestination`
 
-Output format for sinks. `JSON` is recommended for production log aggregation.
+| Value | Meaning | Typical response |
+|---|---|---|
+| `Stdout` | Write to standard output | Container-friendly default |
+| `Stderr` | Write to standard error | Useful for process supervisors |
+| `File` | Append to `LogConfig::file_path` | Use for local file collection |
+| `Disabled` | Drop all entries | Use for benchmarks |
 
-### `aevox::log::LogField`
-
-```cpp
-enum class LogField : std::uint8_t
-{
-    Timestamp,     // Unix nanoseconds since epoch.
-    Level,         // Log severity (TRACE ... FATAL).
-    RequestId,     // Unique request identifier assigned by the acceptor.
-    ThreadId,      // Hashed OS thread ID that handled the request.
-    Method,        // HTTP method (GET, POST, ...).
-    Path,          // Request path without query string.
-    Status,        // HTTP response status code.
-    DurationMs,    // Wall-clock time from request start to response sent.
-    Ip,            // Client remote address.
-    UserAgent,     // Value of the User-Agent header.
-    BodySize,      // Response body length in bytes.
-    Message,       // Free-form log message text.
-    CorrelationId, // Deprecated alias for TraceId. Use TraceId in new code.
-    TraceId,       // W3C trace_id from traceparent header (32 hex chars).
-    SpanId,        // W3C parent_id (span_id) from traceparent header (16 hex chars).
-};
-```
-
-Fields available for automatic request/response logging via `aevox::middleware::logger()`.
-
-`CorrelationId` is a deprecated alias for `TraceId`. New code should use `TraceId` and `SpanId` directly.
-
-### `aevox::log::ConsoleSinkConfig`
-
-```cpp
-struct ConsoleSinkConfig
-{
-    LogFormat format{LogFormat::Pretty};
-    bool      color{true};
-};
-```
-
-Configuration for a `stdout` sink.
-
-### `aevox::log::FileSinkConfig`
-
-```cpp
-struct FileSinkConfig
-{
-    std::string path;
-    std::size_t rotate_mb{100};
-    std::size_t keep_files{10};
-    LogFormat   format{LogFormat::JSON};
-};
-```
-
-Configuration for a file sink with rotation.
-
-### `aevox::log::LogConfig`
+#### `aevox::LogConfig`
 
 ```cpp
 struct LogConfig
 {
+    bool enabled{true};
     LogLevel level{LogLevel::Info};
-    std::vector<std::variant<ConsoleSinkConfig, FileSinkConfig>> sinks{
-        ConsoleSinkConfig{}
-    };
-    std::size_t ring_buffer_entries{65536};
+    LogFormat format{LogFormat::Json};
+    LogDestination destination{LogDestination::Stdout};
+    std::optional<std::string> file_path{std::nullopt};
+    std::uint32_t queue_capacity{kDefaultLogQueueCapacity};
 };
 ```
 
-Runtime logging configuration. Passed via `AppConfig::logging`.
-
-### `aevox::log::Logger`
-
-```cpp
-class Logger
-{
-public:
-    template <typename... Args>
-    void trace(std::format_string<Args...> fmt, Args&&... args) noexcept;
-
-    template <typename... Args>
-    void debug(std::format_string<Args...> fmt, Args&&... args) noexcept;
-
-    template <typename... Args>
-    void info(std::format_string<Args...> fmt, Args&&... args) noexcept;
-
-    template <typename... Args>
-    void warn(std::format_string<Args...> fmt, Args&&... args) noexcept;
-
-    template <typename... Args>
-    void error(std::format_string<Args...> fmt, Args&&... args) noexcept;
-
-    template <typename... Args>
-    void fatal(std::format_string<Args...> fmt, Args&&... args) noexcept;
-};
-```
-
-Lightweight handle to the async logging system. Each `Request` exposes `logger()`, which returns a `Logger` pre-configured with the request's correlation context.
-
-All methods are `noexcept` and return immediately. If the ring buffer is full, the entry is silently dropped.
-
-### `aevox::log::global()`
-
-```cpp
-[[nodiscard]] Logger& global() noexcept;
-```
-
-Returns the global application logger. Use this for framework-level logging outside of request handlers. Automatically initialised when `App::listen()` is called.
-
-### Global level functions
-
-```cpp
-aevox::log::trace("state = {}", state);
-aevox::log::debug("value = {}", value);
-```
-
-These functions log through the global application logger. Runtime level filtering is configured with `LogConfig::level`.
-
----
-
-## Logger Middleware
-
-### `aevox::middleware::logger()`
-
-```cpp
-[[nodiscard]] Middleware logger(LoggerMiddlewareConfig config = {});
-```
-
-Factory function that creates a middleware which automatically logs every incoming request and outgoing response. The produced log line includes timestamp, method, path, status code, and duration.
-
-### `aevox::log::LoggerMiddlewareConfig`
-
-```cpp
-struct LoggerMiddlewareConfig
-{
-    LogFormat format{LogFormat::JSON};
-    LogLevel  level{LogLevel::Info};
-    std::vector<LogField> include{...};
-    std::unordered_set<std::string> exclude_paths{};
-    std::chrono::milliseconds slow_request_threshold{500};
-};
-```
-
-Configuration for the logger middleware. Use `exclude_paths` to suppress logging for health checks or metrics endpoints. Requests exceeding `slow_request_threshold` emit an additional `WARN` entry.
-
----
-
-## Configuration
-
-Logging is configured via `AppConfig::logging`:
-
-```cpp
-aevox::AppConfig config;
-config.logging.level = aevox::log::LogLevel::Info;
-config.logging.sinks = {
-    aevox::log::ConsoleSinkConfig{.format = aevox::log::LogFormat::Pretty, .color = true},
-    aevox::log::FileSinkConfig{.path = "/var/log/aevox/app.log", .format = aevox::log::LogFormat::JSON},
-};
-config.logging.ring_buffer_entries = 65536;
-```
-
-Or via TOML:
+TOML equivalent:
 
 ```toml
 [logging]
+enabled = true
 level = "info"
-ring_buffer_entries = 65536
-
-[[logging.sinks]]
-type = "console"
-format = "pretty"
-color = true
-
-[[logging.sinks]]
-type = "file"
-path = "/var/log/aevox/app.log"
 format = "json"
-rotate_mb = 100
-keep_files = 5
+destination = "file"
+file_path = "/var/log/aevox/app.log"
+queue_capacity = 16384
 ```
+
+#### `aevox::LogStats`
+
+```cpp
+struct LogStats
+{
+    std::uint64_t accepted;
+    std::uint64_t dropped;
+    std::uint64_t written;
+};
+```
+
+`accepted` counts records accepted into the queue. `dropped` counts records filtered out or rejected
+because the queue could not accept them immediately. `written` counts records written by the
+background writer.
+
+#### `aevox::log::write()`
+
+```cpp
+void write(LogLevel level, std::string_view message) noexcept;
+void write(const Request& request, LogLevel level, std::string_view message) noexcept;
+```
+
+Use `write()` when the message is already formatted.
+
+#### `aevox::log::{trace,debug,info,warn,error,fatal}()`
+
+```cpp
+aevox::log::info("Server starting on port {}", port);
+aevox::log::warn(req, "Slow lookup for {}", user_id);
+```
+
+The request overloads attach request correlation fields. Formatting failures emit
+`"[format error]"` instead of throwing.
+
+#### `aevox::log::flush()`
+
+```cpp
+auto result = aevox::log::flush();
+if (!result) {
+    // result.error() is aevox::LogError
+}
+```
+
+`flush()` drains queued entries and flushes the destination. It may block and should not be called
+from request handlers.
+
+#### `aevox::log::stats()`
+
+```cpp
+const aevox::LogStats stats = aevox::log::stats();
+```
+
+Returns counters by value. The values are intended for diagnostics, tests, and future metrics.
+
+#### `aevox::Request::id()`
+
+```cpp
+std::string_view request_id = req.id();
+```
+
+Returns the request id that also appears in request-correlated logs.
+
+#### `aevox::middleware::logger()`
+
+```cpp
+app.use(aevox::middleware::logger({
+    .exclude_paths = {"/health"},
+}));
+```
+
+The middleware emits one access log entry after the response is produced. Slow requests emit the
+access entry at `Warn`; they do not emit a second duplicate line.
+
+## Error Reference
+
+| Value | Meaning | Typical response |
+|---|---|---|
+| `FilePathRequired` | `File` destination was selected without `file_path` | Fix configuration |
+| `FileOpenFailed` | The configured file could not be opened | Check path and permissions |
+| `FlushFailed` | Destination failed while flushing | Inspect disk or stream state |
+
+Use `aevox::to_string(LogError)` and `aevox::category(LogError)` for diagnostics.
+
+When an `App` cannot start the configured logger, Aevox writes a diagnostic to standard error and
+continues with logging disabled. Request handling is not aborted because logging is observability, not
+the service's availability boundary.
+
+## Thread Safety
+
+Global log functions are safe to call concurrently from multiple threads. Request-correlated
+overloads follow the `Request` contract: call them on the request's owning coroutine/strand.
+
+`flush()` is thread-safe but serializes internally and may block. `stats()` reads atomic counters and
+is safe to call concurrently.
+
+## Implementation Notes
+
+The implementation lives in `src/log/`. Public headers expose no fmtlib, Asio, llhttp, glaze, or
+toml++ types. The background writer owns the queue and destination; callers only enqueue
+records or observe counters.
+
+!!! note
+    The queue is bounded. Under contention or overload, Aevox drops log entries instead of blocking
+    request handlers.
+
+## See Also
+
+- [Logging Guide](../guide/logging.md)
+- [Middleware API](middleware.md)
+- [Request and Response API](request-response.md)

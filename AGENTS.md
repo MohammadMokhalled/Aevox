@@ -67,7 +67,7 @@ The `aevox::Executor` interface in `include/aevox/executor.hpp` is the only netw
 
 ### 3.2 No Third-Party Library Types in Public Headers
 
-No file under `include/aevox/` may expose types from llhttp, glaze, spdlog, fmtlib, or any other dependency. Every external library is an implementation detail of `src/`.
+No file under `include/aevox/` may expose types from llhttp, glaze, fmtlib, or any other dependency. Every external library is an implementation detail of `src/`.
 
 ### 3.3 No Raw `new` / `delete` Anywhere
 
@@ -154,7 +154,7 @@ aevox/
 │   ├── http/               ← HTTP parser integration (llhttp)
 │   ├── router/
 │   ├── json/               ← JSON backend (glaze or alt)
-│   └── log/                ← logging backend (spdlog or alt)
+│   └── log/                ← logging backend
 ├── tests/
 │   ├── unit/{module}/
 │   ├── integration/{module}/
@@ -296,7 +296,6 @@ All external libraries are vendored via vcpkg and version-locked in `vcpkg.json`
 | Asio (standalone) | `src/net/` only | `include/aevox/` — absolute ban |
 | llhttp | `src/http/` only | `include/aevox/` — absolute ban |
 | glaze | `src/json/` only | `include/aevox/` — absolute ban |
-| spdlog | `src/log/` only | `include/aevox/` — absolute ban |
 | fmtlib | `src/` only | `include/aevox/` (use `std::format` there) |
 | Catch2 / nanobench | `tests/` only | `src/`, `include/aevox/` |
 
@@ -396,4 +395,3 @@ Always pipe noisy command output through `grep`, `head`, `tail`, `awk`, or `sed`
 - `grep -n "class\|struct" file.hpp` for declarations.
 - `ls -la src/ | grep "\.cpp$"` for specific files.
 - `head -n 20` or `tail -n 20` for partial output.
-

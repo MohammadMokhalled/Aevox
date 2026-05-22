@@ -82,25 +82,12 @@ app.use([](aevox::Request& req,
 
 ## Logging
 
-Log all requests and responses:
+Use the built-in logger middleware to log requests and responses:
 
 ```cpp
-app.use([](aevox::Request& req,
-           std::move_only_function<aevox::Task<aevox::Response>(aevox::Request&)> next)
-    -> aevox::Task<aevox::Response> {
-    auto start = std::chrono::high_resolution_clock::now();
-    
-    std::cout << req.method() << " " << req.path() << "\n";
-    
-    auto res = co_await next(req);
-    
-    auto duration = std::chrono::high_resolution_clock::now() - start;
-    std::cout << "  → " << res.status_code() << " ("
-              << std::chrono::duration_cast<std::chrono::milliseconds>(duration).count()
-              << "ms)\n";
-    
-    co_return res;
-});
+app.use(aevox::middleware::logger({
+    .exclude_paths = {"/health"},
+}));
 ```
 
 ## Scoped Middleware
