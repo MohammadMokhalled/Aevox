@@ -14,3 +14,6 @@ add_subdirectory(json)       # JSON abstraction layer unit tests
 add_subdirectory(log)        # Logging subsystem unit tests
 add_subdirectory(websocket)  # WebSocket handshake, frame, error, and topic bus unit tests
 add_subdirectory(bench)      # Benchmark support helper unit tests
+if(AEVOX_ENABLE_GRPC)
+    add_subdirectory(grpc)   # Optional official gRPC plugin unit tests
+endif()

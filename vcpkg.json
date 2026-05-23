@@ -29,5 +29,16 @@
       "name": "tomlplusplus",
       "version>=": "3.4.0"
     }
-  ]
+  ],
+  "features": {
+    "grpc": {
+      "description": "Build the official Aevox gRPC plugin",
+      "dependencies": [
+        {
+          "name": "nghttp2",
+          "version>=": "1.61.0"
+        }
+      ]
+    }
+  }
 }

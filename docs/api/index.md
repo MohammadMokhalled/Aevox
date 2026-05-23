@@ -20,6 +20,7 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [JSON](json.md) | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` | Automatic request/response JSON serialization via a pluggable backend |
 | [Logging](log.md) | `<aevox/log.hpp>` | Structured async logging — severity levels, request correlation, bounded queue, JSON/pretty output |
 | [WebSocket](websocket.md) | `<aevox/websocket.hpp>` / `<aevox/websocket_handler.hpp>` / `<aevox/websocket_error.hpp>` | RFC 6455 upgrade, bidirectional messaging, and in-process pub/sub |
+| [gRPC Plugin](grpc.md) | `<aevox/plugin.hpp>` / `<aevox/plugins/grpc.hpp>` | Optional h2c unary gRPC plugin with raw protobuf message bytes |
 | [Concepts](concepts.md) | `<aevox/concepts.hpp>` | `ParamConvertible`, `Serializable`, `Deserializable` — C++23 concept constraints for parameters and JSON |
 
 ---

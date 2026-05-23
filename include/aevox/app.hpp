@@ -23,6 +23,7 @@
 #include <aevox/executor.hpp>
 #include <aevox/log.hpp>
 #include <aevox/middleware.hpp>
+#include <aevox/plugin.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
 #include <aevox/router.hpp>
@@ -379,6 +380,25 @@ public:
     {
         use_impl(prefix, Middleware(std::forward<F>(mw)));
     }
+
+    /**
+     * @brief Installs a first-party plugin on this App.
+     *
+     * Installation transfers ownership of `plugin` to the App only after the plugin
+     * validates successfully. Installed plugins start automatically when `listen()`
+     * is called and stop when `stop()` or the App destructor runs.
+     *
+     * @param plugin  Owning plugin pointer. Must not be null.
+     * @return `std::expected<void, PluginError>`:
+     *         - success when ownership was transferred to the App.
+     *         - `PluginError::InvalidArgument` if `plugin == nullptr`.
+     *         - any error returned by `Plugin::install()`.
+     * @note Thread-safety: not thread-safe. Must be called before `listen()`.
+     * @note Ownership: on success, the App owns the plugin. On failure, the caller's
+     *       unique pointer is destroyed as part of the failed call; callers needing
+     *       retry semantics should construct a new plugin.
+     */
+    [[nodiscard]] std::expected<void, PluginError> install(std::unique_ptr<Plugin> plugin) noexcept;
 
     /**
      * @brief Returns a child Router with a shared path prefix.

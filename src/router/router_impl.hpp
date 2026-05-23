@@ -172,11 +172,12 @@ struct ScopedMiddlewareEntry
 
 struct App::Impl
 {
-    AppConfig                          config;
-    Router                             router;
-    std::unique_ptr<Executor>          executor;
-    std::vector<Middleware>            global_middlewares;
-    std::vector<ScopedMiddlewareEntry> scoped_middlewares;
+    AppConfig                            config;
+    Router                               router;
+    std::unique_ptr<Executor>            executor;
+    std::vector<Middleware>              global_middlewares;
+    std::vector<ScopedMiddlewareEntry>   scoped_middlewares;
+    std::vector<std::unique_ptr<Plugin>> plugins;
 
     // WebSocket route handlers: keyed by path pattern.
     // App::ws() stores handlers here and registers an internal GET handler on the router.

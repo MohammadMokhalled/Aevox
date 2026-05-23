@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Optional official gRPC plugin foundation: minimal `aevox::Plugin` lifecycle,
+  `App::install(std::unique_ptr<Plugin>)`, raw-byte unary h2c gRPC API, optional
+  `AEVOX_ENABLE_GRPC`/vcpkg feature wiring, docs, tests, and example
 - Nanobench performance suite workflow with HTTP keep-alive and router dispatch benchmarks,
   benchmark-stat helper tests, CTest `bench` registration, and architecture documentation (AEV-015)
 - `examples/static-files` — runnable static asset serving example with bundled application-owned assets (AEV-014)

@@ -12,3 +12,6 @@ add_subdirectory(middleware) # Middleware pipeline integration tests with real H
 add_subdirectory(json)       # JSON request/response integration tests over loopback TCP
 add_subdirectory(log)        # Logging middleware and multi-sink integration tests
 add_subdirectory(websocket) # WebSocket upgrade, echo, close, and broadcast integration tests
+if(AEVOX_ENABLE_GRPC)
+    add_subdirectory(grpc)   # Optional official gRPC plugin loopback tests
+endif()
