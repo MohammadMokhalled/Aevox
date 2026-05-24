@@ -16,8 +16,10 @@ release branch remains the support line for patch releases.
 The current `main` baseline is `0.3.0-alpha.0`. After `release/0.3.0` is created and stable
 `0.3.0` is published, `main` moves to `0.4.0-alpha.0`.
 
-The `ci-tests` pipeline derives the `main` suffix automatically on every push by counting commits
-at the checked-out `HEAD` and passing `AEVOX_VERSION_PRERELEASE=alpha.<count>` to CMake.
+The `ci-tests` pipeline derives the `main` suffix automatically on every push. It reads the current
+`PROJECT_VERSION` from `CMakeLists.txt`, finds the first commit that declared that version, counts
+commits after that baseline, and passes `AEVOX_VERSION_PRERELEASE=alpha.<count>` to CMake. The
+version-bump commit is therefore `X.Y.0-alpha.0`, without tagging `main` as a stable release.
 
 ## Release Branches
 
@@ -33,9 +35,9 @@ Commits on the release branch produce beta versions such as `0.3.0-beta.1` and
 `0.3.0-beta.2`. The release workflow validates the install tree and external consumer build before
 any stable tag is published.
 
-The release pipeline derives the beta suffix automatically on every `release/X.Y.Z` branch push by
-counting commits since the release branch diverged from `origin/main` and passing
-`AEVOX_VERSION_PRERELEASE=beta.<count>` to CMake.
+The release pipeline derives the beta suffix automatically on every `release/X.Y.Z` branch push. It
+counts commits since the release branch diverged from `origin/main` and passes
+`AEVOX_VERSION_PRERELEASE=beta.<count>` to CMake, so numbering is local to that release branch.
 
 ## Stable Releases
 

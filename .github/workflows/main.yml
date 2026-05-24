@@ -50,10 +50,35 @@ jobs:
         id: version
         shell: bash
         run: |
-          count="$(git rev-list --count HEAD)"
+          version="$(awk '
+            /^project\(aevox/ { in_project = 1 }
+            in_project && $1 == "VERSION" { print $2; exit }
+          ' CMakeLists.txt)"
+          if [[ -z "$version" ]]; then
+            echo "::error::Could not derive PROJECT_VERSION from CMakeLists.txt."
+            exit 1
+          fi
+
+          base=""
+          while read -r commit; do
+            if git show "${commit}:CMakeLists.txt" | awk '
+              /^project\(aevox/ { in_project = 1 }
+              in_project && $1 == "VERSION" { print $2; exit }
+            ' | grep -Fx "$version" >/dev/null; then
+              base="$commit"
+              break
+            fi
+          done < <(git log --reverse --format=%H -- CMakeLists.txt)
+
+          if [[ -z "$base" ]]; then
+            echo "::error::Could not find the baseline commit for Aevox version ${version}."
+            exit 1
+          fi
+
+          count="$(git rev-list --count "${base}..HEAD")"
           prerelease_suffix="alpha.${count}"
           echo "prerelease_suffix=$prerelease_suffix" >> "$GITHUB_OUTPUT"
-          echo "Aevox main prerelease suffix: $prerelease_suffix"
+          echo "Aevox main version: ${version}-${prerelease_suffix}"
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Build — compiler matrix (4 entries), ctest
