@@ -34,6 +34,27 @@ permissions:
   contents: read
 
 jobs:
+  version:
+    name: Derive Main Version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      prerelease_suffix: ${{ steps.version.outputs.prerelease_suffix }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive alpha suffix
+        id: version
+        shell: bash
+        run: |
+          count="$(git rev-list --count HEAD)"
+          prerelease_suffix="alpha.${count}"
+          echo "prerelease_suffix=$prerelease_suffix" >> "$GITHUB_OUTPUT"
+          echo "Aevox main prerelease suffix: $prerelease_suffix"
+
   # ─────────────────────────────────────────────────────────────────────────────
   # Build — compiler matrix (4 entries), ctest
   # GCC 15 and clang 21 on Linux (default and release presets).
@@ -41,6 +62,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   build:
     name: Build (${{ matrix.preset }}) — ${{ matrix.compiler.id }}
+    needs: version
     runs-on: self-ubuntu26.04
     timeout-minutes: 10
     strategy:
@@ -86,7 +108,10 @@ jobs:
           additionalCacheKey: ${{ matrix.compiler.id }}-${{ runner.os }}
 
       - name: Configure (${{ matrix.preset }} preset)
-        run: cmake --preset ${{ matrix.preset }} -DCMAKE_CXX_COMPILER="$CXX"
+        run: >
+          cmake --preset ${{ matrix.preset }}
+          -DCMAKE_CXX_COMPILER="$CXX"
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.version.outputs.prerelease_suffix }}"
 
       - name: Build (${{ matrix.preset }} preset)
         run: cmake --build --preset ${{ matrix.preset }}
@@ -101,6 +126,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   asan-test:
     name: ASan + UBSan — Linux GCC 15
+    needs: version
     runs-on: self-ubuntu26.04
     timeout-minutes: 10
 
@@ -132,7 +158,10 @@ jobs:
           additionalCacheKey: gcc-Linux
 
       - name: Configure (asan-tests preset — ASan + UBSan)
-        run: cmake --preset asan-tests -DCMAKE_CXX_COMPILER="$CXX"
+        run: >
+          cmake --preset asan-tests
+          -DCMAKE_CXX_COMPILER="$CXX"
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.version.outputs.prerelease_suffix }}"
         env:
           CC: gcc-15
           CXX: g++-15
@@ -150,6 +179,7 @@ jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   asan-test-clang:
     name: ASan + UBSan — Linux clang 21
+    needs: version
     runs-on: self-ubuntu26.04
     timeout-minutes: 10
 
@@ -177,7 +207,10 @@ jobs:
           additionalCacheKey: clang-linux-Linux
 
       - name: Configure (asan-tests preset — ASan + UBSan)
-        run: cmake --preset asan-tests -DCMAKE_CXX_COMPILER="$CXX"
+        run: >
+          cmake --preset asan-tests
+          -DCMAKE_CXX_COMPILER="$CXX"
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.version.outputs.prerelease_suffix }}"
         env:
           CC: clang-21
           CXX: clang++-21
@@ -190,6 +223,7 @@ jobs:
 
   install-linux:
     name: Install Consumer — Linux
+    needs: version
     runs-on: self-ubuntu26.04
     timeout-minutes: 15
 
@@ -213,7 +247,10 @@ jobs:
           additionalCacheKey: install-linux
 
       - name: Configure library-only release
-        run: cmake --preset release -DCMAKE_CXX_COMPILER=g++-15
+        run: >
+          cmake --preset release
+          -DCMAKE_CXX_COMPILER=g++-15
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.version.outputs.prerelease_suffix }}"
 
       - name: Build library-only release
         run: cmake --build --preset release
@@ -237,6 +274,7 @@ jobs:
 
   install-windows:
     name: Install Consumer — Windows
+    needs: version
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -253,7 +291,9 @@ jobs:
           additionalCacheKey: install-windows
 
       - name: Configure library-only release
-        run: cmake --preset windows-msvc
+        run: >
+          cmake --preset windows-msvc
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.version.outputs.prerelease_suffix }}"
 
       - name: Build library-only release
         run: cmake --build --preset windows-msvc-release
