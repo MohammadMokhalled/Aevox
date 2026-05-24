@@ -49,7 +49,7 @@ int main()
 
 Async WebSocket connection handle. Obtained exclusively via `App::ws()` — never constructed directly.
 
-**Thread-safety:** `send()` and `close()` are safe to call from any coroutine on any thread. Concurrent sends are serialized via an internal Asio strand. `subscribe()` and `publish()` are safe from any thread.
+**Thread-safety:** `send()` and `close()` are safe to call from any coroutine on any thread. Concurrent sends are serialized by the internal connection executor. `subscribe()` and `publish()` are safe from any thread.
 
 **Move semantics:** Move-only. A moved-from `WebSocket` is in the closed state — all operations return `WebSocketError{Closed, ...}`.
 
@@ -276,7 +276,7 @@ Use `to_string(WebSocketErrorCode)` for diagnostics and `category(...)` for broa
 
 ## Thread Safety
 
-- `WebSocket::send()`, `close()` — safe from any coroutine thread; Asio strand serializes.
+- `WebSocket::send()`, `close()` — safe from any coroutine thread; the connection executor serializes writes.
 - `WebSocket::subscribe()`, `publish()` — safe from any thread; `TopicBus` uses `std::shared_mutex`.
 - `WebSocket::topic()`, `remote_address()` — safe only from the connection-owning coroutine.
 - `App::ws()` — not thread-safe; call before `listen()`.
@@ -286,7 +286,7 @@ Use `to_string(WebSocketErrorCode)` for diagnostics and `category(...)` for broa
 - Frame parsing: O(n) in payload size; no heap allocation for frames under 64 bytes.
 - Topic bus fan-out: O(n) in subscriber count; dead entries pruned lazily on each publish.
 - Send queue depth limit: 128 pending frames. Frames dropped silently when full (back-pressure).
-- Close handshake timeout: not configurable in v0.2; defaults to next read timeout.
+- Close handshake timeout: not currently configurable; defaults to the next read timeout.
 
 ## See Also
 

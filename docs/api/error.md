@@ -1,6 +1,6 @@
 # API Reference: Error Categories
 
-Header: `<aevox/error.hpp>`
+Primary header: `<aevox/error.hpp>`. Module-specific `category(...)` overloads are declared beside their error types in the relevant module headers.
 
 Aevox keeps precise module-specific error types, such as `IoError`, `ConfigError`, `JsonError`, and `WebSocketError`. `aevox::ErrorCategory` is a small shared classifier for logging, metrics, and generic application code. It does not replace module-specific error codes.
 
@@ -31,18 +31,24 @@ Returns a stable static label for logging and diagnostics.
 
 ## Category helpers
 
-These overloads map module-specific errors to `ErrorCategory`:
+These overloads map module-specific errors to `ErrorCategory`. Core Aevox errors use
+`aevox::category(...)`; module-owned errors declare the helper in the module namespace.
 
 ```cpp
-[[nodiscard]] ErrorCategory category(IoError e) noexcept;
-[[nodiscard]] ErrorCategory category(ExecutorError e) noexcept;
-[[nodiscard]] ErrorCategory category(ParamError e) noexcept;
-[[nodiscard]] ErrorCategory category(ConfigError e) noexcept;
-[[nodiscard]] ErrorCategory category(const ConfigErrorDetail& detail) noexcept;
-[[nodiscard]] ErrorCategory category(JsonErrorCode code) noexcept;
-[[nodiscard]] ErrorCategory category(const JsonError& error) noexcept;
-[[nodiscard]] ErrorCategory category(WebSocketErrorCode code) noexcept;
-[[nodiscard]] ErrorCategory category(const WebSocketError& error) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::IoError e) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::ExecutorError e) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::ParamError e) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::ConfigError e) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(const aevox::ConfigErrorDetail& detail) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::LogError error) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::JsonErrorCode code) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(const aevox::JsonError& error) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::WebSocketErrorCode code) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(const aevox::WebSocketError& error) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::category(aevox::PluginError error) noexcept;
+[[nodiscard]] aevox::ErrorCategory
+aevox::middleware::category(aevox::middleware::StaticFilesConfigError error) noexcept;
+[[nodiscard]] aevox::ErrorCategory aevox::grpc::category(aevox::grpc::GrpcError error) noexcept;
 ```
 
 Example:

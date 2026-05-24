@@ -37,6 +37,8 @@ int main() {
 | `executor` | `ExecutorConfig` | `{}` | Thread pool configuration |
 | `max_body_size` | `std::size_t` | `10 MiB` | Maximum request body size |
 | `request_timeout` | `std::chrono::seconds` | `30s` | Per-request timeout |
+| `max_header_count` | `std::size_t` | `100` | Maximum HTTP headers per request |
+| `max_read_bytes` | `std::size_t` | `65536` | Maximum bytes read per TCP read operation |
 
 ---
 
@@ -45,17 +47,23 @@ int main() {
 | Method | Description |
 |---|---|
 | `App(AppConfig)` | Construct with configuration (port binding deferred to `listen()`) |
+| `App::create(base_config, config_path)` | Construct an `App`, optionally merging a TOML config file |
 | `get(pattern, handler)` | Register a GET handler |
 | `post(pattern, handler)` | Register a POST handler |
 | `put(pattern, handler)` | Register a PUT handler |
 | `patch(pattern, handler)` | Register a PATCH handler |
 | `del(pattern, handler)` | Register a DELETE handler (`delete` is a reserved keyword) |
 | `options(pattern, handler)` | Register an OPTIONS handler |
+| `ws(path_pattern, handler)` | Register a WebSocket route with automatic RFC 6455 upgrade |
+| `use(middleware)` | Register global middleware |
+| `use(prefix, middleware)` | Register path-scoped middleware |
+| `install(plugin)` | Install a first-party plugin, such as the official gRPC plugin |
 | `group(prefix)` | Returns a child `Router` scoped to a path prefix |
 | `router()` | Returns the internal `Router` by reference |
 | `listen(port)` | Binds to `port` and blocks until stopped |
 | `listen()` | Binds to `AppConfig::port` |
 | `stop()` | Thread-safe. Signals the executor to stop and drain |
+| `config()` | Returns the resolved immutable `AppConfig` |
 
 ---
 
@@ -67,6 +75,8 @@ int main() {
 | `group(prefix)` | Returns a child `Router` for prefix-scoped registration |
 | `dispatch(req)` | Walks the trie and invokes the matching handler (thread-safe) |
 | `valid()` | Returns `false` if the Router has been moved from |
+
+`<aevox/router.hpp>` includes the template definitions it needs internally. Application code should include `<aevox/router.hpp>` or `<aevox/app.hpp>`, not the template implementation header directly.
 
 ---
 
@@ -84,7 +94,7 @@ Three segment types are supported:
 | `/{name:double}` | Typed double | `/coords/{lat:double}` |
 | `/{name...}` | Wildcard tail | `/files/{path...}` |
 
-Patterns must start with `/`. A wildcard may only appear as the final segment. Regex routing is not available in v0.1 (ADR-4).
+Patterns must start with `/`. A wildcard may only appear as the final segment. Regex routing is not available in the current release (ADR-4).
 
 **Match priority** at each level: static > named parameter > wildcard.
 
@@ -119,7 +129,7 @@ All of the following are accepted by `get()`, `post()`, etc.:
 | No path match | 404 Not Found | No trie node reached for the request path |
 | Path match, method mismatch | 405 Method Not Allowed | Trie node reached but no handler for the method; `Allow` header set |
 | Typed parameter conversion failure | 400 Bad Request | `from_chars` conversion fails for a typed parameter |
-| Malformed request body | 400 Bad Request | llhttp parser returns a fatal error |
+| Malformed request body | 400 Bad Request | HTTP parser reports a fatal protocol error |
 
 ---
 

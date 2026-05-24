@@ -71,7 +71,7 @@ aevox::App app(aevox::AppConfig{
 
 **`port`** — TCP port to bind. Valid TOML range: `1..65535`.
 
-**`host`** — Bind address string. IPv6 is not supported in v0.1. Pass `"127.0.0.1"` to
+**`host`** — Bind address string. IPv6 is not supported in the current release. Pass `"127.0.0.1"` to
 restrict to loopback. Valid TOML constraint: non-empty string.
 
 **`backlog`** — Depth of the OS-level TCP accept queue. Higher values absorb connection

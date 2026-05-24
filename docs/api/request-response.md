@@ -20,7 +20,7 @@ Neither type is thread-safe and neither should be shared between coroutines. Cre
 
 // A route handler receives a Request by reference and returns a Response by value.
 aevox::Task<aevox::Response> get_user(aevox::Request& req) {
-    // Extract a typed path parameter (/users/:id → "id")
+    // Extract a typed path parameter (/users/{id} -> "id")
     auto id_result = req.param<int>("id");
     if (!id_result) {
         co_return aevox::Response::bad_request("invalid user id");
@@ -185,16 +185,16 @@ if (!id) {
 
 ---
 
-#### `json<T>() → Task<std::expected<T, BodyParseError>>`
+#### `json<T>() → Task<std::expected<T, JsonError>>`
 
 ```cpp
 template <typename T>
     requires aevox::Deserializable<T>
-[[nodiscard]] aevox::Task<std::expected<T, BodyParseError>>
+[[nodiscard]] aevox::Task<std::expected<T, aevox::JsonError>>
 json() const;
 ```
 
-Asynchronously parses the request body as JSON into type `T`. Must be `co_await`-ed. In v0.1, always returns `BodyParseError::NotImplemented`. A future JSON backend task wires in real glaze deserialization.
+Asynchronously parses the request body as JSON into type `T`. Must be `co_await`-ed. Awaiting the task yields either the parsed value or an `aevox::JsonError` describing parse, type, missing-field, encoding, or serialization-backend failures.
 
 ---
 
@@ -253,11 +253,13 @@ A fully formed HTTP/1.1 response. Created via static factory methods and returne
 | `Response::created(body = "")` | 201 | `text/plain` |
 | `Response::not_found(body = "")` | 404 | `text/plain` |
 | `Response::bad_request(body = "")` | 400 | `text/plain` |
+| `Response::method_not_allowed(body = "")` | 405 | `text/plain` |
 | `Response::unauthorized(body = "")` | 401 | `text/plain` |
 | `Response::forbidden(body = "")` | 403 | `text/plain` |
 | `Response::json(std::string body)` | 200 | `application/json` |
-| `Response::json<T>(T&& value)` | 200 | `application/json` (stub in v0.1) |
+| `Response::json<T>(const T& value)` | 200 on success, 500 on serialization failure | `application/json` |
 | `Response::stream(content_type)` | 200 | given content type |
+| `Response::switching_protocols()` | 101 WebSocket upgrade sentinel; prefer `Request::upgrade_websocket()` or `App::ws()` in application code | none |
 
 ---
 
@@ -302,6 +304,17 @@ Returns a read-only view of the response body. Valid for the lifetime of this Re
 
 ---
 
+#### `get_header(name) → std::optional<std::string_view>`
+
+```cpp
+[[nodiscard]] std::optional<std::string_view>
+get_header(std::string_view name) const noexcept;
+```
+
+Retrieves a response header by exact name. Unlike request header lookup, response header lookup is case-sensitive and returns `std::nullopt` when the header has not been set.
+
+---
+
 ## Error Reference
 
 ### `aevox::ParamError`
@@ -311,20 +324,18 @@ Returns a read-only view of the response body. Valid for the lifetime of this Re
 | `ParamError::NotFound` | No path parameter with the given name was captured by the router | Check the route pattern; return `bad_request()` |
 | `ParamError::BadConversion` | The raw string cannot be parsed as the requested type | Return `bad_request()` with a diagnostic message |
 
-### `aevox::BodyParseError`
+### `aevox::JsonError`
 
-| Error | Meaning | How to handle |
+`Request::json<T>()` returns `std::expected<T, aevox::JsonError>`. Use `JsonError::code()` for stable branching and `JsonError::message()` for diagnostics.
+
+| Error code | Meaning | How to handle |
 |---|---|---|
-| `BodyParseError::NotImplemented` | JSON parsing not wired in v0.1 | Expected until JSON backend is implemented |
-| `BodyParseError::BadJson` | Body is not valid JSON (reserved for the JSON backend task) | Return `bad_request()` |
-| `BodyParseError::TypeMismatch` | JSON does not match target type (reserved for the JSON backend task) | Return `bad_request()` |
-
-### `aevox::SerializeError`
-
-| Error | Meaning | How to handle |
-|---|---|---|
-| `SerializeError::NotImplemented` | JSON serialization not wired in v0.1 | Expected until JSON backend |
-| `SerializeError::TypeNotSupported` | Type cannot be serialized (reserved for the JSON backend task) | Use `Response::json(std::string)` overload |
+| `JsonErrorCode::ParseError` | Body is not valid JSON | Return `bad_request()` |
+| `JsonErrorCode::TypeMismatch` | JSON value cannot be converted to the requested C++ type | Return `bad_request()` |
+| `JsonErrorCode::MissingField` | A required field is missing | Return `bad_request()` |
+| `JsonErrorCode::SerializationFailed` | Response serialization failed | Inspect logs; `Response::json<T>()` returns a 500 response |
+| `JsonErrorCode::InvalidUtf8` | Input contains invalid UTF-8 | Return `bad_request()` |
+| `JsonErrorCode::Unknown` | Backend reported an uncategorized failure | Return `bad_request()` or a generic 500 depending on context |
 
 ## Thread Safety
 
@@ -344,10 +355,8 @@ auto r2 = std::move(r1);
 // r1.status_code() == 0,   r1.body_view().empty()
 ```
 
-## v0.1 Limitations
+## Current Limitations
 
-- **JSON parsing (`req.json<T>()`):** Always returns `BodyParseError::NotImplemented`. Real implementation wired in a future JSON backend task.
-- **JSON serialization (`Response::json<T>()`):** Always produces sentinel body `{"error":"not_implemented"}`. Real implementation wired in a future JSON backend task. Use `Response::json(std::string)` to pass a pre-serialized string.
 - **Streaming (`Response::stream()`):** Returns a normal Response with empty body. The streaming write API is not yet designed.
 - **Duplicate headers:** `Request::header()` returns the first occurrence of a repeated header name. Multi-value header support is deferred.
 - **Query parameter parsing:** `Request::query()` returns the raw query string. Typed extraction (e.g. `req.query_param<int>("page")`) is deferred.
@@ -355,5 +364,6 @@ auto r2 = std::move(r1);
 ## See Also
 
 - [Task](task.md) — `aevox::Task<T>` coroutine return type used by `json<T>()`
+- [JSON](json.md) — `JsonError`, `JsonBackend`, `Request::json<T>()`, and `Response::json<T>()`
 - [Executor](executor.md) — the I/O execution layer below Request/Response
 - [Async Helpers](async.md) — `pool()`, `sleep()`, `when_all()`

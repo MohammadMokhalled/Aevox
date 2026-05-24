@@ -45,6 +45,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Default JSON backend: glaze, selectable via `AEVOX_JSON_BACKEND` CMake option (AEV-009)
 
 ### Changed
+- API documentation site coverage now maps every public Aevox header to a navigable MkDocs API
+  reference page (AEV-018)
 - Logger API simplified from request-owned `Logger` handles to free functions: use `aevox::log::info(req, "...")` for request-correlated messages and `aevox::log::info("...")` for global messages (AEV-029)
 - `aevox::ConfigErrorDetail` now stores its detail fields privately; use `error_code()`, `error_message()`, and `error_key()` for access (AEV-028)
 - `scripts/tidy.sh` now runs clang-tidy only against product code under `include/aevox/` and `src/`, matching the stricter product-code gate (AEV-028)

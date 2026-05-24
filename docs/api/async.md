@@ -68,7 +68,7 @@ Dispatches a CPU-bound callable to the dedicated CPU thread pool. The calling co
 
 ```cpp
 aevox::Task<aevox::Response> handle_resize(aevox::Request& req) {
-    auto body = co_await req.body();
+    auto body = req.body();
 
     // image_resize() is CPU-intensive — offload it so the I/O thread
     // can continue accepting other requests.
@@ -145,7 +145,7 @@ Runs multiple tasks concurrently and returns all results as a tuple. All tasks a
 
 **Returns** `Task<std::tuple<Ts...>>`. Tuple elements are in the same order as `tasks`.
 
-**Error semantics (v0.1):** If any task throws, the first exception is re-thrown at the `co_await` site. Remaining tasks complete naturally (no cancellation). Structured cancellation is planned for v0.2.
+**Error semantics:** If any task throws, the first exception is re-thrown at the `co_await` site. Remaining tasks complete naturally; there is no automatic cancellation of sibling tasks.
 
 **Constraints:**
 - `sizeof...(Ts) >= 2` — single-task `when_all` is a compile error.
@@ -173,7 +173,7 @@ aevox::Task<aevox::Response> handle_report(aevox::Request& req) {
 
 ## Thread Safety
 
-All three helpers are **only valid on executor-managed I/O threads**. The thread-local context required for their operation is initialised by `AsioExecutor` when each I/O thread starts.
+All three helpers are **only valid on executor-managed I/O threads**. The thread-local context required for their operation is initialised by the executor backend when each I/O thread starts.
 
 Calling `pool()`, `sleep()`, or `when_all()` from:
 - `main()` — **undefined behaviour**
@@ -188,9 +188,9 @@ In debug builds, an `assert` fires on misuse if `NDEBUG` is not defined.
 
 | Helper | Overhead | Notes |
 |---|---|---|
-| `pool(fn)` | ~2 × `asio::post` + coroutine suspend/resume | Cross-pool post dominates for very short callables |
-| `sleep(d)` | Asio `steady_timer` + coroutine suspend/resume | Timer precision is OS-dependent (~1ms granularity typical) |
-| `when_all(...)` | N × `asio::post` + N coroutine launches + 1 shared_ptr allocation | Scales linearly with task count; shared_ptr allocation is amortized |
+| `pool(fn)` | Cross-pool dispatch + coroutine suspend/resume | Cross-pool handoff dominates for very short callables |
+| `sleep(d)` | Backend timer + coroutine suspend/resume | Timer precision is OS-dependent (~1ms granularity typical) |
+| `when_all(...)` | N task dispatches + N coroutine launches + 1 shared state allocation | Scales linearly with task count; shared state allocation is amortized |
 
 **CPU pool sizing guideline:** default 4 threads suits image resizing, PDF generation, and large JSON serialisation. For primarily I/O-bound workloads, `cpu_pool_threads = 0` reduces thread count with no correctness impact.
 

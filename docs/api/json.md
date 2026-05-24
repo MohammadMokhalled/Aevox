@@ -2,7 +2,7 @@
 
 Headers: `<aevox/json_error.hpp>`, `<aevox/json_backend.hpp>`
 
-The JSON layer provides structured error reporting (`aevox::JsonError`), a pluggable backend concept (`aevox::JsonBackend<B>`), and the request and response operations `Request::json<T>()` and `Response::json(value)`. The default backend is `aevox::internal::GlazeBackend`, backed by glaze 3.x. No glaze types appear in the public headers.
+The JSON layer provides structured error reporting (`aevox::JsonError`), a pluggable backend concept (`aevox::JsonBackend<B>`), and the request and response operations `Request::json<T>()` and `Response::json(value)`. The default backend is an implementation detail; no backend-specific types appear in the public headers.
 
 ---
 
@@ -214,7 +214,7 @@ Serializes `value` to JSON and returns a 200 OK response with `Content-Type: app
 ```cpp
 struct Product { std::string id; std::string name; double price{}; };
 
-app.get("/products/:id", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
+app.get("/products/{id}", [](aevox::Request& req) -> aevox::Task<aevox::Response> {
     auto id = req.param<std::string>("id");
     if (!id) {
         co_return aevox::Response::not_found();
@@ -234,25 +234,16 @@ This overload sets `Content-Type: application/json` and status 200 without any s
 
 ### Notes
 
-- **Synchronous:** serialization with glaze completes in microseconds for typical structs. For very large bodies (>1 MiB), offload to `co_await aevox::pool(...)` before calling this factory.
-- **Thread-safety:** the default `GlazeBackend` carries no mutable state — safe to call concurrently from separate handlers.
+- **Synchronous:** serialization completes in microseconds for typical structs. For very large bodies (>1 MiB), offload to `co_await aevox::pool(...)` before calling this factory.
+- **Thread-safety:** the default backend carries no mutable state — safe to call concurrently from separate handlers.
 
 ---
 
-## aevox::internal::GlazeBackend
+## Default Backend Boundary
 
-```cpp
-// src/json/glaze_backend.hpp  (internal — not included by application code)
-namespace aevox::internal {
-struct GlazeBackend { /* ... */ };
-}
-```
+The default backend is stateless and confined to `src/json/`. Application code never includes its headers, names its concrete type, or handles backend-specific errors. All public failures are reported as `aevox::JsonError`.
 
-The default JSON backend, backed by glaze 3.x. This type is confined to `src/json/` — it is never included by application code. It satisfies `aevox::JsonBackend`.
-
-`GlazeBackend` is stateless. All calls operate on function-local variables. Any struct with public fields is automatically reflectable without annotation.
-
-Glaze performs compile-time schema inference — no runtime type map, no registration macro. The compiler instantiates the JSON codec for each distinct `T` at the call site.
+Any aggregate struct with public fields can be serialized or deserialized without an application-level registration macro. The codec is instantiated for each distinct `T` at the call site.
 
 ---
 
