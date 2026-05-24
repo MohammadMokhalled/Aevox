@@ -38,6 +38,7 @@ endif()
 
 add_subdirectory(http)    # aevox_http OBJECT library (HttpParser + llhttp)
 add_subdirectory(router)  # aevox_router OBJECT library (Router + App)
+add_subdirectory(plugins) # optional first-party plugin targets
 
 add_library(aevox_core STATIC
     error.cpp                       # Shared public error taxonomy helpers

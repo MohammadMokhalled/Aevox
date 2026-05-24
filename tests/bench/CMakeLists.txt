@@ -13,3 +13,6 @@ add_subdirectory(log)        # logging hot-path latency and throughput benchmark
 add_subdirectory(websocket)  # WebSocket throughput and frame-parse benchmarks
 add_subdirectory(http)       # HTTP keep-alive request/response benchmark
 add_subdirectory(router)     # Router dispatch throughput benchmark
+if(AEVOX_ENABLE_GRPC)
+    add_subdirectory(grpc)   # Optional gRPC unary throughput benchmark
+endif()

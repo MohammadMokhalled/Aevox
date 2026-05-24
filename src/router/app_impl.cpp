@@ -14,6 +14,7 @@
 #include <aevox/executor.hpp>
 #include <aevox/log.hpp>
 #include <aevox/middleware.hpp>
+#include <aevox/plugin.hpp>
 #include <aevox/request.hpp>
 #include <aevox/response.hpp>
 #include <aevox/router.hpp>
@@ -275,6 +276,13 @@ App::App(AppConfig config) : impl_{std::make_unique<Impl>()}
 
 App::~App()
 {
+    if (impl_) {
+        for (auto& plugin : impl_->plugins) {
+            if (plugin) {
+                plugin->stop();
+            }
+        }
+    }
     if (impl_ && impl_->executor) {
         impl_->executor->stop();
     }
@@ -331,12 +339,43 @@ Router App::group(std::string_view prefix)
     return impl_->router.group(prefix);
 }
 
+std::expected<void, PluginError> App::install(std::unique_ptr<Plugin> plugin) noexcept
+{
+    if (!plugin) {
+        return std::unexpected{PluginError::InvalidArgument};
+    }
+
+    auto installed = plugin->install(*this);
+    if (!installed) {
+        return std::unexpected{installed.error()};
+    }
+
+    impl_->plugins.push_back(std::move(plugin));
+    return {};
+}
+
 // =============================================================================
 // App — listen
 // =============================================================================
 
 void App::listen(std::uint16_t port)
 {
+    std::vector<std::reference_wrapper<Plugin>> started_plugins;
+    started_plugins.reserve(impl_->plugins.size());
+    for (auto& plugin : impl_->plugins) {
+        if (!plugin) {
+            continue;
+        }
+        auto started = plugin->start();
+        if (!started) {
+            for (auto& started_plugin : std::ranges::reverse_view(started_plugins)) {
+                started_plugin.get().stop();
+            }
+            std::terminate();
+        }
+        started_plugins.push_back(std::ref(*plugin));
+    }
+
     // Install signal handlers so Ctrl-C stops the executor cleanly.
     signal_executor().store(impl_->executor.get(), std::memory_order_relaxed);
     std::signal(SIGINT, handle_signal);
@@ -449,6 +488,9 @@ void App::listen(std::uint16_t port)
 
     auto lr = impl_->executor->listen(port, std::move(connection_handler));
     if (!lr) {
+        for (auto& started_plugin : std::ranges::reverse_view(started_plugins)) {
+            started_plugin.get().stop();
+        }
         // Bind or listen failed — terminate (startup defect, not recoverable).
         std::terminate();
     }
@@ -462,6 +504,12 @@ void App::listen(std::uint16_t port)
     }
     aevox::detail::reset_log_writer();
     impl_->log_writer.reset();
+
+    for (auto& plugin : std::ranges::reverse_view(impl_->plugins)) {
+        if (plugin) {
+            plugin->stop();
+        }
+    }
 
     // Clear signal handler so a second listen() call (UB per contract, but defensive)
     // does not double-install.
@@ -479,6 +527,13 @@ void App::listen()
 
 void App::stop() noexcept
 {
+    if (impl_) {
+        for (auto& plugin : impl_->plugins) {
+            if (plugin) {
+                plugin->stop();
+            }
+        }
+    }
     if (impl_ && impl_->executor)
         impl_->executor->stop();
 }

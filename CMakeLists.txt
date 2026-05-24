@@ -66,6 +66,9 @@ endif()
 set(AEVOX_COMPILE_OPTIONS "${AEVOX_COMPILE_OPTIONS}" CACHE INTERNAL
     "Compiler flags applied privately to all aevox targets")
 
+# ── Optional first-party plugins ──────────────────────────────────────────────
+option(AEVOX_ENABLE_GRPC "Build the official Aevox gRPC plugin" OFF)
+
 # ── Testing ───────────────────────────────────────────────────────────────────
 # enable_testing() must live here (root) so that `ctest` invoked from the root
 # build directory discovers all registered tests across all subdirectories.

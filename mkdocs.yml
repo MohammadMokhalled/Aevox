@@ -39,6 +39,7 @@ nav:
       - Logging: guide/logging.md
       - JSON: guide/json.md
       - WebSocket: guide/websocket.md
+      - gRPC: guide/grpc.md
   - Architecture:
       - Overview: architecture/index.md
       - Executor: architecture/executor.md
@@ -62,6 +63,7 @@ nav:
       - Logging: api/log.md
       - JSON: api/json.md
       - WebSocket: api/websocket.md
+      - gRPC Plugin: api/grpc.md
       - Concepts: api/concepts.md
   - Examples:
       - Overview: examples/index.md
@@ -70,6 +72,7 @@ nav:
       - Middleware Plugin: examples/middleware-plugin.md
       - Static Files: examples/static-files.md
       - WebSocket Chat: examples/websocket-chat.md
+      - gRPC Echo: examples/grpc-echo.md
   - Changelog: changelog.md
 
 markdown_extensions:
