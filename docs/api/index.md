@@ -12,10 +12,10 @@ Aevox's public API lives entirely under `include/aevox/`. No internal headers (`
 | [Task](task.md) | `<aevox/task.hpp>` | Coroutine return type for all async operations |
 | [Async Helpers](async.md) | `<aevox/async.hpp>` | `pool()`, `sleep()`, `when_all()` — CPU offload, timers, concurrent fan-out |
 | [TcpStream](tcp_stream.md) | `<aevox/tcp_stream.hpp>` | Move-only async TCP connection — `read()` and `write()` as coroutines |
-| [Request and Response](request-response.md) | `<aevox/request.hpp>` / `<aevox/response.hpp>` | Incoming HTTP request and outgoing HTTP response — typed parameter extraction, factory methods, fluent header builder |
+| [Request and Response](request-response.md) | `<aevox/request.hpp>` / `<aevox/response.hpp>` | Incoming HTTP request and outgoing HTTP response — typed parameter extraction, JSON body parsing, factory methods, fluent header builder |
 | [Router and App](router.md) | `<aevox/router.hpp>` / `<aevox/app.hpp>` | URL routing and top-level server entry point — static, parameter, wildcard segments |
 | [Configuration](config.md) | `<aevox/config.hpp>` | Named defaults, `AppConfig`, `ExecutorConfig`, `ConfigError`, TOML key reference |
-| [Middleware](middleware.md) | `<aevox/middleware.hpp>` | Composable middleware pipeline — logging, auth, CORS, request/response interceptors |
+| [Middleware](middleware.md) | `<aevox/middleware.hpp>` / `<aevox/middleware/logger.hpp>` | Composable middleware pipeline and built-in access logger middleware |
 | [Static Files](static-files.md) | `<aevox/middleware/static_files.hpp>` | Middleware for serving read-only application assets from a configured directory |
 | [JSON](json.md) | `<aevox/json_error.hpp>` / `<aevox/json_backend.hpp>` | Automatic request/response JSON serialization via a pluggable backend |
 | [Logging](log.md) | `<aevox/log.hpp>` | Structured async logging — severity levels, request correlation, bounded queue, JSON/pretty output |

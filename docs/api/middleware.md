@@ -2,6 +2,14 @@
 
 Aevox provides a composable async middleware pipeline for request and response interception.
 
+**Headers:** `#include <aevox/middleware.hpp>`, `#include <aevox/middleware/logger.hpp>`, `#include <aevox/middleware/static_files.hpp>`
+
+## Overview
+
+`aevox::Middleware` is the move-only, type-erased handle stored by `App::use()`. Application code usually passes lambdas, function objects, or built-in middleware factories to `App::use()`; it does not need to construct `Middleware` directly.
+
+Built-in middleware currently includes automatic request/response logging and static file serving.
+
 ## Concepts
 
 ### MiddlewareNext
@@ -133,6 +141,13 @@ app.use([](aevox::Request& req,
 - **Zero overhead**: Apps with no middleware have identical performance to direct dispatch
 - **Composable**: Middleware is applied at connection time; no per-request overhead for chain construction
 - **Memory efficient**: Middleware state is stored inline in the handler chain; no heap allocations per middleware
+
+## Built-In Middleware
+
+| Factory | Header | API page |
+|---|---|---|
+| `aevox::middleware::logger(LoggerMiddlewareConfig)` | `<aevox/middleware/logger.hpp>` | [Logging](log.md) |
+| `aevox::middleware::static_files(StaticFilesConfig)` | `<aevox/middleware/static_files.hpp>` | [Static Files](static-files.md) |
 
 ## See Also
 

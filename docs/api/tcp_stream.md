@@ -10,7 +10,7 @@
 
 `aevox::TcpStream` wraps a single accepted TCP socket. It is created by the `Executor` on each accepted connection and moved into the connection handler — the handler owns it for the lifetime of the connection.
 
-The underlying `asio::ip::tcp::socket` is hidden behind a pimpl and never exposed. Replacing Asio with `std::net` requires only changes inside `src/net/`.
+The underlying socket backend is hidden behind a pimpl and never exposed. Replacing the current networking backend with `std::net` requires only changes inside `src/net/`.
 
 ```mermaid
 sequenceDiagram

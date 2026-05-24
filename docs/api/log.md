@@ -2,7 +2,7 @@
 
 > Structured asynchronous logging with global and request-correlated entry points.
 
-**Header:** `#include <aevox/log.hpp>`
+**Headers:** `#include <aevox/app.hpp>`, `#include <aevox/log.hpp>`, `#include <aevox/middleware/logger.hpp>`
 
 ---
 
@@ -18,6 +18,10 @@ HTTP access logging is provided by `#include <aevox/middleware/logger.hpp>`.
 ## Quick Start
 
 ```cpp
+#include <aevox/app.hpp>
+#include <aevox/log.hpp>
+#include <aevox/middleware/logger.hpp>
+
 aevox::AppConfig config;
 config.logging.destination = aevox::LogDestination::File;
 config.logging.file_path = "/var/log/aevox/app.log";
@@ -158,6 +162,25 @@ app.use(aevox::middleware::logger({
 
 The middleware emits one access log entry after the response is produced. Slow requests emit the
 access entry at `Warn`; they do not emit a second duplicate line.
+
+#### `aevox::middleware::LoggerMiddlewareConfig`
+
+```cpp
+struct LoggerMiddlewareConfig
+{
+    LogLevel level{LogLevel::Info};
+    std::unordered_set<std::string> exclude_paths{};
+    std::chrono::milliseconds slow_request_threshold{kDefaultSlowRequestThreshold};
+    bool log_slow_requests{true};
+};
+```
+
+| Field | Meaning |
+|---|---|
+| `level` | Severity used for normal access log entries |
+| `exclude_paths` | Exact request paths that produce no access log entry |
+| `slow_request_threshold` | Duration after which a request is considered slow |
+| `log_slow_requests` | Emits slow requests at `Warn` when enabled |
 
 ## Error Reference
 

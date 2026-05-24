@@ -40,18 +40,22 @@ app.get("/items/{id:int}", [](aevox::Request& req) {
 
 ```cpp
 template <typename T>
-concept Serializable = true;   // v0.1 placeholder
+concept Serializable = true;
 ```
 
-**Purpose:** Constrains `Response::json<T>()`. In v0.1 this is an unconstrained placeholder that allows compilation of `json<T>()` for any type. The actual glaze-backed constraint will replace it in a future release.
+**Purpose:** Constrains `Response::json<T>()` at the public API boundary. The current public concept is intentionally broad so application aggregate types do not need to include or name the JSON backend in user code.
 
-**Note:** In v0.1, `Response::json<T>()` returns `SerializeError::NotImplemented` at runtime for all `T` except `std::string`, which has a non-template overload.
+Serialization is performed by the active JSON backend. If a type cannot be serialized, `Response::json<T>()` returns a valid 500 response with a structured JSON error body instead of throwing.
 
 **Example:**
 
 ```cpp
-// Compiles in v0.1, but may fail at runtime depending on the JSON backend.
-return aevox::Response::json(my_struct);
+struct Product {
+    std::string id;
+    std::string name;
+};
+
+return aevox::Response::json(Product{.id = "p1", .name = "Widget"});
 ```
 
 ---
@@ -60,16 +64,20 @@ return aevox::Response::json(my_struct);
 
 ```cpp
 template <typename T>
-concept Deserializable = true;   // v0.1 placeholder
+concept Deserializable = true;
 ```
 
-**Purpose:** Constrains `Request::json<T>()`. In v0.1 this is an unconstrained placeholder. `Request::json<T>()` returns `BodyParseError::NotImplemented` at runtime for all `T` except direct string deserialization.
+**Purpose:** Constrains `Request::json<T>()` at the public API boundary. The current public concept is intentionally broad so handlers can request ordinary application aggregate types without depending on backend-specific concepts.
+
+Deserialization returns `std::expected<T, aevox::JsonError>`. Parse failures, type mismatches, missing required fields, and unsupported target types use the error branch.
 
 **Example:**
 
 ```cpp
-// Compiles in v0.1, but may fail at runtime depending on the JSON backend.
 auto result = co_await req.json<MyStruct>();
+if (!result) {
+    co_return aevox::Response::bad_request(std::string{result.error().message()});
+}
 ```
 
 ---
