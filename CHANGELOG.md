@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Deployment guide for Caddy and Nginx reverse-proxy setups, including TLS termination,
+  WebSocket upgrade forwarding, forwarded headers, static asset caching notes, and gRPC boundary
+  guidance (AEV-017)
 - Optional official gRPC plugin foundation: minimal `aevox::Plugin` lifecycle,
   `App::install(std::unique_ptr<Plugin>)`, raw-byte unary h2c gRPC API, optional
   `AEVOX_ENABLE_GRPC`/vcpkg feature wiring, docs, tests, and example (AEV-016)

@@ -49,3 +49,6 @@ seconds-based, so sub-second values are rounded up to one second by the plugin.
 Installed plugins start automatically when `App::listen()` starts and stop when `App::stop()` or the
 `App` destructor runs. gRPC uses its own executor so HTTP/1.1 routes and gRPC methods can run side by
 side on separate ports.
+
+For public TLS, terminate at the reverse proxy and forward to the plugin's h2c listener. Do not proxy
+gRPC traffic through the core HTTP/1.1 app port; see [Deployment](deployment.md) for the boundary.

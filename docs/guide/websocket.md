@@ -134,6 +134,7 @@ if (!result) {
 
 ## See Also
 
+- [Deployment](deployment.md) - reverse-proxy upgrade forwarding for production WebSocket routes
 - [WebSocket API Reference](../api/websocket.md) — full class and method documentation
 - [Async Patterns](async-patterns.md) — coroutine usage, `Task<T>`, and executor model
 - [Request and Response](request-response.md) — HTTP upgrade via `req.upgrade_websocket()`

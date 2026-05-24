@@ -13,6 +13,7 @@ This guide walks you through every feature of Aevox step by step, assuming you k
 | [Async Patterns](async-patterns.md) | Writing coroutine handlers, offloading CPU work, non-blocking timers, concurrent fan-out, and graceful shutdown |
 | [Error Handling](error-handling.md) | The `std::expected` error model, Aevox error types, propagating errors in coroutines, and diagnostics |
 | [Configuration](configuration.md) | Runtime configuration via `AppConfig` and an optional TOML file — ports, limits, thread counts, and error handling |
+| [Deployment](deployment.md) | Running Aevox behind Caddy or Nginx for TLS termination, HTTP/2/HTTP/3, forwarded headers, and WebSocket/gRPC boundaries |
 | [JSON](json.md) | Parsing request bodies and building JSON responses with automatic serialization |
 | [Middleware](middleware.md) | Composing interceptors for logging, auth, CORS, and request/response transformation |
 | [Static Files](static-files.md) | Serving read-only application assets with a filesystem root and URL prefix |

@@ -83,5 +83,6 @@ graph TD
 
 - [Getting Started](getting-started.md) — zero to a running TCP echo server in minutes
 - [User Guide](guide/index.md) — step-by-step guide to every framework feature
+- [Deployment](guide/deployment.md) - Caddy and Nginx reverse-proxy setup for TLS, forwarded headers, WebSocket upgrades, and gRPC boundaries
 - [API Reference](api/index.md) — complete symbol reference for all public headers
 - [Architecture Overview](architecture/index.md) — design rationale and layer diagram
