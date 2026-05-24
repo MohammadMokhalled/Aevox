@@ -6,10 +6,10 @@
 # Jobs:
 #   format-check      — clang-format-21 diff over include/ src/ tests/ examples/ (fails PR on violation)
 #   tidy              — clang-tidy-21 check-only via scripts/tidy.sh (fails PR on any warning)
-#   build             — compiler matrix [gcc×2 + clang-linux×2] × [default, release], ctest
-#   asan-test         — GCC 15, CMake asan preset, ASan + UBSan, ctest
-#   asan-test-clang   — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
-#   build-windows     — MSVC 2022 (windows-latest), CMake windows-msvc preset
+#   build             — compiler matrix [gcc×2 + clang-linux×2] × [default-tests, release-tests], ctest
+#   asan-test         — GCC 15, CMake asan-tests preset, ASan + UBSan, ctest
+#   asan-test-clang   — clang 21 (Linux), CMake asan-tests preset, ASan + UBSan, ctest
+#   build-windows     — MSVC 2022 (windows-latest), CMake windows-msvc-tests preset
 #
 # Cache strategy: lukka/run-vcpkg@v11 binary cache keyed on hash of vcpkg.json + compiler id + runner OS.
 #   Separate cache namespaces for gcc, clang-linux, and msvc to prevent ABI-incompatible
@@ -127,14 +127,14 @@ jobs:
         include:
           # GCC 15 — Linux only
           - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
-            preset: default
+            preset: default-tests
           - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
-            preset: release
+            preset: release-tests
           # clang 21 — Linux
           - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
-            preset: default
+            preset: default-tests
           - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
-            preset: release
+            preset: release-tests
 
     steps:
       - name: Check out merge commit
@@ -211,17 +211,17 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
           additionalCacheKey: gcc-Linux
 
-      - name: Configure (asan preset — ASan + UBSan)
-        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+      - name: Configure (asan-tests preset — ASan + UBSan)
+        run: cmake --preset asan-tests -DCMAKE_CXX_COMPILER="$CXX"
         env:
           CC: gcc-15
           CXX: g++-15
 
-      - name: Build (asan preset)
-        run: cmake --build --preset asan
+      - name: Build (asan-tests preset)
+        run: cmake --build --preset asan-tests
 
-      - name: Test (asan preset — ASan + UBSan)
-        run: ctest --preset asan
+      - name: Test (asan-tests preset — ASan + UBSan)
+        run: ctest --preset asan-tests
 
   # ─────────────────────────────────────────────────────────────────────────────
   # ASan + UBSan — clang 21 (Linux), asan CMake preset
@@ -257,17 +257,17 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
           additionalCacheKey: clang-linux-Linux
 
-      - name: Configure (asan preset — ASan + UBSan)
-        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+      - name: Configure (asan-tests preset — ASan + UBSan)
+        run: cmake --preset asan-tests -DCMAKE_CXX_COMPILER="$CXX"
         env:
           CC: clang-21
           CXX: clang++-21
 
-      - name: Build (asan preset)
-        run: cmake --build --preset asan
+      - name: Build (asan-tests preset)
+        run: cmake --build --preset asan-tests
 
-      - name: Test (asan preset — ASan + UBSan)
-        run: ctest --preset asan
+      - name: Test (asan-tests preset — ASan + UBSan)
+        run: ctest --preset asan-tests
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Docs build — validates that MkDocs builds without warnings or errors
@@ -293,7 +293,7 @@ jobs:
         run: mkdocs build --strict
 
   # ─────────────────────────────────────────────────────────────────────────────
-  # Windows — MSVC 2022 (windows-latest), windows-msvc preset (multi-config, debug)
+  # Windows — MSVC 2022 (windows-latest), windows-msvc-tests preset (multi-config, debug)
   # Retained in pr.yml only (not main.yml) because the PR gate catches Windows
   # regressions before merge; re-running on main is redundant (ADD §4.2).
   # ─────────────────────────────────────────────────────────────────────────────
@@ -314,11 +314,11 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
           additionalCacheKey: msvc-Windows
 
-      - name: Configure (windows-msvc preset)
-        run: cmake --preset windows-msvc
+      - name: Configure (windows-msvc-tests preset)
+        run: cmake --preset windows-msvc-tests
 
-      - name: Build Debug (windows-msvc-debug preset)
-        run: cmake --build --preset windows-msvc-debug
+      - name: Build Debug (windows-msvc-tests-debug preset)
+        run: cmake --build --preset windows-msvc-tests-debug
 
-      - name: Test Debug (windows-msvc-debug preset)
-        run: ctest --preset windows-msvc-debug
+      - name: Test Debug (windows-msvc-tests-debug preset)
+        run: ctest --preset windows-msvc-tests-debug

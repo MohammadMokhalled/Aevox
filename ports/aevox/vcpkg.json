@@ -1,0 +1,21 @@
+{
+  "name": "aevox",
+  "version": "0.3.0",
+  "description": "A modern C++23 high-performance web framework",
+  "homepage": "https://github.com/MohammadMokhalled/Aevox",
+  "license": "MIT",
+  "dependencies": [
+    "asio",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    },
+    "llhttp",
+    "tomlplusplus",
+    "glaze"
+  ]
+}

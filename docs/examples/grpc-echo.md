@@ -5,8 +5,8 @@
 Build it with gRPC enabled:
 
 ```bash
-cmake --preset default -DAEVOX_ENABLE_GRPC=ON
-cmake --build --preset default --target grpc-echo
+cmake --preset default-tests -DAEVOX_ENABLE_GRPC=ON
+cmake --build --preset default-tests --target grpc-echo
 ```
 
 The example serves HTTP `/health` on port `8080` and an h2c unary echo method

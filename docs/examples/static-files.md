@@ -10,9 +10,9 @@ Demonstrates `aevox::middleware::static_files()` with an application-owned `publ
 
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
-cmake --preset default
-cmake --build --preset default --target static-files-example
-./build/debug/examples/static-files/static-files-example
+cmake --preset default-tests
+cmake --build --preset default-tests --target static-files-example
+./build/debug-tests/examples/static-files/static-files-example
 ```
 
 The server listens on port 8080. Stop it with `Ctrl-C`.

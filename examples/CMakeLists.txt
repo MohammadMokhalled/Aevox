@@ -1,7 +1,7 @@
 # examples/CMakeLists.txt
 #
 # Example applications demonstrating the Aevox public API.
-# Built as part of the default build — ensures examples always compile against the current API.
+# Built only when AEVOX_BUILD_EXAMPLES=ON.
 # Location convention: examples/{example-name}/main.cpp
 
 add_subdirectory(hello-world)

@@ -9,6 +9,9 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Branch-based release process with `release/X.Y.Z` branches, main alpha versions,
+  release-branch beta versions, stable patch flow, Linux/Windows install validation, and
+  release artifact workflow (AEV-023)
 - Deployment guide for Caddy and Nginx reverse-proxy setups, including TLS termination,
   WebSocket upgrade forwarding, forwarded headers, static asset caching notes, and gRPC boundary
   guidance (AEV-017)
@@ -45,6 +48,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - Default JSON backend: glaze, selectable via `AEVOX_JSON_BACKEND` CMake option (AEV-009)
 
 ### Changed
+- Default CMake builds now build the Aevox library only; tests, benchmarks, and examples are
+  opt-in through CMake options and CI presets (AEV-023)
 - API documentation site coverage now maps every public Aevox header to a navigable MkDocs API
   reference page (AEV-018)
 - Logger API simplified from request-owned `Logger` handles to free functions: use `aevox::log::info(req, "...")` for request-correlated messages and `aevox::log::info("...")` for global messages (AEV-029)

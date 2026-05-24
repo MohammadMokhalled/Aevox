@@ -1,6 +1,6 @@
 # Installation
 
-This page covers everything you need to build Aevox from source: prerequisites, cloning, configuring, building, and verifying with the test suite.
+This page covers building, installing, and consuming Aevox on Linux and Windows.
 
 ## Requirements
 
@@ -24,9 +24,9 @@ export VCPKG_ROOT=$HOME/vcpkg   # adjust if vcpkg is elsewhere
 
 `VCPKG_ROOT` must be set before CMake runs. Aevox uses vcpkg manifest mode: `vcpkg.json` in the repo root lists all dependencies, and CMake installs them automatically during the configure step.
 
-## Configure
+## Configure And Build From Source
 
-Choose the preset that matches your platform and build type.
+The default presets build only the Aevox library. Tests and examples are opt-in.
 
 === "Linux"
     ```bash
@@ -35,7 +35,7 @@ Choose the preset that matches your platform and build type.
 
 === "Windows"
     ```bash
-    cmake --preset windows-msvc-debug
+    cmake --preset windows-msvc
     ```
 
 === "Release"
@@ -43,47 +43,99 @@ Choose the preset that matches your platform and build type.
     cmake --preset release
     ```
 
-The configure step downloads and builds all vcpkg dependencies (Asio, llhttp, Catch2, nanobench). This takes a few minutes on the first run. Subsequent runs are cached.
+The configure step downloads and builds vcpkg dependencies. This takes a few minutes on the first
+run. Subsequent runs are cached.
 
-## Build
+=== "Linux"
+    ```bash
+    cmake --build --preset default
+    ```
 
-```bash
-cmake --build build/debug
-```
+=== "Windows"
+    ```bash
+    cmake --build --preset windows-msvc-release
+    ```
 
-For a release build:
-
-```bash
-cmake --build build/release
-```
+=== "Release"
+    ```bash
+    cmake --build --preset release
+    ```
 
 ## Verify
 
-Run the full test suite to confirm the build is correct:
+Use validation presets when you want tests and examples:
+
+=== "Linux"
+    ```bash
+    cmake --preset default-tests
+    cmake --build --preset default-tests
+    ctest --preset default-tests
+    ```
+
+=== "Windows"
+    ```bash
+    cmake --preset windows-msvc-tests
+    cmake --build --preset windows-msvc-tests-debug
+    ctest --preset windows-msvc-tests-debug
+    ```
+
+Benchmarks are explicit:
 
 ```bash
-ctest --test-dir build/debug --output-on-failure
+cmake --preset release-bench
+cmake --build --preset release-bench
+ctest --preset bench
 ```
 
-All tests should pass. The suite includes unit tests, integration tests (real loopback sockets), and benchmarks.
+## Install
+
+Install the library into a prefix:
+
+=== "Linux"
+    ```bash
+    cmake --preset release
+    cmake --build --preset release
+    cmake --install build/release --prefix "$PWD/build/install/aevox"
+    ```
+
+=== "Windows"
+    ```powershell
+    cmake --preset windows-msvc
+    cmake --build --preset windows-msvc-release
+    cmake --install build/msvc --config Release --prefix "$PWD/build/install/aevox"
+    ```
+
+The install tree contains public headers, the compiled library, and CMake package files under
+`lib/cmake/aevox`.
 
 ## CMake Integration
 
-Aevox does not yet ship an install target or a find-package config. The recommended way to use Aevox as a dependency today is via vcpkg. Add the repository as a vcpkg port or build from source and include the build directory directly.
-
-When a proper install target is added in a future release, the integration will look like:
+Point `CMAKE_PREFIX_PATH` at the install prefix and link the exported target:
 
 ```cmake
 find_package(aevox REQUIRED)
 
 add_executable(my_server main.cpp)
-target_link_libraries(my_server PRIVATE aevox::aevox)
+target_link_libraries(my_server PRIVATE aevox::aevox_core)
 target_compile_features(my_server PRIVATE cxx_std_23)
 ```
 
-Until then, use the source-tree build and link `aevox_core` directly from the build output.
+For a standalone consumer:
+
+=== "Linux"
+    ```bash
+    cmake -S . -B build -DCMAKE_PREFIX_PATH=/path/to/aevox/install
+    cmake --build build
+    ```
+
+=== "Windows"
+    ```powershell
+    cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_PREFIX_PATH=C:/path/to/aevox/install
+    cmake --build build --config Release
+    ```
 
 ## See Also
 
 - [First HTTP Server](first-http-server.md) — write your first working HTTP server after installation
 - [Getting Started](../getting-started.md) — a fast-path guide covering a TCP echo server in minutes
+- [Release Versioning](../contributing/release-versioning.md) — release branch and version format rules

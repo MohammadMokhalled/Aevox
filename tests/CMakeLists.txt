@@ -10,7 +10,10 @@
 # Provides: aevox_tests_unit, aevox_tests_integration, aevox_tests_bench targets.
 
 find_package(Catch2 3 CONFIG REQUIRED)
-find_package(nanobench CONFIG REQUIRED)
+
+if(AEVOX_BUILD_BENCHMARKS)
+    find_package(nanobench CONFIG REQUIRED)
+endif()
 
 include(CTest)
 include(Catch)
@@ -26,4 +29,7 @@ add_subdirectory(smoke)
 add_subdirectory(support)
 add_subdirectory(unit)
 add_subdirectory(integration)
-add_subdirectory(bench)
+
+if(AEVOX_BUILD_BENCHMARKS)
+    add_subdirectory(bench)
+endif()

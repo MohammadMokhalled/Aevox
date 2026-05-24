@@ -15,19 +15,19 @@ self-contained binary under `examples/` in the repository.
 
 ## Building examples
 
-Examples are built as part of the default build:
+Examples are opt-in and are built by the validation presets:
 
 === "Linux"
     ```bash
     export VCPKG_ROOT=$HOME/vcpkg
-    cmake --preset default
-    cmake --build --preset default
+    cmake --preset default-tests
+    cmake --build --preset default-tests
     ```
 
 === "Windows"
     ```bash
-    cmake --preset windows-msvc
-    cmake --build --preset windows-msvc-debug
+    cmake --preset windows-msvc-tests
+    cmake --build --preset windows-msvc-tests-debug
     ```
 
 ---

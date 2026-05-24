@@ -4,9 +4,11 @@
 #
 # Triggers: push to main
 # Jobs:
-#   build           — compiler matrix [gcc×2 + clang-linux×2] × [default, release], ctest
-#   asan-test       — GCC 15, CMake asan preset, ASan + UBSan, ctest
-#   asan-test-clang — clang 21 (Linux), CMake asan preset, ASan + UBSan, ctest
+#   build           — compiler matrix [gcc×2 + clang-linux×2] × [default-tests, release-tests], ctest
+#   asan-test       — GCC 15, CMake asan-tests preset, ASan + UBSan, ctest
+#   asan-test-clang — clang 21 (Linux), CMake asan-tests preset, ASan + UBSan, ctest
+#   install-linux   — default library-only install + external consumer validation
+#   install-windows — default library-only install + external consumer validation
 #
 # NOTE: No format-check or tidy jobs — those run only on PRs (pr.yml).
 # Format and tidy violations are caught before merge; re-checking on main
@@ -16,9 +18,9 @@
 #   Separate cache namespaces for gcc and clang-linux to prevent ABI-incompatible
 #   binary reuse between compilers (ADD §3.4).
 # CMake: installed via system apt (Ubuntu 26.04 ships cmake 3.31+) on Linux.
-# Supported platforms: Linux only (GCC 15, clang 21).
+# Supported platforms: Linux (GCC 15, clang 21) and Windows install validation.
 
-name: Main
+name: ci-tests
 
 on:
   push:
@@ -47,14 +49,14 @@ jobs:
         include:
           # GCC 15 — Linux only
           - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
-            preset: default
+            preset: default-tests
           - compiler: { cc: gcc-15, cxx: g++-15, id: gcc }
-            preset: release
+            preset: release-tests
           # clang 21 — Linux
           - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
-            preset: default
+            preset: default-tests
           - compiler: { cc: clang-21, cxx: clang++-21, id: clang-linux }
-            preset: release
+            preset: release-tests
 
     steps:
       - name: Check out repository
@@ -129,17 +131,17 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
           additionalCacheKey: gcc-Linux
 
-      - name: Configure (asan preset — ASan + UBSan)
-        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+      - name: Configure (asan-tests preset — ASan + UBSan)
+        run: cmake --preset asan-tests -DCMAKE_CXX_COMPILER="$CXX"
         env:
           CC: gcc-15
           CXX: g++-15
 
-      - name: Build (asan preset)
-        run: cmake --build --preset asan
+      - name: Build (asan-tests preset)
+        run: cmake --build --preset asan-tests
 
-      - name: Test (asan preset — ASan + UBSan)
-        run: ctest --preset asan
+      - name: Test (asan-tests preset — ASan + UBSan)
+        run: ctest --preset asan-tests
 
   # ─────────────────────────────────────────────────────────────────────────────
   # ASan + UBSan — clang 21 (Linux), asan CMake preset
@@ -174,14 +176,100 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
           additionalCacheKey: clang-linux-Linux
 
-      - name: Configure (asan preset — ASan + UBSan)
-        run: cmake --preset asan -DCMAKE_CXX_COMPILER="$CXX"
+      - name: Configure (asan-tests preset — ASan + UBSan)
+        run: cmake --preset asan-tests -DCMAKE_CXX_COMPILER="$CXX"
         env:
           CC: clang-21
           CXX: clang++-21
 
-      - name: Build (asan preset)
-        run: cmake --build --preset asan
+      - name: Build (asan-tests preset)
+        run: cmake --build --preset asan-tests
 
-      - name: Test (asan preset — ASan + UBSan)
-        run: ctest --preset asan
+      - name: Test (asan-tests preset — ASan + UBSan)
+        run: ctest --preset asan-tests
+
+  install-linux:
+    name: Install Consumer — Linux
+    runs-on: self-ubuntu26.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install GCC 15, Ninja, and CMake
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build cmake
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: install-linux
+
+      - name: Configure library-only release
+        run: cmake --preset release -DCMAKE_CXX_COMPILER=g++-15
+
+      - name: Build library-only release
+        run: cmake --build --preset release
+
+      - name: Install Aevox
+        run: cmake --install build/release --prefix "$PWD/build/install/aevox"
+
+      - name: Configure external consumer
+        run: >
+          cmake -S tests/smoke/install-consumer -B build/install-consumer -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DCMAKE_PREFIX_PATH="$PWD/build/install/aevox"
+          -DCMAKE_CXX_COMPILER=g++-15
+
+      - name: Build external consumer
+        run: cmake --build build/install-consumer
+
+      - name: Run external consumer
+        run: ./build/install-consumer/aevox_install_consumer
+
+  install-windows:
+    name: Install Consumer — Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: install-windows
+
+      - name: Configure library-only release
+        run: cmake --preset windows-msvc
+
+      - name: Build library-only release
+        run: cmake --build --preset windows-msvc-release
+
+      - name: Install Aevox
+        run: cmake --install build/msvc --config Release --prefix "$PWD/build/install/aevox"
+
+      - name: Configure external consumer
+        run: >
+          cmake -S tests/smoke/install-consumer -B build/install-consumer
+          -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DCMAKE_PREFIX_PATH="$PWD/build/install/aevox"
+
+      - name: Build external consumer
+        run: cmake --build build/install-consumer --config Release
+
+      - name: Run external consumer
+        run: ./build/install-consumer/Release/aevox_install_consumer.exe

@@ -12,9 +12,9 @@ application code.
 
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
-cmake --preset default
-cmake --build --preset default --target hello-world
-./build/debug/examples/hello-world/hello-world
+cmake --preset default-tests
+cmake --build --preset default-tests --target hello-world
+./build/debug-tests/examples/hello-world/hello-world
 ```
 
 The server listens on port 8080. Stop it with `Ctrl-C`.
