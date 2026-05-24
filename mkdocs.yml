@@ -34,6 +34,7 @@ nav:
       - Async Patterns: guide/async-patterns.md
       - Error Handling: guide/error-handling.md
       - Configuration: guide/configuration.md
+      - Deployment: guide/deployment.md
       - Middleware: guide/middleware.md
       - Static Files: guide/static-files.md
       - Logging: guide/logging.md
