@@ -41,6 +41,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Changed
 - Default CMake builds now build the Aevox library only; tests, benchmarks, and examples are
   opt-in through CMake options and CI presets (AEV-023)
+- Contributing documentation now separates general issue, PR, coding, and formatting guidance from
+  detailed release versioning rules (AEV-023)
 - API documentation site coverage now maps every public Aevox header to a navigable MkDocs API
   reference page (AEV-018)
 - WebSocket integration test architecture now requires Aevox-owned deadline-bounded test transport wrappers instead of raw Asio usage in test cases, preserving the no-public-Asio project goal and covering split-frame, close, upgrade, and broadcast scenarios without exposing backend networking details.

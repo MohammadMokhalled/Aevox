@@ -50,6 +50,8 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 ### Changed
 - Default CMake builds now build the Aevox library only; tests, benchmarks, and examples are
   opt-in through CMake options and CI presets (AEV-023)
+- Contributing documentation now separates general issue, PR, coding, and formatting guidance from
+  detailed release versioning rules (AEV-023)
 - API documentation site coverage now maps every public Aevox header to a navigable MkDocs API
   reference page (AEV-018)
 - Logger API simplified from request-owned `Logger` handles to free functions: use `aevox::log::info(req, "...")` for request-correlated messages and `aevox::log::info("...")` for global messages (AEV-029)

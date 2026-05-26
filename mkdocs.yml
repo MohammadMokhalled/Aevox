@@ -77,6 +77,7 @@ nav:
       - gRPC Echo: examples/grpc-echo.md
   - Contributing:
       - Overview: contributing.md
+      - Coding And Formatting: contributing/coding-formatting.md
       - Release Versioning: contributing/release-versioning.md
   - Changelog: changelog.md
 
