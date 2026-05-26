@@ -48,6 +48,7 @@ nav:
       - Coroutines: architecture/coroutines.md
       - Error Model: architecture/error-model.md
       - Layer Diagram: architecture/layer-diagram.md
+      - Release: architecture/release.md
       - Performance: architecture/performance.md
   - API Reference:
       - Overview: api/index.md
@@ -74,6 +75,10 @@ nav:
       - Static Files: examples/static-files.md
       - WebSocket Chat: examples/websocket-chat.md
       - gRPC Echo: examples/grpc-echo.md
+  - Contributing:
+      - Overview: contributing.md
+      - Coding And Formatting: contributing/coding-formatting.md
+      - Release Versioning: contributing/release-versioning.md
   - Changelog: changelog.md
 
 markdown_extensions:

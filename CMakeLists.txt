@@ -10,11 +10,15 @@
 cmake_minimum_required(VERSION 3.27)
 
 project(aevox
-    VERSION 0.1.0
+    VERSION 0.3.0
     DESCRIPTION "A modern C++23 high-performance web framework"
     HOMEPAGE_URL "https://github.com/aevox/aevox"
     LANGUAGES CXX
 )
+
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+include(cmake/aevox_version.cmake)
 
 # ── Language standard ─────────────────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 23)
@@ -67,14 +71,62 @@ set(AEVOX_COMPILE_OPTIONS "${AEVOX_COMPILE_OPTIONS}" CACHE INTERNAL
     "Compiler flags applied privately to all aevox targets")
 
 # ── Optional first-party plugins ──────────────────────────────────────────────
+option(AEVOX_BUILD_TESTS "Build Aevox tests" OFF)
+option(AEVOX_BUILD_EXAMPLES "Build Aevox examples" OFF)
+option(AEVOX_BUILD_BENCHMARKS "Build Aevox benchmarks" OFF)
 option(AEVOX_ENABLE_GRPC "Build the official Aevox gRPC plugin" OFF)
 
 # ── Testing ───────────────────────────────────────────────────────────────────
-# enable_testing() must live here (root) so that `ctest` invoked from the root
-# build directory discovers all registered tests across all subdirectories.
-enable_testing()
+if(AEVOX_BUILD_TESTS OR AEVOX_BUILD_BENCHMARKS)
+    # enable_testing() must live here (root) so that `ctest` invoked from the
+    # root build directory discovers all registered tests across subdirectories.
+    enable_testing()
+endif()
 
 # ── Subdirectories ────────────────────────────────────────────────────────────
 add_subdirectory(src)
-add_subdirectory(tests)
-add_subdirectory(examples)  # always built — examples are the canonical public-API smoke test
+
+if(AEVOX_BUILD_TESTS OR AEVOX_BUILD_BENCHMARKS)
+    add_subdirectory(tests)
+endif()
+
+if(AEVOX_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# ── Installation ──────────────────────────────────────────────────────────────
+install(TARGETS aevox_core
+    EXPORT aevox-targets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(DIRECTORY include/aevox
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    PATTERN ".gitkeep" EXCLUDE
+)
+
+install(EXPORT aevox-targets
+    FILE aevox-targets.cmake
+    NAMESPACE aevox::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aevox
+)
+
+configure_package_config_file(
+    cmake/aevox-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/aevox-config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aevox
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/aevox-config-version.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/aevox-config.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/aevox-config-version.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/aevox
+)

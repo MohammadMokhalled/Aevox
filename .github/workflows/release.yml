@@ -1,0 +1,248 @@
+# .github/workflows/release.yml
+#
+# Aevox Release Pipeline
+#
+# Release branches (`release/X.Y.Z`) validate the release build, install tree,
+# external consumer integration, and archive layout. Version tags (`vX.Y.Z` or
+# `vX.Y.Z-beta.N`) publish the validated artifacts to GitHub Releases.
+
+name: release
+
+on:
+  push:
+    branches:
+      - 'release/**'
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ref:
+    name: Validate Release Ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease_suffix: ${{ steps.version.outputs.prerelease_suffix }}
+      release_name: ${{ steps.version.outputs.release_name }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate branch or tag format
+        id: version
+        shell: bash
+        run: |
+          ref="${GITHUB_REF_NAME}"
+          publish="false"
+          prerelease_suffix=""
+
+          if [[ "${GITHUB_REF_TYPE}" == "branch" ]]; then
+            if [[ ! "$ref" =~ ^release/[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Release branches must be named release/X.Y.Z."
+              exit 1
+            fi
+            version="${ref#release/}"
+            if git rev-parse --verify origin/main >/dev/null 2>&1; then
+              base="$(git merge-base origin/main HEAD)"
+              count="$(git rev-list --count "${base}..HEAD")"
+            else
+              count="$(git rev-list --count HEAD)"
+            fi
+            prerelease_suffix="beta.${count}"
+            release_name="$version-beta.${count}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            if [[ ! "$ref" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-alpha\.[0-9]+|-beta\.[0-9]+)?$ ]]; then
+              echo "::error::Release tags must be vX.Y.Z, vX.Y.Z-alpha.N, or vX.Y.Z-beta.N."
+              exit 1
+            fi
+            raw="${ref#v}"
+            version="${raw%%-*}"
+            git fetch --no-tags origin "+refs/heads/release/*:refs/remotes/origin/release/*"
+            if ! git show-ref --verify --quiet "refs/remotes/origin/release/${version}"; then
+              echo "::error::Tag ${ref} requires a matching release/${version} branch."
+              exit 1
+            fi
+            if ! git branch -r --contains "$GITHUB_SHA" | sed 's/^[* ]*//' | grep -Fx "origin/release/${version}" >/dev/null; then
+              echo "::error::Tag ${ref} must point to a commit on release/${version}."
+              exit 1
+            fi
+            release_name="$raw"
+            publish="true"
+            if [[ "$raw" == *-* ]]; then
+              prerelease_suffix="${raw#*-}"
+            fi
+          else
+            echo "::error::Unsupported ref type: ${GITHUB_REF_TYPE}."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease_suffix=$prerelease_suffix" >> "$GITHUB_OUTPUT"
+          echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+  source-archive:
+    name: Source Archive
+    needs: validate-ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Archive source tree
+        run: >
+          git archive --format=tar.gz
+          --prefix="aevox-${{ needs.validate-ref.outputs.release_name }}/"
+          --output="aevox-${{ needs.validate-ref.outputs.release_name }}-source.tar.gz"
+          HEAD
+
+      - name: Upload source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aevox-${{ needs.validate-ref.outputs.release_name }}-source.tar.gz
+          path: aevox-${{ needs.validate-ref.outputs.release_name }}-source.tar.gz
+          if-no-files-found: error
+
+  package:
+    name: Package — ${{ matrix.name }}
+    needs: validate-ref
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            runner: self-ubuntu26.04
+            artifact: aevox-${{ needs.validate-ref.outputs.release_name }}-linux.tar.gz
+          - name: windows
+            runner: windows-latest
+            artifact: aevox-${{ needs.validate-ref.outputs.release_name }}-windows.zip
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux toolchain
+        if: matrix.name == 'linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y gcc-15 g++-15 ninja-build cmake
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+
+      - name: Set up vcpkg with binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: 'vcpkg.json'
+          additionalCacheKey: release-${{ matrix.name }}
+
+      - name: Configure release (Linux)
+        if: matrix.name == 'linux'
+        run: >
+          cmake --preset release
+          -DCMAKE_CXX_COMPILER=g++-15
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.validate-ref.outputs.prerelease_suffix }}"
+
+      - name: Configure release (Windows)
+        if: matrix.name == 'windows'
+        run: >
+          cmake --preset windows-msvc
+          -DAEVOX_VERSION_PRERELEASE="${{ needs.validate-ref.outputs.prerelease_suffix }}"
+
+      - name: Build release (Linux)
+        if: matrix.name == 'linux'
+        run: cmake --build --preset release
+
+      - name: Build release (Windows)
+        if: matrix.name == 'windows'
+        run: cmake --build --preset windows-msvc-release
+
+      - name: Install Aevox (Linux)
+        if: matrix.name == 'linux'
+        run: cmake --install build/release --prefix "$PWD/dist/aevox"
+
+      - name: Install Aevox (Windows)
+        if: matrix.name == 'windows'
+        run: cmake --install build/msvc --config Release --prefix "$PWD/dist/aevox"
+
+      - name: Configure external consumer (Linux)
+        if: matrix.name == 'linux'
+        run: >
+          cmake -S tests/smoke/install-consumer -B build/install-consumer -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DCMAKE_PREFIX_PATH="$PWD/dist/aevox"
+          -DCMAKE_CXX_COMPILER=g++-15
+
+      - name: Configure external consumer (Windows)
+        if: matrix.name == 'windows'
+        run: >
+          cmake -S tests/smoke/install-consumer -B build/install-consumer
+          -G "Visual Studio 17 2022" -A x64
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+          -DCMAKE_PREFIX_PATH="$PWD/dist/aevox"
+
+      - name: Build external consumer (Linux)
+        if: matrix.name == 'linux'
+        run: cmake --build build/install-consumer
+
+      - name: Build external consumer (Windows)
+        if: matrix.name == 'windows'
+        run: cmake --build build/install-consumer --config Release
+
+      - name: Run external consumer (Linux)
+        if: matrix.name == 'linux'
+        run: ./build/install-consumer/aevox_install_consumer
+
+      - name: Run external consumer (Windows)
+        if: matrix.name == 'windows'
+        run: ./build/install-consumer/Release/aevox_install_consumer.exe
+
+      - name: Archive Linux artifact
+        if: matrix.name == 'linux'
+        run: tar -czf "${{ matrix.artifact }}" -C dist aevox
+
+      - name: Archive Windows artifact
+        if: matrix.name == 'windows'
+        run: Compress-Archive -Path dist/aevox -DestinationPath "${{ matrix.artifact }}"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [validate-ref, source-archive, package]
+    if: needs.validate-ref.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: aevox-*
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Aevox ${{ needs.validate-ref.outputs.release_name }}
+          prerelease: ${{ contains(needs.validate-ref.outputs.release_name, '-') }}
+          files: aevox-*

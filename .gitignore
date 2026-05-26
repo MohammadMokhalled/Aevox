@@ -33,6 +33,8 @@ CPackSourceConfig.cmake
 Makefile
 *.cmake
 !CMakeLists.txt
+!cmake/*.cmake
+!ports/aevox/portfile.cmake
 
 # -----------------------------------------------------------------------------
 # Compiled object files and libraries

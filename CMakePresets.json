@@ -4,7 +4,7 @@
   "configurePresets": [
     {
       "name": "default",
-      "description": "Debug build with all warnings, vcpkg toolchain, compile_commands.json for IDE/Clang-Tidy",
+      "description": "Debug library-only build with all warnings, vcpkg toolchain, compile_commands.json for IDE/Clang-Tidy",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/debug",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
@@ -15,8 +15,18 @@
       }
     },
     {
+      "name": "default-tests",
+      "description": "Debug validation build with tests and examples enabled",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build/debug-tests",
+      "cacheVariables": {
+        "AEVOX_BUILD_TESTS": "ON",
+        "AEVOX_BUILD_EXAMPLES": "ON"
+      }
+    },
+    {
       "name": "release",
-      "description": "Optimised release build with Link-Time Optimisation",
+      "description": "Optimised release library-only build with Link-Time Optimisation",
       "inherits": "default",
       "binaryDir": "${sourceDir}/build/release",
       "cacheVariables": {
@@ -25,8 +35,29 @@
       }
     },
     {
+      "name": "release-tests",
+      "description": "Optimised release validation build with tests and examples enabled",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/release-tests",
+      "cacheVariables": {
+        "AEVOX_BUILD_TESTS": "ON",
+        "AEVOX_BUILD_EXAMPLES": "ON"
+      }
+    },
+    {
+      "name": "release-bench",
+      "description": "Optimised release build with tests, examples, and benchmarks enabled",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/release-bench",
+      "cacheVariables": {
+        "AEVOX_BUILD_TESTS": "ON",
+        "AEVOX_BUILD_EXAMPLES": "ON",
+        "AEVOX_BUILD_BENCHMARKS": "ON"
+      }
+    },
+    {
       "name": "asan",
-      "description": "Debug build with AddressSanitizer + UndefinedBehaviorSanitizer (Linux only)",
+      "description": "Debug library-only build with AddressSanitizer + UndefinedBehaviorSanitizer (Linux only)",
       "inherits": "default",
       "binaryDir": "${sourceDir}/build/asan",
       "cacheVariables": {
@@ -35,8 +66,18 @@
       }
     },
     {
+      "name": "asan-tests",
+      "description": "Debug validation build with tests, examples, AddressSanitizer, and UndefinedBehaviorSanitizer (Linux only)",
+      "inherits": "asan",
+      "binaryDir": "${sourceDir}/build/asan-tests",
+      "cacheVariables": {
+        "AEVOX_BUILD_TESTS": "ON",
+        "AEVOX_BUILD_EXAMPLES": "ON"
+      }
+    },
+    {
       "name": "windows-msvc",
-      "description": "Windows Visual Studio 2022 generator — multi-config, debug/release selected at build time",
+      "description": "Windows Visual Studio 2022 library-only generator — multi-config, debug/release selected at build time",
       "generator": "Visual Studio 17 2022",
       "binaryDir": "${sourceDir}/build/msvc",
       "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
@@ -47,6 +88,16 @@
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
+    },
+    {
+      "name": "windows-msvc-tests",
+      "description": "Windows Visual Studio 2022 validation generator with tests and examples enabled",
+      "inherits": "windows-msvc",
+      "binaryDir": "${sourceDir}/build/msvc-tests",
+      "cacheVariables": {
+        "AEVOX_BUILD_TESTS": "ON",
+        "AEVOX_BUILD_EXAMPLES": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -55,12 +106,28 @@
       "configurePreset": "default"
     },
     {
+      "name": "default-tests",
+      "configurePreset": "default-tests"
+    },
+    {
       "name": "release",
       "configurePreset": "release"
     },
     {
+      "name": "release-tests",
+      "configurePreset": "release-tests"
+    },
+    {
+      "name": "release-bench",
+      "configurePreset": "release-bench"
+    },
+    {
       "name": "asan",
       "configurePreset": "asan"
+    },
+    {
+      "name": "asan-tests",
+      "configurePreset": "asan-tests"
     },
     {
       "name": "windows-msvc-debug",
@@ -71,20 +138,30 @@
       "name": "windows-msvc-release",
       "configurePreset": "windows-msvc",
       "configuration": "Release"
+    },
+    {
+      "name": "windows-msvc-tests-debug",
+      "configurePreset": "windows-msvc-tests",
+      "configuration": "Debug"
+    },
+    {
+      "name": "windows-msvc-tests-release",
+      "configurePreset": "windows-msvc-tests",
+      "configuration": "Release"
     }
   ],
   "testPresets": [
     {
-      "name": "default",
-      "configurePreset": "default",
+      "name": "default-tests",
+      "configurePreset": "default-tests",
       "output": { "outputOnFailure": true },
       "filter": {
         "exclude": { "label": "bench" }
       }
     },
     {
-      "name": "release",
-      "configurePreset": "release",
+      "name": "release-tests",
+      "configurePreset": "release-tests",
       "output": { "outputOnFailure": true },
       "filter": {
         "exclude": { "label": "bench" }
@@ -92,7 +169,7 @@
     },
     {
       "name": "bench",
-      "configurePreset": "release",
+      "configurePreset": "release-bench",
       "description": "Run throughput benchmarks only — use release build for accurate numbers",
       "output": { "outputOnFailure": true },
       "filter": {
@@ -100,16 +177,16 @@
       }
     },
     {
-      "name": "asan",
-      "configurePreset": "asan",
+      "name": "asan-tests",
+      "configurePreset": "asan-tests",
       "output": { "outputOnFailure": true },
       "filter": {
         "exclude": { "label": "bench" }
       }
     },
     {
-      "name": "windows-msvc-debug",
-      "configurePreset": "windows-msvc",
+      "name": "windows-msvc-tests-debug",
+      "configurePreset": "windows-msvc-tests",
       "configuration": "Debug",
       "output": { "outputOnFailure": true },
       "filter": {

@@ -1,0 +1,10 @@
+{
+  "name": "aevox-install-consumer",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "asio",
+    "llhttp",
+    "tomlplusplus",
+    "glaze"
+  ]
+}

@@ -10,9 +10,9 @@ Demonstrates how to write, register, and compose middleware in Aevox. Two middle
 
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
-cmake --preset default
-cmake --build --preset default --target middleware-plugin
-./build/debug/examples/middleware-plugin/middleware-plugin
+cmake --preset default-tests
+cmake --build --preset default-tests --target middleware-plugin
+./build/debug-tests/examples/middleware-plugin/middleware-plugin
 ```
 
 The server listens on port 8080. Stop it with `Ctrl-C`.

@@ -10,20 +10,20 @@ Demonstrates `App::create()` with an optional TOML configuration file. Every fie
 
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
-cmake --preset default
-cmake --build --preset default --target configured-server
+cmake --preset default-tests
+cmake --build --preset default-tests --target configured-server
 ```
 
 Run with defaults (no file):
 
 ```bash
-./build/debug/examples/configured-server/configured-server
+./build/debug-tests/examples/configured-server/configured-server
 ```
 
 Run with a TOML file:
 
 ```bash
-./build/debug/examples/configured-server/configured-server examples/configured-server/aevox.toml
+./build/debug-tests/examples/configured-server/configured-server examples/configured-server/aevox.toml
 ```
 
 ---

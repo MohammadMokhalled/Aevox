@@ -10,9 +10,9 @@ Minimal WebSocket chat example demonstrating room-based broadcast with Aevox. Mu
 
 ```bash
 export VCPKG_ROOT=$HOME/vcpkg
-cmake --preset default
-cmake --build --preset default --target websocket-chat
-./build/debug/examples/websocket-chat/websocket-chat
+cmake --preset default-tests
+cmake --build --preset default-tests --target websocket-chat
+./build/debug-tests/examples/websocket-chat/websocket-chat
 ```
 
 The server listens on port 8080. Stop it with `Ctrl-C`.

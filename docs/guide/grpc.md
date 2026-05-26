@@ -8,8 +8,8 @@ the HTTP/1.1 app listener, keeping native HTTP/2 out of the core framework.
 Configure with the gRPC feature enabled:
 
 ```bash
-cmake --preset default -DAEVOX_ENABLE_GRPC=ON
-cmake --build --preset default --target aevox_grpc_plugin
+cmake --preset default-tests -DAEVOX_ENABLE_GRPC=ON
+cmake --build --preset default-tests --target aevox_grpc_plugin
 ```
 
 Applications link both `aevox_core` and `aevox_grpc_plugin`.
@@ -17,7 +17,7 @@ Applications link both `aevox_core` and `aevox_grpc_plugin`.
 Enable the matching vcpkg feature when configuring with vcpkg manifest features:
 
 ```bash
-cmake --preset default -DAEVOX_ENABLE_GRPC=ON -DVCPKG_MANIFEST_FEATURES=grpc
+cmake --preset default-tests -DAEVOX_ENABLE_GRPC=ON -DVCPKG_MANIFEST_FEATURES=grpc
 ```
 
 ## Unary Method

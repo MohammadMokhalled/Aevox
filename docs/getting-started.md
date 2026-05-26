@@ -32,20 +32,20 @@ Configure and build:
 
 === "Linux (GCC 13)"
     ```bash
-    cmake --preset default
-    cmake --build build/debug
+    cmake --preset default-tests
+    cmake --build --preset default-tests
     ```
 
 === "Windows (MSVC)"
     ```bash
-    cmake --preset windows-msvc-debug
-    cmake --build --preset windows-msvc-debug
+    cmake --preset windows-msvc-tests
+    cmake --build --preset windows-msvc-tests-debug
     ```
 
 Verify everything works:
 
 ```bash
-ctest --test-dir build/debug --output-on-failure
+ctest --preset default-tests
 ```
 
 ---

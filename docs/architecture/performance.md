@@ -21,7 +21,7 @@ llhttp, glaze, fmtlib, and Catch2 types.
 
 | Invariant | Enforcement |
 |---|---|
-| Benchmarks run from a release build | Use `cmake --preset release` and `ctest --preset bench` |
+| Benchmarks run from a release build | Use `cmake --preset release-bench` and `ctest --preset bench` |
 | Every benchmark is discoverable | Each executable is registered with CTest label `bench` |
 | Public API stays benchmark-free | Benchmark helpers live under `tests/support/` |
 | Networking benchmarks use real loopback I/O | HTTP and executor benchmarks use standalone Asio clients in `tests/bench/` |
@@ -62,15 +62,15 @@ flowchart TD
 Use a release build for useful numbers:
 
 ```bash
-cmake --preset release
-cmake --build --preset release --target aevox_tests_bench
+cmake --preset release-bench
+cmake --build --preset release-bench --target aevox_tests_bench
 ctest --preset bench
 ```
 
 For the helper unit tests:
 
 ```bash
-ctest --preset release -R "Benchmark stats" --output-on-failure
+ctest --preset release-tests -R "Benchmark stats" --output-on-failure
 ```
 
 ## Benchmark Map
